@@ -16,7 +16,7 @@ export default function SignUpPage() {
   const handleGoogleSignUp = async () => {
     await signIn.social({
       provider: "google",
-      callbackURL: "/map",
+      callbackURL: "/",
     });
   };
 
@@ -35,7 +35,7 @@ export default function SignUpPage() {
       name,
       email,
       password,
-      callbackURL: "/map",
+      callbackURL: "/",
     });
 
     if (error) {

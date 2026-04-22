@@ -1,0 +1,204 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useSession, signOut } from "@/lib/auth-client";
+
+export default function Header() {
+  const pathname = usePathname();
+  const { data: session } = useSession();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // Hide header on auth pages
+  const authPages = [
+    "/sign-in",
+    "/sign-up",
+    "/verify-email",
+    "/forgot-password",
+    "/reset-password",
+  ];
+
+  if (authPages.includes(pathname)) return null;
+
+  const handleSignOut = async () => {
+    await signOut();
+    setMenuOpen(false);
+  };
+
+  return (
+    <>
+      {/* Header Bar */}
+      <header className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-50">
+        <div className="flex items-center justify-between px-4 py-3 max-w-lg mx-auto">
+
+          {/* Logo */}
+          <Link
+            href="/"
+            className="text-lg font-medium"
+          >
+            Vendor Maps
+          </Link>
+
+          {/* Hamburger Button */}
+          <button
+            onClick={() => setMenuOpen(true)}
+            className="p-2 rounded-lg hover:bg-gray-100 transition"
+            aria-label="Open menu"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="6" x2="21" y2="6"/>
+              <line x1="3" y1="12" x2="21" y2="12"/>
+              <line x1="3" y1="18" x2="21" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      {/* Overlay */}
+      {menuOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-40 z-50"
+          onClick={() => setMenuOpen(false)}
+        />
+      )}
+
+      {/* Slide Out Menu */}
+      <div className={`fixed top-0 right-0 h-full w-72 bg-white z-50 shadow-xl transform transition-transform duration-300 ${menuOpen ? "translate-x-0" : "translate-x-full"}`}>
+
+        {/* Menu Header */}
+        <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
+          <span className="font-medium">Menu</span>
+          <button
+            onClick={() => setMenuOpen(false)}
+            className="p-2 rounded-lg hover:bg-gray-100 transition"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+
+        {/* Menu Links */}
+        <div className="flex flex-col py-4">
+
+          {/* Main Links */}
+          <MenuLink
+            href="/resources"
+            onClick={() => setMenuOpen(false)}
+            icon={
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+              </svg>
+            }
+          >
+            Resources
+          </MenuLink>
+
+          <MenuLink
+            href="/about"
+            onClick={() => setMenuOpen(false)}
+            icon={
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+            }
+          >
+            About
+          </MenuLink>
+
+          <MenuLink
+            href="/contact"
+            onClick={() => setMenuOpen(false)}
+            icon={
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+            }
+          >
+            Contact
+          </MenuLink>
+
+          {/* Divider */}
+          <div className="h-px bg-gray-100 my-3 mx-4" />
+
+          {/* Owner Links — only if logged in */}
+          {session && (
+            <>
+              <MenuLink
+                href="/my-listings"
+                onClick={() => setMenuOpen(false)}
+                icon={
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                    <polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                }
+              >
+                My Listings
+              </MenuLink>
+
+              <MenuLink
+                href="/my-claims"
+                onClick={() => setMenuOpen(false)}
+                icon={
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                    <polyline points="22 4 12 14.01 9 11.01"/>
+                  </svg>
+                }
+              >
+                My Claims
+              </MenuLink>
+
+              {/* Divider */}
+              <div className="h-px bg-gray-100 my-3 mx-4" />
+
+              {/* Sign Out */}
+              <button
+                onClick={handleSignOut}
+                className="flex items-center gap-3 px-4 py-3 text-red-500 hover:bg-red-50 transition text-sm"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                  <polyline points="16 17 21 12 16 7"/>
+                  <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+                Sign out
+              </button>
+            </>
+          )}
+
+        </div>
+      </div>
+    </>
+  );
+}
+
+// Reusable menu link component
+function MenuLink({
+  href,
+  onClick,
+  icon,
+  children,
+}: {
+  href: string;
+  onClick: () => void;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-gray-50 transition"
+    >
+      <span className="text-gray-500">{icon}</span>
+      {children}
+    </Link>
+  );
+}
