@@ -29,17 +29,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {/* Top header */}
         <HeaderWrapper />
-
-        {/* Page content */}
-        {/* pt-14 clears the fixed header */}
-        {/* pb-20 clears the fixed bottom nav */}
         <main className="pt-14 pb-20">
           {children}
         </main>
-
-        {/* Bottom navigation */}
         <BottomNavWrapper />
       </body>
     </html>
