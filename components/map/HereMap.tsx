@@ -1,7 +1,32 @@
 "use client";
 
-import { get } from "http";
 import { useEffect, useRef } from "react";
+import { getIconBase64 } from "@/lib/getIconBase64";
+
+const CATEGORY_ICONS: Record<string, string> = {
+  "Food":             "food",
+  "Coffee":           "cafe",
+  "Candy":            "candy",
+  "Fresh Fruit":      "fruits",
+  "Beverages":        "beverages",
+  "Flowers":          "flowers",
+  "Desserts":         "desserts",
+  "Other":            "other",
+  "Personal Care":    "personal-care",
+  "Wellness":         "wellness",
+  "Fitness":          "fitness",
+  "Event Services":   "event-services",
+  "Custom Designs":   "custom-design",
+  "Handmade":         "handmade",
+  "Event":            "event",
+  "Merchandise":      "merchandise",
+  "General Services": "general-services",
+  "Apparel":          "apparel",
+  "Event Space":      "event-space",
+  "Collectables":     "collectables",
+  "Jewelry":          "jewelry",
+  "Art":              "art",
+};
 
 const loadScript = (src: string): Promise<void> => {
   return new Promise((resolve, reject) => {
@@ -13,17 +38,43 @@ const loadScript = (src: string): Promise<void> => {
     script.src = src;
     script.type = "text/javascript";
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error(`Failed to load: ${src}`));
+    script.onerror = () => reject(
+      new Error(`Failed to load: ${src}`)
+    );
     document.head.appendChild(script);
   });
+};
+
+const loadCSS = (href: string): void => {
+  if (document.querySelector(`link[href="${href}"]`)) return;
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = href;
+  document.head.appendChild(link);
 };
 
 const wait = (ms: number) =>
   new Promise(resolve => setTimeout(resolve, ms));
 
-export default function HereMap() {
+interface HereMapProps {
+  onMarkerTap: (location: any) => void;
+}
+
+export default function HereMap({ onMarkerTap }: HereMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
+
+  const getMarkerColor = (
+    type: string,
+    subType: string
+  ): string | null => {
+    if (subType === "street_vendor") return "#E63946";
+    if (subType === "food_truck")    return "#1B4FE4";
+    if (subType === "home_based")    return "#7B2D8B";
+    if (subType === "pop_up")        return "#FF006E";
+    if (subType === "market")        return "#2D6A4F";
+    return null;
+  };
 
   const addMarkers = async (H: any, map: any) => {
     try {
@@ -31,49 +82,32 @@ export default function HereMap() {
       const { locations } = await res.json();
 
       if (!locations || locations.length === 0) {
-        console.log("No locations to display");
+        console.log("No locations found");
         return;
       }
 
-      // Color by sub_type
-      const getMarkerColor = (
-        type: string,
-        subType: string
-      ): string | null => {
-        
-        // Shown on map
-        if (subType === "street_vendor") return "#E63946";
-        if (subType === "food_truck") return "#1B4FE4";
-        if (subType === "home_based") return "#7B2D8B";
-        if (subType === "pop_up") return "#FF006E"
-        if (subType === "market") return "#2D6A4F";
-
-        // Not Shown on map: 
-        // shipping only, catering only, market_based, pop_up based
-        return null;
-      };
-
-      locations.forEach((location: any) => {
+      for (const location of locations) {
         const color = getMarkerColor(
-          location.type, 
+          location.type,
           location.sub_type
         );
 
-        if (!color) return;
+        if (!color) continue;
 
-        const svgMarkup = `
-          <svg width="40" height="40" viewBox="0 0 40 40"
-            xmlns="http://www.w3.org/2000/svg">
-            <circle cx="20" cy="20" r="18" fill="${color}" stroke="#fff" stroke-width="3"/>
-          </svg>
-        `;
+        const iconFile =
+          CATEGORY_ICONS[location.category] || "other";
+
+        const base64Icon = await getIconBase64(iconFile);
+
+        const svgMarkup = `<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><circle cx="20" cy="20" r="18" fill="${color}" stroke="white" stroke-width="3"/><image href="${base64Icon}" x="10" y="10" width="20" height="20"/></svg>`;
 
         const icon = new H.map.Icon(
           `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`,
-          { size: { w: 40, h: 40 },
-            anchor: { x: 20, y: 20 } 
+          {
+            size: { w: 40, h: 40 },
+            anchor: { x: 20, y: 20 },
           }
-      );
+        );
 
         const marker = new H.map.Marker(
           { lat: location.lat, lng: location.lng },
@@ -82,115 +116,18 @@ export default function HereMap() {
 
         marker.setData(location);
 
+        // Pass location data to parent via onMarkerTap
         marker.addEventListener("tap", (evt: any) => {
-          const data = evt.target.getData();
-          showPopup(H, map, data);
+          onMarkerTap(evt.target.getData());
         });
 
         map.addObject(marker);
-
-       console.log(`Added ${locations.length} markers`);
-      });
-
-      console.log(`Added ${locations.length} markers`);
+        console.log(`Marker added: ${location.name}`);
+      }
 
     } catch (error) {
       console.error("Error adding markers:", error);
     }
-  };
-
-  const showPopup = (H: any, map: any, location: any) => {
-    // Remove existing popups
-    map.getObjects().forEach((obj: any) => {
-      if (obj instanceof H.map.DomMarker) {
-        map.removeObject(obj);
-      }
-    });
-
-    const priceTier = "$".repeat(location.price_tier || 1);
-
-    const popupEl = document.createElement("div");
-    popupEl.innerHTML = `
-      <div style="
-        background: white;
-        border-radius: 12px;
-        padding: 12px;
-        width: 200px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-        font-family: sans-serif;
-        position: relative;
-      ">
-        <button onclick="this.parentElement.parentElement.remove()" style="
-          position: absolute;
-          top: 8px;
-          right: 8px;
-          background: none;
-          border: none;
-          cursor: pointer;
-          font-size: 16px;
-          color: #999;
-          line-height: 1;
-        ">×</button>
-        <p style="
-          font-size: 13px;
-          font-weight: 600;
-          margin: 0 0 4px;
-          padding-right: 20px;
-          color: #111;
-        ">${location.name}</p>
-        <p style="
-          font-size: 11px;
-          color: #666;
-          margin: 0 0 4px;
-        ">${location.category || ""}</p>
-        <div style="
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          margin-bottom: 8px;
-        ">
-          <span style="font-size: 11px; color: #666;">
-            ${priceTier}
-          </span>
-          ${location.avg_rating > 0 ? `
-            <span style="font-size: 11px; color: #666;">
-              ★ ${Number(location.avg_rating).toFixed(1)}
-              (${location.review_count})
-            </span>
-          ` : ""}
-        </div>
-        <p style="
-          font-size: 11px;
-          color: #888;
-          margin: 0 0 10px;
-        ">${location.neighborhood || location.city}</p>
-        <a href="/businesses/${location.id}" style="
-          display: block;
-          background: #111;
-          color: white;
-          text-align: center;
-          padding: 8px;
-          border-radius: 8px;
-          font-size: 12px;
-          text-decoration: none;
-        ">View Business</a>
-      </div>
-    `;
-
-    const popup = new H.map.DomMarker(
-      { lat: location.lat, lng: location.lng },
-      {
-        element: popupEl,
-        anchor: { x: 100, y: 220 },
-      }
-    );
-
-    map.addObject(popup);
-
-    map.setCenter(
-      { lat: location.lat, lng: location.lng },
-      true
-    );
   };
 
   useEffect(() => {
@@ -198,6 +135,10 @@ export default function HereMap() {
 
     const initMap = async () => {
       try {
+        loadCSS(
+          "https://js.api.here.com/v3/3.1/mapsjs-ui.css"
+        );
+
         await loadScript(
           "https://js.api.here.com/v3/3.1/mapsjs-core.js"
         );
@@ -225,10 +166,13 @@ export default function HereMap() {
           return;
         }
 
-        // Positron style
         const positronLayer = new H.map.layer.TileLayer(
           new H.map.provider.ImageTileProvider({
-            getURL: (col: number, row: number, zoom: number) => {
+            getURL: (
+              col: number,
+              row: number,
+              zoom: number
+            ) => {
               return `https://a.basemaps.cartocdn.com/light_all/${zoom}/${col}/${row}@2x.png`;
             },
             min: 0,
@@ -238,7 +182,6 @@ export default function HereMap() {
           })
         );
 
-        // Initialize map
         const map = new H.Map(
           mapRef.current,
           positronLayer,
@@ -249,18 +192,15 @@ export default function HereMap() {
           }
         );
 
-        // Enable interaction
         const mapEvents = new H.mapevents.MapEvents(map);
         new H.mapevents.Behavior(mapEvents);
 
-        // Handle resize
         window.addEventListener("resize", () => {
           map.getViewPort().resize();
         });
 
         mapInstance.current = map;
 
-        // Add markers after map is ready
         await addMarkers(H, map);
 
         console.log("HERE Maps initialized");
