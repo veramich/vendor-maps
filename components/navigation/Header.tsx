@@ -35,7 +35,7 @@ export default function Header() {
           {/* Logo */}
           <Link
             href="/"
-            className="text-lg font-medium"
+            className="text-lg font-medium text-black"
           >
             Vendor Maps
           </Link>
