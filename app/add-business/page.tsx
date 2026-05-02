@@ -10,6 +10,10 @@ import Step1Type from "@/components/forms/add-business/Step1Type";
 import Step2SubType from "@/components/forms/add-business/Step2SubType";
 import Step3Location from "@/components/forms/add-business/Step3Location";
 import ConfirmationScreen from "@/components/forms/add-business/ConfirmationScreen";
+import Step4Info from "@/components/forms/add-business/Step4Info";
+import Step5Details from "@/components/forms/add-business/Step5Details";
+import Step6Media from "@/components/forms/add-business/Step6Media";
+import Step7Review from "@/components/forms/add-business/Step7Review";
 
 export default function AddBusinessPage() {
   const router = useRouter();
@@ -195,7 +199,34 @@ export default function AddBusinessPage() {
             nextStep={nextStep}
           />
         )}
-      </div>
+        {step === 4 && (
+        <Step4Info
+          formData={formData}
+          updateForm={updateForm}
+          nextStep={nextStep}
+        />
+      )}
+      {step === 5 && (
+      <Step5Details
+        formData={formData}
+        updateForm={updateForm}
+        nextStep={nextStep}
+      />
+    )}
+    {step === 6 && (
+      <Step6Media
+        formData={formData}
+        updateForm={updateForm}
+        nextStep={nextStep}
+      />
+    )}
+    {step === 7 && (
+      <Step7Review
+        formData={formData}
+        onSubmit={handleSubmit}
+      />
+    )}
     </div>
+  </div>
   );
 }

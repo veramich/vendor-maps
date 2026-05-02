@@ -27,6 +27,7 @@ export type BusinessCategory =
   | "Merchandise"
   | "General Services"
   | "Apparel"
+  | "Produce"
   | "Event Space"
   | "Collectables"
   | "Jewelry"
@@ -124,6 +125,7 @@ export type BusinessFormData = {
   locationAmenities:  string[];
   // hours (small business)
   hours:              BusinessHours[];
+  hoursSubjectToChange:   boolean;
   // schedule (market)
   marketSchedules:    MarketSchedule[];
   // event (pop_up)
@@ -175,6 +177,7 @@ export const INITIAL_FORM_DATA: BusinessFormData = {
   businessAmenities: [],
   locationAmenities: [],
   hours:            [],
+  hoursSubjectToChange: false,
   marketSchedules:  [],
   popUpEvent:       null,
   vendorSpace:      null,
@@ -241,13 +244,15 @@ export const PAYMENT_OPTIONS = [
   "Venmo",
   "Zelle",
   "CashApp",
-  "Check",
+  "Tap to Pay"
 ];
 
 export const ORDERING_METHODS = [
   "Walk Up",
   "Online Order",
   "Phone Order",
+  "Text to Order",
+  "Direct Message to Order",
   "App Order",
   "Advance Order",
   "Catering Request",
@@ -265,11 +270,10 @@ export const DIETARY_OPTIONS = [
 ];
 
 export const LOCATION_AMENITIES = [
-  "Parking",
+  "Parking Lot",
   "Street Parking",
   "ADA Accessible",
   "Outdoor Seating",
-  "Indoor Seating",
   "Restrooms Nearby",
   "Dog Friendly",
   "Covered Area",
@@ -288,38 +292,54 @@ export const BUSINESS_AMENITIES = [
 
 // Vendor types for markets
 export const VENDOR_TYPES = [
-  "Food",
-  "Craft",
-  "Beverage",
-  "Clothing",
+  "Apparel",
   "Art",
-  "Wellness",
+  "Beverages",
+  "Candy",
+  "Coffee",
+  "Collectables",
+  "Custom Designs",
+  "Desserts",
+  "Event",
+  "Event Services",
+  "Event Space",
+  "Fitness",
+  "Flowers",
+  "Food",
+  "Fresh Fruit",
+  "General Services",
+  "Handmade",
   "Jewelry",
+  "Merchandise",
+  "Personal Care",
   "Produce",
+  "Wellness",
+  "Other",
 ];
 
 // Categories
 export const CATEGORIES: BusinessCategory[] = [
-  "Food",
-  "Coffee",
-  "Candy",
-  "Fresh Fruit",
-  "Beverages",
-  "Flowers",
-  "Desserts",
-  "Personal Care",
-  "Wellness",
-  "Fitness",
-  "Event Services",
-  "Custom Designs",
-  "Handmade",
-  "Event",
-  "Merchandise",
-  "General Services",
   "Apparel",
-  "Event Space",
-  "Collectables",
-  "Jewelry",
   "Art",
+  "Beverages",
+  "Candy",
+  "Coffee",
+  "Collectables",
+  "Custom Designs",
+  "Desserts",
+  "Event",
+  "Event Services",
+  "Event Space",
+  "Fitness",
+  "Flowers",
+  "Food",
+  "Fresh Fruit",
+  "General Services",
+  "Handmade",
+  "Jewelry",
+  "Merchandise",
+  "Personal Care",
+  "Produce",
+  "Wellness",
   "Other",
 ];
