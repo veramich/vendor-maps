@@ -8,17 +8,6 @@ export default function BottomNav() {
   const pathname = usePathname();
   const { data: session } = useSession();
 
-  // Hide bottom nav on auth pages
-  const authPages = [
-    "/sign-in",
-    "/sign-up",
-    "/verify-email",
-    "/forgot-password",
-    "/reset-password",
-  ];
-
-  if (authPages.includes(pathname)) return null;
-
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
       <div className="flex items-center justify-around px-2 py-2 max-w-lg mx-auto">

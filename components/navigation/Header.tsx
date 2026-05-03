@@ -10,17 +10,6 @@ export default function Header() {
   const { data: session } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Hide header on auth pages
-  const authPages = [
-    "/sign-in",
-    "/sign-up",
-    "/verify-email",
-    "/forgot-password",
-    "/reset-password",
-  ];
-
-  if (authPages.includes(pathname)) return null;
-
   const handleSignOut = async () => {
     await signOut();
     setMenuOpen(false);

@@ -8,10 +8,14 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const res = await fetch(
-      `https://autocomplete.search.hereapi.com/v1/autocomplete?q=${encodeURIComponent(q)}&in=countryCode:USA&limit=5&apiKey=${process.env.HERE_API_KEY}`
-    );
+    const url = `https://autocomplete.search.hereapi.com/v1/autocomplete?q=${encodeURIComponent(q)}&in=countryCode:USA&limit=5&apiKey=${process.env.HERE_API_KEY}`;
+
+    console.log("HERE URL:", url);
+
+    const res = await fetch(url);
     const data = await res.json();
+
+    console.log("HERE Response:", JSON.stringify(data));
 
     const suggestions = data.items?.map((item: any) => ({
       id:      item.id,

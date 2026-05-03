@@ -81,10 +81,44 @@ export default function AddBusinessPage() {
   };
 
   const handleSubmit = async () => {
-    setSubmittedName(formData.name);
-    setShowConfirmation(true);
-  };
+  const formDataToSend = new FormData();
 
+  // Add JSON data
+  formDataToSend.append(
+    "data",
+    JSON.stringify({
+      ...formData,
+      images: [], // images sent separately
+    })
+  );
+
+  // Add logo
+  if (formData.logoUrl) {
+    const logoResponse = await fetch(formData.logoUrl);
+    const logoBlob = await logoResponse.blob();
+    formDataToSend.append("logo", logoBlob, "logo.jpg");
+  }
+
+  // Add images
+  formData.images.forEach((image, index) => {
+    formDataToSend.append(`image_${index}`, image);
+  });
+
+  const res = await fetch("/api/businesses/submit", {
+    method: "POST",
+    body: formDataToSend,
+  });
+
+  const result = await res.json();
+
+  if (!result.success) {
+    throw new Error(result.error || "Submission failed");
+  }
+
+  setSubmittedName(formData.name);
+  setCurrentBrandId(result.businessId);
+  setShowConfirmation(true);
+};
   const handleAnotherLocation = () => {
     setFormData({
       ...INITIAL_FORM_DATA,

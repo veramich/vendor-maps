@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import BottomNavWrapper from "@/components/navigation/BottomNavWrapper";
 import HeaderWrapper from "@/components/navigation/HeaderWrapper";
+import ConstructionBannerWrapper from "@/components/ui/ConstructionBannerDynamic";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,8 +30,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <ConstructionBannerWrapper />
         <HeaderWrapper />
-        <main className="pt-14 pb-20">
+        <main className="pt-24 pb-20">
           {children}
         </main>
         <BottomNavWrapper />
