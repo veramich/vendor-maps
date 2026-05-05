@@ -5,6 +5,7 @@ import BottomNavWrapper from "@/components/navigation/BottomNavWrapper";
 import HeaderWrapper from "@/components/navigation/HeaderWrapper";
 import ConstructionBannerWrapper from "@/components/ui/ConstructionBannerDynamic";
 
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -18,6 +19,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Vendor Maps",
   description: "Find local vendors, markets and pop-ups near you",
+  icons: {
+    icon: "/favicon.png",
+  },
 };
 
 export default function RootLayout({
