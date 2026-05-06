@@ -505,7 +505,7 @@ export default function Step3Location({
               </svg>
               <p className="text-xs text-gray-500">
                 Only cross streets are shown publicly.
-                Your exact location stays private.
+                The exact location stays private until the confirmed business owner adds their exact address.
               </p>
             </div>
           </div>
