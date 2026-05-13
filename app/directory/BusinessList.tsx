@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 type Business = {
   id: string;
+  slug: string;
   name: string;
   category: string;
   sub_type: string;
@@ -83,7 +84,7 @@ function BusinessCard({ business }: { business: Business }) {
 
   return (
     <a
-      href={`/businesses/${business.id}`}
+      href={`/${business.slug || business.id}`}
       className="block border border-gray-100 rounded-2xl
         p-4 hover:border-gray-200 transition
         active:scale-99"

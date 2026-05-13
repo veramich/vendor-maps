@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { uploadImage } from "@/lib/utils/uploadImage";
 import { buildSocialUrls } from "@/lib/utils/buildSocialUrls";
+import { generateSlug } from "@/lib/utils/generateSlug";
+
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,6 +13,9 @@ export async function POST(req: NextRequest) {
     const data = JSON.parse(
       formData.get("data") as string
     );
+
+    // Generate slug
+    const slug = await generateSlug(data.name, data.city, data.neighborhood);
 
     // Get IP for spam prevention
     const ip = req.headers.get("x-forwarded-for")
@@ -288,6 +293,13 @@ export async function POST(req: NextRequest) {
         )
       `;
     }
+
+    // Update business with slug  
+    await sql`
+      UPDATE businesses
+      SET slug = ${slug}
+      WHERE id = ${businessId}
+    `;
 
     return NextResponse.json({
       success: true,

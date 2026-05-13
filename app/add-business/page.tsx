@@ -81,44 +81,57 @@ export default function AddBusinessPage() {
   };
 
   const handleSubmit = async () => {
-  const formDataToSend = new FormData();
+  try {
+    const formDataToSend = new FormData();
 
-  // Add JSON data
-  formDataToSend.append(
-    "data",
-    JSON.stringify({
-      ...formData,
-      images: [], // images sent separately
-    })
-  );
+    formDataToSend.append(
+      "data",
+      JSON.stringify({
+        ...formData,
+        images: [],
+      })
+    );
 
-  // Add logo
-  if (formData.logoUrl) {
-    const logoResponse = await fetch(formData.logoUrl);
-    const logoBlob = await logoResponse.blob();
-    formDataToSend.append("logo", logoBlob, "logo.jpg");
+    // Add logo if it's a data URI
+    if (
+      formData.logoUrl &&
+      formData.logoUrl.startsWith("data:")
+    ) {
+      const logoBlob = await fetch(formData.logoUrl)
+        .then(r => r.blob());
+      formDataToSend.append(
+        "logo", logoBlob, "logo.jpg"
+      );
+    }
+
+    // Add images
+    formData.images.forEach((image, index) => {
+      formDataToSend.append(`image_${index}`, image);
+    });
+
+    const res = await fetch("/api/businesses/submit", {
+      method: "POST",
+      body: formDataToSend,
+    });
+
+    const result = await res.json();
+
+    if (!result.success) {
+      throw new Error(
+        result.error || "Submission failed"
+      );
+    }
+
+    setSubmittedName(formData.name);
+    setCurrentBrandId(result.businessId);
+    setShowConfirmation(true);
+
+  } catch (error) {
+    console.error("Submission error:", error);
+    throw error;
   }
-
-  // Add images
-  formData.images.forEach((image, index) => {
-    formDataToSend.append(`image_${index}`, image);
-  });
-
-  const res = await fetch("/api/businesses/submit", {
-    method: "POST",
-    body: formDataToSend,
-  });
-
-  const result = await res.json();
-
-  if (!result.success) {
-    throw new Error(result.error || "Submission failed");
-  }
-
-  setSubmittedName(formData.name);
-  setCurrentBrandId(result.businessId);
-  setShowConfirmation(true);
 };
+
   const handleAnotherLocation = () => {
     setFormData({
       ...INITIAL_FORM_DATA,

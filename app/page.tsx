@@ -105,7 +105,7 @@ export default function MapPage() {
             </p>
 
             
-            < a href={`/businesses/${popup.id}`}
+            <a href={`/${popup.slug || popup.id}`}
               style={{
                 display: "block",
                 background: "#111",

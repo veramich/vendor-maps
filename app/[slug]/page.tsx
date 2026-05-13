@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import sql from "@/lib/db";
 import Link from "next/link";
 
-async function getBusiness(id: string) {
+async function getBusinessBySlug(slug: string) {
   try {
     const result = await sql`
       SELECT
@@ -27,7 +27,7 @@ async function getBusiness(id: string) {
         ON l.business_id = b.id
       LEFT JOIN brands br
         ON br.id = b.brand_id
-      WHERE b.id = ${id}
+      WHERE b.slug = ${slug}
       AND b.status = 'listed'
     `;
 
@@ -38,14 +38,14 @@ async function getBusiness(id: string) {
     const images = await sql`
       SELECT *
       FROM business_images
-      WHERE business_id = ${id}
+      WHERE business_id = ${business.id}
       ORDER BY is_primary DESC, display_order ASC
     `;
 
     const hours = await sql`
       SELECT *
       FROM business_hours
-      WHERE business_id = ${id}
+      WHERE business_id = ${business.id}
       ORDER BY
         CASE day_of_week
           WHEN 'monday'    THEN 1
@@ -61,7 +61,7 @@ async function getBusiness(id: string) {
     const schedules = await sql`
       SELECT *
       FROM market_schedules
-      WHERE business_id = ${id}
+      WHERE business_id = ${business.id}
     `;
 
     const popupResult = await sql`
@@ -69,7 +69,7 @@ async function getBusiness(id: string) {
         lower(event_range) as start_time,
         upper(event_range) as end_time
       FROM popup_events
-      WHERE business_id = ${id}
+      WHERE business_id = ${business.id}
       AND upper(event_range) > NOW()
       LIMIT 1
     `;
@@ -83,7 +83,7 @@ async function getBusiness(id: string) {
       FROM reviews r
       LEFT JOIN review_responses rr
         ON rr.review_id = r.id
-      WHERE r.business_id = ${id}
+      WHERE r.business_id = ${business.id}
       AND r.status = 'approved'
       ORDER BY r.created_at DESC
       LIMIT 10
@@ -94,6 +94,7 @@ async function getBusiness(id: string) {
       otherLocations = await sql`
         SELECT
           b.id,
+          b.slug,
           b.name,
           b.location_nickname,
           b.avg_rating,
@@ -105,7 +106,7 @@ async function getBusiness(id: string) {
         LEFT JOIN locations l
           ON l.business_id = b.id
         WHERE b.brand_id = ${business.brand_id}
-        AND b.id != ${id}
+        AND b.id != ${business.id}
         AND b.status = 'listed'
       `;
     }
@@ -129,10 +130,10 @@ async function getBusiness(id: string) {
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: Promise<{ slug: string }>
 }) {
-  const { id } = await params;
-  const data = await getBusiness(id);
+  const { slug } = await params;
+  const data = await getBusinessBySlug(slug);
 
   if (!data) return { title: "Business Not Found" };
 
@@ -185,10 +186,10 @@ const DAY_LABELS: Record<string, string> = {
 export default async function BusinessProfilePage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: Promise<{ slug: string }>
 }) {
-  const { id } = await params;
-  const data = await getBusiness(id);
+  const { slug } = await params;
+  const data = await getBusinessBySlug(slug);
 
   if (!data) notFound();
 
@@ -248,7 +249,6 @@ export default async function BusinessProfilePage({
         <div className="py-5 border-b border-gray-100">
           <div className="flex items-start gap-3">
 
-            {/* Logo */}
             {(business.logo_url ||
               business.brand_logo) && (
               <img
@@ -290,9 +290,7 @@ export default async function BusinessProfilePage({
                 </span>
                 {business.price_tier && (
                   <>
-                    <span className="text-gray-300">
-                      ·
-                    </span>
+                    <span className="text-gray-300">·</span>
                     <span className="text-xs
                       text-gray-500">
                       {PRICE_TIER_LABELS[
@@ -303,7 +301,6 @@ export default async function BusinessProfilePage({
                 )}
               </div>
 
-              {/* Rating */}
               {business.review_count > 0 && (
                 <div className="flex items-center
                   gap-1 mt-1">
@@ -322,7 +319,6 @@ export default async function BusinessProfilePage({
               )}
             </div>
 
-            {/* Claim button */}
             {business.claim_status === "unclaimed" && (
               <Link
                 href={`/claim/${business.id}`}
@@ -335,7 +331,6 @@ export default async function BusinessProfilePage({
               </Link>
             )}
 
-            {/* Verified badge */}
             {business.claim_status === "claimed" && (
               <div className="flex items-center
                 gap-1 flex-shrink-0">
@@ -489,8 +484,7 @@ export default async function BusinessProfilePage({
                   <p className="text-xs text-gray-500">
                     {s.start_time} — {s.end_time}
                   </p>
-                  {(s.season_start ||
-                    s.season_end) && (
+                  {(s.season_start || s.season_end) && (
                     <p className="text-xs text-gray-400">
                       {new Date(s.season_start)
                         .toLocaleDateString("en-US", {
@@ -650,13 +644,13 @@ export default async function BusinessProfilePage({
                     1-8.63-3.07 19.5 19.5 0 0
                     1-6-6 19.79 19.79 0 0
                     1-3.07-8.67A2 2 0 0 1
-                    4.11 2h3a2 2 0 0 1 2
-                    1.72 12.84 12.84 0 0 0 .7
-                    2.81 2 2 0 0 1-.45
-                    2.11L8.09 9.91a16 16 0 0
-                    0 6 6l1.27-1.27a2 2 0 0 1
-                    2.11-.45 12.84 12.84 0 0 0
-                    2.81.7A2 2 0 0 1 22 16.92z"/>
+                    4.11 2h3a2 2 0 0 1 2 1.72
+                    12.84 12.84 0 0 0 .7 2.81
+                    2 2 0 0 1-.45 2.11L8.09
+                    9.91a16 16 0 0 0 6 6l1.27-1.27
+                    a2 2 0 0 1 2.11-.45 12.84
+                    12.84 0 0 0 2.81.7A2 2 0 0
+                    1 22 16.92z"/>
                 </svg>
                 {business.phone}
               </a>
@@ -704,8 +698,6 @@ export default async function BusinessProfilePage({
                 Website
               </a>
             )}
-
-            {/* Social links */}
             <div className="flex gap-2 flex-wrap">
               {business.instagram && (
                 <SocialLink
@@ -753,11 +745,10 @@ export default async function BusinessProfilePage({
               {otherLocations.map((loc: any) => (
                 <Link
                   key={loc.id}
-                  href={`/businesses/${loc.id}`}
+                  href={`/${loc.slug || loc.id}`}
                   className="block border
-                    border-gray-100 rounded-xl
-                    p-3 hover:border-gray-200
-                    transition"
+                    border-gray-100 rounded-xl p-3
+                    hover:border-gray-200 transition"
                 >
                   <p className="text-sm font-medium
                     text-black">
@@ -797,7 +788,7 @@ export default async function BusinessProfilePage({
               )}
             </h2>
             <Link
-              href={`/businesses/${id}/review`}
+              href={`/${slug}/review`}
               className="text-xs text-black underline"
             >
               Write a review
@@ -809,7 +800,8 @@ export default async function BusinessProfilePage({
               <p className="text-sm text-gray-400">
                 No reviews yet
               </p>
-              <p className="text-xs text-gray-300 mt-1">
+              <p className="text-xs text-gray-300
+                mt-1">
                 Be the first to review
               </p>
             </div>

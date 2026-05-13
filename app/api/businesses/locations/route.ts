@@ -6,6 +6,7 @@ export async function GET() {
     const locations = await sql`
       SELECT
         b.id,
+        b.slug,
         b.name,
         b.category,
         b.price_tier,
