@@ -46,6 +46,10 @@ export async function POST(req: NextRequest) {
 
     // Build social URLs
     const socialUrls = buildSocialUrls(data);
+    const submittedOtherLinks = [
+      ...(Array.isArray(data.otherLinks) ? data.otherLinks : []),
+      ...(socialUrls.videoUrl ? [socialUrls.videoUrl] : []),
+    ];
 
     // Honeypot check
     if (data.honeypot) {
@@ -72,7 +76,6 @@ export async function POST(req: NextRequest) {
         youtube,
         email,
         phone,
-        video_url,
         other_links,
         payment_options,
         ordering_methods,
@@ -109,8 +112,7 @@ export async function POST(req: NextRequest) {
         ${socialUrls.youtube || null},
         ${data.email || null},
         ${data.phone || null},
-        ${socialUrls.videoUrl || null},
-        ${JSON.stringify(data.otherLinks || [])},
+        ${JSON.stringify(submittedOtherLinks)},
         ${data.paymentOptions || []},
         ${data.orderingMethods || []},
         ${data.dietaryOptions || []},
