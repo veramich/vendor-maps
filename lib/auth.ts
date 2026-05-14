@@ -1,16 +1,19 @@
 import { betterAuth } from "better-auth";
 import { Resend } from "resend";
-import postgres from "postgres";
+import { Pool } from "pg";
 
-const sql = postgres(process.env.DATABASE_URL!, {
-  ssl: "require",
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const auth = betterAuth({
   database: {
-    db: sql,
+    db: pool,
     type: "postgres",
   },
 
