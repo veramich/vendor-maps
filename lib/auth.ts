@@ -12,10 +12,7 @@ const pool = new Pool({
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const auth = betterAuth({
-  database: {
-    db: pool,
-    type: "postgres",
-  },
+  database: pool,
 
   baseURL: process.env.BETTER_AUTH_URL,
   secret: process.env.BETTER_AUTH_SECRET,
