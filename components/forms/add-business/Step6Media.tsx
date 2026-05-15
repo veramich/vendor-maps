@@ -35,22 +35,6 @@ export default function Step6Media({
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
-    // At least one contact method required
-    const hasContact =
-      formData.phone ||
-      formData.email ||
-      formData.instagram ||
-      formData.facebook ||
-      formData.tiktok ||
-      formData.twitter ||
-      formData.youtube ||
-      formData.website;
-
-    if (!hasContact) {
-      newErrors.contact =
-        "Please add at least one contact method";
-    }
-
     // Validate URL formats
     const urlFields = [
       { field: "website",   label: "Website" },
@@ -401,21 +385,13 @@ export default function Step6Media({
           <label className="block text-sm font-medium
             text-black mb-1">
             Contact & Social Media
-            <span className="text-red-500 ml-1">*</span>
+            <span className="text-gray-400 text-xs font-normal ml-2">
+              Optional
+            </span>
           </label>
           <p className="text-xs text-gray-400 mb-3">
-            Add at least one way for customers to
-            reach you
+            Add ways for customers to reach you
           </p>
-
-          {errors.contact && (
-            <div className="bg-red-50 border border-red-200
-              rounded-xl px-4 py-3 mb-4">
-              <p className="text-red-500 text-xs">
-                {errors.contact}
-              </p>
-            </div>
-          )}
 
           <div className="space-y-3">
 

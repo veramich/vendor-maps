@@ -81,7 +81,6 @@ export async function POST(req: NextRequest) {
         ordering_methods,
         dietary_options,
         business_amenities,
-        location_amenities,
         hours_subject_to_change,
         is_chain_location,
         location_nickname,
@@ -117,7 +116,6 @@ export async function POST(req: NextRequest) {
         ${data.orderingMethods || []},
         ${data.dietaryOptions || []},
         ${data.businessAmenities || []},
-        ${data.locationAmenities || []},
         ${data.hoursSubjectToChange || false},
         ${data.isChainLocation || false},
         ${data.locationNickname || null},
@@ -151,6 +149,7 @@ export async function POST(req: NextRequest) {
           zip,
           country,
           neighborhood,
+          location_amenities,
           coordinates,
           is_active_area
         ) VALUES (
@@ -168,6 +167,7 @@ export async function POST(req: NextRequest) {
           ${data.zip},
           'USA',
           ${data.neighborhood || null},
+          ${data.locationAmenities || []},
           ST_MakePoint(${data.lng}, ${data.lat}),
           true
         )
