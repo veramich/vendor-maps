@@ -8,6 +8,18 @@ export type BusinessSubType =
   | "market"
   | "pop_up";
 
+export type DetailedSubType =
+  | "street_vendor"
+  | "food_truck"
+  | "home_based"
+  | "other_permanent"
+  | "market_based"
+  | "pop_up_based"
+  | "catering_only"
+  | "shipping_only"
+  | "other_no_location"
+  | null;
+
 export type BusinessCategory =
   | "Food"
   | "Coffee"
@@ -91,6 +103,7 @@ export type BusinessFormData = {
 
   // Step 2 — sub type
   subType:        BusinessSubType | null;
+  detailedSubType: DetailedSubType;
 
   // Step 3 — location
   // cross streets (all except market and pop_up)
@@ -112,6 +125,10 @@ export type BusinessFormData = {
   category:       BusinessCategory | null;
   description:    string;
   logoUrl:        string;
+
+  // Event admission
+  isFreeEntry:    boolean;
+  admissionPrice: string;
 
   // Step 5 — details
   // pricing
@@ -155,6 +172,7 @@ export type BusinessFormData = {
 export const INITIAL_FORM_DATA: BusinessFormData = {
   type:             null,
   subType:          null,
+  detailedSubType: null,
   street1:          "",
   street2:          "",
   streetAddress:    "",
@@ -169,6 +187,8 @@ export const INITIAL_FORM_DATA: BusinessFormData = {
   category:         null,
   description:      "",
   logoUrl:          "",
+  isFreeEntry:    true,
+  admissionPrice: "",
   priceTier:        null,
   priceContext:     "",
   paymentOptions:   [],

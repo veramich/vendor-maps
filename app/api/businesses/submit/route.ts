@@ -4,7 +4,6 @@ import { uploadImage } from "@/lib/utils/uploadImage";
 import { buildSocialUrls } from "@/lib/utils/buildSocialUrls";
 import { generateSlug } from "@/lib/utils/generateSlug";
 
-
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
@@ -14,14 +13,16 @@ export async function POST(req: NextRequest) {
       formData.get("data") as string
     );
 
-    // Generate slug
-    const slug = await generateSlug(data.name, data.city, data.neighborhood);
+    // Honeypot check
+    if (data.honeypot) {
+      return NextResponse.json({ success: true });
+    }
 
     // Get IP for spam prevention
-    const ip = req.headers.get("x-forwarded-for")
-      || "unknown";
+    const ip =
+      req.headers.get("x-forwarded-for") || "unknown";
 
-    // Rate limit check — max 3 submissions per IP per day
+    // Rate limit — max 3 submissions per IP per day
     const recentSubmissions = await sql`
       SELECT COUNT(*) as count
       FROM businesses
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
       AND created_at > NOW() - INTERVAL '24 hours'
     `;
 
-    if (Number(recentSubmissions[0].count) >= 3) {
+    if (Number(recentSubmissions[0].count) >= 6) {
       return NextResponse.json(
         { error: "Too many submissions. Try again tomorrow." },
         { status: 429 }
@@ -47,14 +48,67 @@ export async function POST(req: NextRequest) {
     // Build social URLs
     const socialUrls = buildSocialUrls(data);
     const submittedOtherLinks = [
-      ...(Array.isArray(data.otherLinks) ? data.otherLinks : []),
-      ...(socialUrls.videoUrl ? [socialUrls.videoUrl] : []),
+      ...(Array.isArray(data.otherLinks)
+        ? data.otherLinks
+        : []
+      ),
+      ...(socialUrls.videoUrl
+        ? [socialUrls.videoUrl]
+        : []
+      ),
     ];
 
-    // Honeypot check
-    if (data.honeypot) {
-      return NextResponse.json({ success: true });
-    }
+    // Map form subType to DB type and sub_type
+    const dbType =
+      data.type === "small_business"
+        ? data.subType === "permanent_location"
+          ? "permanent_location"
+          : "no_location"
+        : "event";
+
+    const dbSubType =
+      data.subType === "permanent_location" ||
+      data.subType === "no_location"
+        ? data.detailedSubType &&
+          [
+            "street_vendor",
+            "food_truck",
+            "home_based",
+            "market_based",
+            "pop_up_based",
+            "catering_only",
+            "shipping_only",
+          ].includes(data.detailedSubType)
+          ? data.detailedSubType
+          : null
+        : data.subType === "market"
+        ? "market"
+        : data.subType === "pop_up"
+        ? "pop_up"
+        : null;
+
+    // Handle event pricing
+    const isEventType = data.type === "event";
+
+    const dbPriceTier = isEventType
+      ? null  // ← always null for events
+      : data.priceTier || null;
+
+    const dbPriceContext = isEventType
+      ? data.isFreeEntry
+        ? "Free entry"
+        : data.admissionPrice
+        ? `$${data.admissionPrice} admission`
+        : null
+      : data.priceContext || null;
+
+
+    // Generate slug
+    const slug = await generateSlug(
+      data.name,
+      data.city,
+      data.neighborhood
+    );
 
     // Insert business
     const [business] = await sql`
@@ -84,25 +138,21 @@ export async function POST(req: NextRequest) {
         hours_subject_to_change,
         is_chain_location,
         location_nickname,
+        slug,
         status,
         claim_status,
         added_by,
         submitter_ip
       ) VALUES (
         ${data.brandId || null},
-        ${data.type === "small_business"
-          ? (data.subType === "permanent_location"
-            ? "permanent_location"
-            : "no_location")
-          : "event"
-        },
-        ${data.subType},
+        ${dbType},
+        ${dbSubType},
         ${data.name.trim()},
         ${logoUrl || null},
         ${data.description.trim()},
-        ${data.category},
-        ${data.priceTier},
-        ${data.priceContext},
+        ${!isEventType ? data.category : null},
+        ${dbPriceTier},
+        ${dbPriceContext},
         ${socialUrls.website || null},
         ${socialUrls.instagram || null},
         ${socialUrls.facebook || null},
@@ -112,13 +162,17 @@ export async function POST(req: NextRequest) {
         ${data.email || null},
         ${data.phone || null},
         ${JSON.stringify(submittedOtherLinks)},
-        ${data.paymentOptions || []},
-        ${data.orderingMethods || []},
-        ${data.dietaryOptions || []},
-        ${data.businessAmenities || []},
-        ${data.hoursSubjectToChange || false},
+        ${!isEventType ? data.paymentOptions || [] : []},
+        ${!isEventType ? data.orderingMethods || [] : []},
+        ${!isEventType ? data.dietaryOptions || [] : []},
+        ${!isEventType ? data.businessAmenities || [] : []},
+        ${!isEventType
+          ? data.hoursSubjectToChange || false
+          : false
+        },
         ${data.isChainLocation || false},
         ${data.locationNickname || null},
+        ${slug},
         'pending',
         'unclaimed',
         'user_submission',
@@ -135,47 +189,79 @@ export async function POST(req: NextRequest) {
       data.subType === "market" ||
       data.subType === "pop_up";
 
-    if (hasLocation && data.lat && data.lng) {
-      await sql`
-        INSERT INTO locations (
-          business_id,
-          location_type,
-          street_1,
-          street_2,
-          street_address,
-          city,
-          state,
-          state_code,
-          zip,
-          country,
-          neighborhood,
-          location_amenities,
-          coordinates,
-          is_active_area
-        ) VALUES (
-          ${businessId},
-          ${data.subType === "permanent_location"
-            ? "intersection"
-            : "address"
-          },
-          ${data.street1 || null},
-          ${data.street2 || null},
-          ${data.streetAddress || null},
-          ${data.city},
-          ${data.state},
-          ${data.stateCode},
-          ${data.zip},
-          'USA',
-          ${data.neighborhood || null},
-          ${data.locationAmenities || []},
-          ST_MakePoint(${data.lng}, ${data.lat}),
-          true
-        )
-      `;
+    if (hasLocation) {
+      if (data.lat && data.lng) {
+        await sql`
+          INSERT INTO locations (
+            business_id,
+            street_1,
+            street_2,
+            street_address,
+            city,
+            state,
+            state_code,
+            zip,
+            country,
+            neighborhood,
+            location_amenities,
+            coordinates,
+            is_active_area
+          ) VALUES (
+            ${businessId},
+            ${data.street1 || null},
+            ${data.street2 || null},
+            ${data.streetAddress || null},
+            ${data.city || null},
+            ${data.state || null},
+            ${data.stateCode || null},
+            ${data.zip || null},
+            'USA',
+            ${data.neighborhood || null},
+            ${data.locationAmenities || []},
+            ST_MakePoint(${data.lng}, ${data.lat}),
+            true
+          )
+        `;
+      } else {
+        // No coordinates — save without map pin
+        await sql`
+          INSERT INTO locations (
+            business_id,
+            street_1,
+            street_2,
+            street_address,
+            city,
+            state,
+            state_code,
+            zip,
+            country,
+            neighborhood,
+            location_amenities,
+            is_active_area
+          ) VALUES (
+            ${businessId},
+            ${data.street1 || null},
+            ${data.street2 || null},
+            ${data.streetAddress || null},
+            ${data.city || null},
+            ${data.state || null},
+            ${data.stateCode || null},
+            ${data.zip || null},
+            'USA',
+            ${data.neighborhood || null},
+            ${data.locationAmenities || []},
+            true
+          )
+        `;
+      }
     }
 
     // Insert business hours
-    if (data.hours && data.hours.length > 0) {
+    if (
+      !isEventType &&
+      data.hours &&
+      data.hours.length > 0
+    ) {
       for (const hour of data.hours) {
         await sql`
           INSERT INTO business_hours (
@@ -223,7 +309,7 @@ export async function POST(req: NextRequest) {
             ${schedule.startTime},
             ${schedule.endTime},
             ${schedule.closesNextDay || false},
-            ${schedule.isNightMarket || false},
+            false,
             ${schedule.seasonStart || null},
             ${schedule.seasonEnd || null}
           )
@@ -234,16 +320,30 @@ export async function POST(req: NextRequest) {
     // Insert pop-up event
     if (
       data.subType === "pop_up" &&
-      data.popUpEvent
+      data.popUpEvent?.startDate &&
+      data.popUpEvent?.startTime &&
+      data.popUpEvent?.endTime
     ) {
       const { popUpEvent } = data;
       const startDateTime =
         `${popUpEvent.startDate} ${popUpEvent.startTime}`;
-      const endDate = popUpEvent.closesNextDay
-        ? popUpEvent.endDate
-        : popUpEvent.startDate;
+      let endDate =
+        popUpEvent.endDate || popUpEvent.startDate;
+      
+      if (popUpEvent.closesNextDay) {
+        const start = new Date(popUpEvent.startDate);
+        start.setDate(start.getDate() + 1);
+        endDate = start.toISOString().split("T")[0];
+      } 
       const endDateTime =
         `${endDate} ${popUpEvent.endTime}`;
+
+      if (new Date(startDateTime) >= new Date(endDateTime)) {
+        return NextResponse.json(
+          { error: "Event end time must be after start time." },
+          { status: 400 }
+        );
+      }
 
       await sql`
         INSERT INTO popup_events (
@@ -266,7 +366,9 @@ export async function POST(req: NextRequest) {
     const imageFiles: File[] = [];
     let i = 0;
     while (formData.get(`image_${i}`)) {
-      imageFiles.push(formData.get(`image_${i}`) as File);
+      imageFiles.push(
+        formData.get(`image_${i}`) as File
+      );
       i++;
     }
 
@@ -296,22 +398,22 @@ export async function POST(req: NextRequest) {
       `;
     }
 
-    // Update business with slug  
-    await sql`
-      UPDATE businesses
-      SET slug = ${slug}
-      WHERE id = ${businessId}
-    `;
-
     return NextResponse.json({
       success: true,
       businessId,
+      slug,
     });
 
   } catch (error) {
     console.error("Submission error:", error);
+    
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Failed to submit business";
+
     return NextResponse.json(
-      { error: "Failed to submit business" },
+      { error: message },
       { status: 500 }
     );
   }

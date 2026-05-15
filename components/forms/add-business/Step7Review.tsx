@@ -21,7 +21,11 @@ export default function Step7Review({
     try {
       await onSubmit();
     } catch (err) {
-      setError("Something went wrong. Please try again.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong. Please try again."
+      );
       setSubmitting(false);
     }
   };

@@ -6,8 +6,10 @@ export async function GET() {
     const businesses = await sql`
       SELECT
         b.id,
+        b.slug,
         b.name,
         b.category,
+        b.type,
         b.sub_type,
         b.price_tier,
         b.avg_rating,
@@ -15,11 +17,13 @@ export async function GET() {
         l.neighborhood,
         l.city
       FROM businesses b
-      LEFT JOIN locations l ON l.business_id = b.id
+      LEFT JOIN locations l
+        ON l.business_id = b.id
       WHERE b.status = 'listed'
-      AND b.type IN ('small_business', 'permanent_location',
-        'no_location')
-      AND b.sub_type NOT IN ('market', 'pop_up')
+      AND b.type IN (
+        'permanent_location',
+        'no_location'
+      )
       ORDER BY b.created_at DESC
     `;
 

@@ -19,6 +19,104 @@ interface Step5DetailsProps {
   nextStep: () => void;
 }
 
+const generateTimeOptions = () => {
+  const options = [];
+  for (let hour = 0; hour < 24; hour++) {
+    for (const minute of [0, 15, 30, 45]) {
+      const h12 = hour % 12 === 0 ? 12 : hour % 12;
+      const ampm = hour < 12 ? "AM" : "PM";
+      const label = `${h12}:${minute
+        .toString()
+        .padStart(2, "0")} ${ampm}`;
+      const value = `${hour
+        .toString()
+        .padStart(2, "0")}:${minute
+        .toString()
+        .padStart(2, "0")}`;
+      options.push({ label, value });
+    }
+  }
+  return options;
+};
+
+const TIME_OPTIONS = generateTimeOptions();
+
+function TimeSelect({
+  value,
+  onChange,
+  className,
+  hasError,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  className?: string;
+  hasError?: boolean;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={className || `w-full border-2
+        rounded-xl px-4 py-3 text-sm text-black
+        focus:outline-none focus:border-black
+        bg-white transition
+        ${hasError
+          ? "border-red-400"
+          : "border-gray-200"
+        }`}
+    >
+      <option value="">Select time</option>
+      {TIME_OPTIONS.map((opt) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function AmenitySection({
+  title,
+  options,
+  selected,
+  onToggle,
+}: {
+  title: string;
+  options: string[];
+  selected: string[];
+  onToggle: (value: string) => void;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium
+        text-black mb-3">
+        {title}
+        <span className="text-gray-400 text-xs
+          font-normal ml-2">
+          Optional
+        </span>
+      </label>
+      <div className="flex flex-wrap gap-2">
+        {options.map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => onToggle(option)}
+            className={`px-4 py-2 rounded-full text-xs
+              font-medium border-2 transition
+              ${selected.includes(option)
+                ? "bg-black border-black text-white"
+                : "bg-white border-gray-200 text-black"
+              }`}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Step5Details({
   formData,
   updateForm,
@@ -26,9 +124,9 @@ export default function Step5Details({
 }: Step5DetailsProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const isMarket = formData.subType === "market";
-  const isPopUp = formData.subType === "pop_up";
-  const isEvent = isMarket || isPopUp;
+  const isMarket  = formData.subType === "market";
+  const isPopUp   = formData.subType === "pop_up";
+  const isEvent   = isMarket || isPopUp;
   const isPermanent =
     formData.subType === "permanent_location";
 
@@ -38,8 +136,17 @@ export default function Step5Details({
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.priceTier) {
+    if (!isEvent && !formData.priceTier) {
       newErrors.priceTier = "Please select a price tier";
+    }
+
+    if (
+      isEvent &&
+      !(formData as any).isFreeEntry &&
+      !(formData as any).admissionPrice
+    ) {
+      newErrors.admissionPrice =
+        "Please enter an admission price";
     }
 
     if (isPopUp) {
@@ -57,7 +164,29 @@ export default function Step5Details({
       }
     }
 
-    if (isMarket && formData.marketSchedules.length === 0) {
+    if (isPopUp &&
+    formData.popUpEvent?.startDate &&
+    formData.popUpEvent?.startTime &&
+    formData.popUpEvent?.endTime &&
+    !formData.popUpEvent?.closesNextDay
+    ) {
+      const start = new Date(
+        `${formData.popUpEvent.startDate} ${formData.popUpEvent.startTime}`
+      );
+      const end = new Date(
+        `${formData.popUpEvent.endDate || formData.popUpEvent.startDate} ${formData.popUpEvent.endTime}`
+      );
+
+      if (start >= end) {
+        newErrors.endTime =
+          "End time must be after start time";
+      }
+    }
+
+    if (
+      isMarket &&
+      formData.marketSchedules.length === 0
+    ) {
       newErrors.schedule =
         "Please add at least one schedule";
     }
@@ -70,7 +199,6 @@ export default function Step5Details({
     if (validate()) nextStep();
   };
 
-  // Toggle amenity selection
   const toggleAmenity = (
     field: keyof BusinessFormData,
     value: string
@@ -82,7 +210,6 @@ export default function Step5Details({
     updateForm({ [field]: updated });
   };
 
-  // Add market schedule
   const addSchedule = () => {
     updateForm({
       marketSchedules: [
@@ -117,7 +244,6 @@ export default function Step5Details({
     });
   };
 
-  // Hours helpers
   const addHours = (day: string) => {
     const existing = formData.hours.find(
       h => h.dayOfWeek === day
@@ -165,54 +291,157 @@ export default function Step5Details({
 
       <div className="space-y-8">
 
-        {/* Price Tier */}
-        <div>
-          <label className="block text-sm font-medium
-            text-black mb-1">
-            Price Range
-            <span className="text-red-500 ml-1">*</span>
-          </label>
-          <p className="text-xs text-gray-400 mb-3">
-            Estimated {priceContext}
-          </p>
-          <div className="grid grid-cols-4 gap-2">
-            {PRICE_TIERS.map((tier) => (
-              <button
-                key={tier.tier}
-                type="button"
-                onClick={() => {
-                  updateForm({
-                    priceTier: tier.tier,
-                    priceContext,
-                  });
-                  setErrors(prev => ({
-                    ...prev, priceTier: ""
-                  }));
-                }}
-                className={`border-2 rounded-xl py-3
-                  text-center transition
-                  ${formData.priceTier === tier.tier
-                    ? "border-black bg-black text-white"
-                    : "border-gray-200 text-black"
-                  }`}
-              >
-                <p className="font-bold text-sm">
-                  {tier.label}
-                </p>
-                <p className="text-xs mt-0.5 opacity-70">
-                  {tier.description}
-                </p>
-              </button>
-            ))}
-          </div>
-          {errors.priceTier && (
-            <p className="text-red-500 text-xs mt-1">
-              {errors.priceTier}
+        {/* Price Range — small business only */}
+        {!isEvent && (
+          <div>
+            <label className="block text-sm font-medium
+              text-black mb-1">
+              Price Range
+              <span className="text-red-500 ml-1">*</span>
+            </label>
+            <p className="text-xs text-gray-400 mb-3">
+              Estimated {priceContext}
             </p>
-          )}
-        </div>
+            <div className="grid grid-cols-4 gap-2">
+              {PRICE_TIERS.map((tier) => (
+                <button
+                  key={tier.tier}
+                  type="button"
+                  onClick={() => {
+                    updateForm({
+                      priceTier: tier.tier,
+                      priceContext,
+                    });
+                    setErrors(prev => ({
+                      ...prev, priceTier: ""
+                    }));
+                  }}
+                  className={`border-2 rounded-xl py-3
+                    text-center transition
+                    ${formData.priceTier === tier.tier
+                      ? "border-black bg-black text-white"
+                      : "border-gray-200 text-black"
+                    }`}
+                >
+                  <p className="font-bold text-sm">
+                    {tier.label}
+                  </p>
+                  <p className="text-xs mt-0.5 opacity-70">
+                    {tier.description}
+                  </p>
+                </button>
+              ))}
+            </div>
+            {errors.priceTier && (
+              <p className="text-red-500 text-xs mt-1">
+                {errors.priceTier}
+              </p>
+            )}
+          </div>
+        )}
 
-        {/* Pop-Up Event Date/Time */}
+        {/* Admission — events only */}
+        {isEvent && (
+          <div>
+            <label className="block text-sm font-medium
+              text-black mb-3">
+              Admission
+              <span className="text-red-500 ml-1">*</span>
+            </label>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateForm({
+                      isFreeEntry:    true,
+                      admissionPrice: "",
+                    } as any)
+                  }
+                  className={`border-2 rounded-xl py-4
+                    text-center transition
+                    ${(formData as any).isFreeEntry
+                      ? "border-black bg-black text-white"
+                      : "border-gray-200 text-black"
+                    }`}
+                >
+                  <p className="font-semibold text-sm">
+                    Free Entry
+                  </p>
+                  <p className="text-xs mt-0.5 opacity-70">
+                    No admission fee
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateForm({
+                      isFreeEntry: false,
+                    } as any)
+                  }
+                  className={`border-2 rounded-xl py-4
+                    text-center transition
+                    ${!(formData as any).isFreeEntry
+                      ? "border-black bg-black text-white"
+                      : "border-gray-200 text-black"
+                    }`}
+                >
+                  <p className="font-semibold text-sm">
+                    Paid Entry
+                  </p>
+                  <p className="text-xs mt-0.5 opacity-70">
+                    Admission required
+                  </p>
+                </button>
+              </div>
+
+              {!(formData as any).isFreeEntry && (
+                <div>
+                  <label className="block text-xs
+                    text-gray-500 mb-1">
+                    Admission Price
+                  </label>
+                  <div className="flex items-center
+                    border-2 border-gray-200 rounded-xl
+                    focus-within:border-black transition">
+                    <span className="pl-4 text-gray-400
+                      text-sm">
+                      $
+                    </span>
+                    <input
+                      type="text"
+                      value={
+                        (formData as any).admissionPrice
+                      }
+                      onChange={(e) =>
+                        updateForm({
+                          admissionPrice: e.target.value
+                        } as any)
+                      }
+                      placeholder="e.g. 5 or 5-10"
+                      className="flex-1 px-3 py-3 text-sm
+                        text-black focus:outline-none
+                        bg-transparent"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400
+                    mt-1">
+                    You can enter a range e.g. 5-10
+                  </p>
+                  {errors.admissionPrice && (
+                    <p className="text-red-500 text-xs
+                      mt-1">
+                      {errors.admissionPrice}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Pop-Up Event Details */}
         {isPopUp && (
           <div className="space-y-4">
             <label className="block text-sm font-medium
@@ -269,14 +498,18 @@ export default function Step5Details({
                 </label>
                 <input
                   type="date"
-                  value={formData.popUpEvent?.startDate || ""}
-                  min={new Date().toISOString().split("T")[0]}
+                  value={
+                    formData.popUpEvent?.startDate || ""
+                  }
+                  min={
+                    new Date().toISOString().split("T")[0]
+                  }
                   onChange={(e) => {
                     updateForm({
                       popUpEvent: {
                         ...formData.popUpEvent!,
                         startDate: e.target.value,
-                        endDate: e.target.value,
+                        endDate:   e.target.value,
                       }
                     });
                     if (errors.startDate) {
@@ -293,6 +526,11 @@ export default function Step5Details({
                       : "border-gray-200 focus:border-black"
                     }`}
                 />
+                {errors.startDate && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {errors.startDate}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-xs
@@ -301,9 +539,13 @@ export default function Step5Details({
                 </label>
                 <input
                   type="date"
-                  value={formData.popUpEvent?.endDate || ""}
-                  min={formData.popUpEvent?.startDate ||
-                    new Date().toISOString().split("T")[0]}
+                  value={
+                    formData.popUpEvent?.endDate || ""
+                  }
+                  min={
+                    formData.popUpEvent?.startDate ||
+                    new Date().toISOString().split("T")[0]
+                  }
                   onChange={(e) =>
                     updateForm({
                       popUpEvent: {
@@ -312,10 +554,10 @@ export default function Step5Details({
                       }
                     })
                   }
-                  className="w-full border-2 border-gray-200
-                    rounded-xl px-4 py-3 text-sm text-black
-                    focus:outline-none focus:border-black
-                    transition"
+                  className="w-full border-2
+                    border-gray-200 rounded-xl px-4 py-3
+                    text-sm text-black focus:outline-none
+                    focus:border-black transition"
                 />
               </div>
             </div>
@@ -327,14 +569,15 @@ export default function Step5Details({
                   text-gray-500 mb-1">
                   Start Time
                 </label>
-                <input
-                  type="time"
-                  value={formData.popUpEvent?.startTime || ""}
-                  onChange={(e) => {
+                <TimeSelect
+                  value={
+                    formData.popUpEvent?.startTime || ""
+                  }
+                  onChange={(val) => {
                     updateForm({
                       popUpEvent: {
                         ...formData.popUpEvent!,
-                        startTime: e.target.value,
+                        startTime: val,
                       }
                     });
                     if (errors.startTime) {
@@ -343,28 +586,28 @@ export default function Step5Details({
                       }));
                     }
                   }}
-                  className={`w-full border-2 rounded-xl
-                    px-4 py-3 text-sm text-black
-                    focus:outline-none transition
-                    ${errors.startTime
-                      ? "border-red-400"
-                      : "border-gray-200 focus:border-black"
-                    }`}
+                  hasError={!!errors.startTime}
                 />
+                {errors.startTime && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {errors.startTime}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-xs
                   text-gray-500 mb-1">
                   End Time
                 </label>
-                <input
-                  type="time"
-                  value={formData.popUpEvent?.endTime || ""}
-                  onChange={(e) => {
+                <TimeSelect
+                  value={
+                    formData.popUpEvent?.endTime || ""
+                  }
+                  onChange={(val) => {
                     updateForm({
                       popUpEvent: {
                         ...formData.popUpEvent!,
-                        endTime: e.target.value,
+                        endTime: val,
                       }
                     });
                     if (errors.endTime) {
@@ -373,14 +616,13 @@ export default function Step5Details({
                       }));
                     }
                   }}
-                  className={`w-full border-2 rounded-xl
-                    px-4 py-3 text-sm text-black
-                    focus:outline-none transition
-                    ${errors.endTime
-                      ? "border-red-400"
-                      : "border-gray-200 focus:border-black"
-                    }`}
+                  hasError={!!errors.endTime}
                 />
+                {errors.endTime && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {errors.endTime}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -390,7 +632,8 @@ export default function Step5Details({
               <input
                 type="checkbox"
                 checked={
-                  formData.popUpEvent?.closesNextDay || false
+                  formData.popUpEvent?.closesNextDay ||
+                  false
                 }
                 onChange={(e) =>
                   updateForm({
@@ -407,13 +650,14 @@ export default function Step5Details({
               </span>
             </label>
 
-            {/* Night Market */}
+            {/* Is Market toggle */}
             <label className="flex items-center gap-3
               cursor-pointer">
               <input
                 type="checkbox"
                 checked={
-                  formData.popUpEvent?.isNightMarket || false
+                  formData.popUpEvent?.isNightMarket ||
+                  false
                 }
                 onChange={(e) =>
                   updateForm({
@@ -426,7 +670,7 @@ export default function Step5Details({
                 className="w-4 h-4 rounded"
               />
               <span className="text-sm text-black">
-                This is hosted by a market
+                This is part of a market
               </span>
             </label>
           </div>
@@ -470,7 +714,8 @@ export default function Step5Details({
               </button>
             )}
 
-            {formData.marketSchedules.map((schedule, i) => (
+            {formData.marketSchedules.map(
+              (schedule, i) => (
               <div key={i} className="border-2
                 border-gray-200 rounded-xl p-4 mb-3">
 
@@ -505,7 +750,7 @@ export default function Step5Details({
                       border-gray-200 rounded-xl px-4
                       py-3 text-sm text-black
                       focus:outline-none
-                      focus:border-black"
+                      focus:border-black bg-white"
                   >
                     {DAYS_OF_WEEK.map(day => (
                       <option key={day} value={day}>
@@ -516,7 +761,7 @@ export default function Step5Details({
                   </select>
                 </div>
 
-                {/* Recurrence */}
+                {/* Frequency */}
                 <div className="mb-3">
                   <label className="block text-xs
                     text-gray-500 mb-1">
@@ -533,7 +778,7 @@ export default function Step5Details({
                       border-gray-200 rounded-xl px-4
                       py-3 text-sm text-black
                       focus:outline-none
-                      focus:border-black"
+                      focus:border-black bg-white"
                   >
                     <option value="weekly">
                       Every week
@@ -557,25 +802,20 @@ export default function Step5Details({
                 </div>
 
                 {/* Time */}
-                <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="grid grid-cols-2
+                  gap-3 mb-3">
                   <div>
                     <label className="block text-xs
                       text-gray-500 mb-1">
                       Start Time
                     </label>
-                    <input
-                      type="time"
+                    <TimeSelect
                       value={schedule.startTime}
-                      onChange={(e) =>
+                      onChange={(val) =>
                         updateSchedule(i, {
-                          startTime: e.target.value
+                          startTime: val
                         })
                       }
-                      className="w-full border-2
-                        border-gray-200 rounded-xl px-4
-                        py-3 text-sm text-black
-                        focus:outline-none
-                        focus:border-black"
                     />
                   </div>
                   <div>
@@ -583,40 +823,16 @@ export default function Step5Details({
                       text-gray-500 mb-1">
                       End Time
                     </label>
-                    <input
-                      type="time"
+                    <TimeSelect
                       value={schedule.endTime}
-                      onChange={(e) =>
+                      onChange={(val) =>
                         updateSchedule(i, {
-                          endTime: e.target.value
+                          endTime: val
                         })
                       }
-                      className="w-full border-2
-                        border-gray-200 rounded-xl px-4
-                        py-3 text-sm text-black
-                        focus:outline-none
-                        focus:border-black"
                     />
                   </div>
                 </div>
-
-                {/* Night Market */}
-                <label className="flex items-center
-                  gap-3 cursor-pointer mb-2">
-                  <input
-                    type="checkbox"
-                    checked={schedule.isNightMarket}
-                    onChange={(e) =>
-                      updateSchedule(i, {
-                        isNightMarket: e.target.checked
-                      })
-                    }
-                    className="w-4 h-4 rounded"
-                  />
-                  <span className="text-sm text-black">
-                    🌙 Night market
-                  </span>
-                </label>
 
                 {/* Season */}
                 <div className="grid grid-cols-2 gap-3">
@@ -667,242 +883,236 @@ export default function Step5Details({
         )}
 
         {/* Business Hours — small business only */}
-
         {!isEvent && (
-  <div>
-    <label className="block text-sm font-medium
-      text-black mb-3">
-      Business Hours
-      <span className="text-gray-400 text-xs
-        font-normal ml-2">
-        Optional
-      </span>
-    </label>
+          <div>
+            <label className="block text-sm font-medium
+              text-black mb-3">
+              Business Hours
+              <span className="text-gray-400 text-xs
+                font-normal ml-2">
+                Optional
+              </span>
+            </label>
 
-    {/* Two checkboxes */}
-    <div className="space-y-3 mb-4">
-
-      {/* Hours posted on social */}
-      <label className="flex items-start gap-3
-        cursor-pointer p-4 border-2 rounded-xl
-        transition border-gray-200">
-        <input
-          type="checkbox"
-          checked={formData.hours.some(
-            h => h.hoursVary
-          )}
-          onChange={(e) => {
-            if (e.target.checked) {
-              updateForm({
-                hours: DAYS_OF_WEEK.map(day => ({
-                  dayOfWeek:     day,
-                  openTime:      "",
-                  closeTime:     "",
-                  closesNextDay: false,
-                  isClosed:      false,
-                  hoursVary:     true,
-                  seasonStart:   "",
-                  seasonEnd:     "",
-                }))
-              });
-            } else {
-              updateForm({ hours: [] });
-            }
-          }}
-          className="w-4 h-4 rounded mt-0.5
-            flex-shrink-0"
-        />
-        <p className="text-sm text-black">
-          Hours posted weekly on social media page
-        </p>
-      </label>
-
-      {/* Hours subject to change */}
-      <label className="flex items-start gap-3
-        cursor-pointer p-4 border-2 rounded-xl
-        transition border-gray-200">
-        <input
-          type="checkbox"
-          checked={
-            (formData as any).hoursSubjectToChange
-            || false
-          }
-          onChange={(e) =>
-            updateForm({
-              hoursSubjectToChange: e.target.checked
-            } as any)
-          }
-          className="w-4 h-4 rounded mt-0.5
-            flex-shrink-0"
-        />
-        <p className="text-sm text-black">
-          Hours subject to change due to
-          weather, events, etc.
-        </p>
-      </label>
-
-    </div>
-
-    {/* Monday-Sunday schedule
-        only collapses when hours vary is checked */}
-    {!formData.hours.some(h => h.hoursVary) && (
-      <div className="space-y-2">
-        {DAYS_OF_WEEK.map((day) => {
-          const hours = getHours(day);
-          const isAdded = !!hours;
-
-          return (
-            <div key={day}
-              className="border-2 border-gray-100
-                rounded-xl overflow-hidden">
-
-              <div className="flex items-center
-                justify-between px-4 py-3">
-                <p className="text-sm font-medium
-                  text-black capitalize">
-                  {day}
-                </p>
-                <div className="flex items-center
-                  gap-3">
-                  {isAdded && (
-                    <label className="flex items-center
-                      gap-2 text-xs text-gray-500
-                      cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={hours?.isClosed}
-                        onChange={(e) =>
-                          updateHours(day, {
-                            isClosed: e.target.checked
-                          })
-                        }
-                        className="w-3.5 h-3.5"
-                      />
-                      Closed
-                    </label>
+            {/* Hours vary toggle */}
+            <div className="space-y-3 mb-4">
+              <label className="flex items-start gap-3
+                cursor-pointer p-4 border-2 rounded-xl
+                transition border-gray-200">
+                <input
+                  type="checkbox"
+                  checked={formData.hours.some(
+                    h => h.hoursVary
                   )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (isAdded) {
-                        updateForm({
-                          hours: formData.hours.filter(
-                            h => h.dayOfWeek !== day
-                          )
-                        });
-                      } else {
-                        addHours(day);
-                      }
-                    }}
-                    className="text-xs text-black
-                      underline"
-                  >
-                    {isAdded ? "Remove" : "Add"}
-                  </button>
-                </div>
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      updateForm({
+                        hours: DAYS_OF_WEEK.map(day => ({
+                          dayOfWeek:     day,
+                          openTime:      "",
+                          closeTime:     "",
+                          closesNextDay: false,
+                          isClosed:      false,
+                          hoursVary:     true,
+                          seasonStart:   "",
+                          seasonEnd:     "",
+                        }))
+                      });
+                    } else {
+                      updateForm({ hours: [] });
+                    }
+                  }}
+                  className="w-4 h-4 rounded mt-0.5
+                    flex-shrink-0"
+                />
+                <p className="text-sm text-black">
+                  Hours posted weekly on social media page
+                </p>
+              </label>
+
+              <label className="flex items-start gap-3
+                cursor-pointer p-4 border-2 rounded-xl
+                transition border-gray-200">
+                <input
+                  type="checkbox"
+                  checked={
+                    (formData as any).hoursSubjectToChange
+                    || false
+                  }
+                  onChange={(e) =>
+                    updateForm({
+                      hoursSubjectToChange:
+                        e.target.checked
+                    } as any)
+                  }
+                  className="w-4 h-4 rounded mt-0.5
+                    flex-shrink-0"
+                />
+                <p className="text-sm text-black">
+                  Hours subject to change due to
+                  weather, events, etc.
+                </p>
+              </label>
+            </div>
+
+            {/* Day schedule */}
+            {!formData.hours.some(h => h.hoursVary) && (
+              <div className="space-y-2">
+                {DAYS_OF_WEEK.map((day) => {
+                  const hours = getHours(day);
+                  const isAdded = !!hours;
+
+                  return (
+                    <div key={day}
+                      className="border-2 border-gray-100
+                        rounded-xl overflow-hidden">
+
+                      <div className="flex items-center
+                        justify-between px-4 py-3">
+                        <p className="text-sm font-medium
+                          text-black capitalize">
+                          {day}
+                        </p>
+                        <div className="flex items-center
+                          gap-3">
+                          {isAdded && (
+                            <label className="flex
+                              items-center gap-2 text-xs
+                              text-gray-500
+                              cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={hours?.isClosed}
+                                onChange={(e) =>
+                                  updateHours(day, {
+                                    isClosed:
+                                      e.target.checked
+                                  })
+                                }
+                                className="w-3.5 h-3.5"
+                              />
+                              Closed
+                            </label>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isAdded) {
+                                updateForm({
+                                  hours: formData.hours
+                                    .filter(
+                                      h => h.dayOfWeek
+                                        !== day
+                                    )
+                                });
+                              } else {
+                                addHours(day);
+                              }
+                            }}
+                            className="text-xs text-black
+                              underline"
+                          >
+                            {isAdded ? "Remove" : "Add"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {isAdded && !hours?.isClosed && (
+                        <div className="px-4 pb-3
+                          grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block
+                              text-xs text-gray-400 mb-1">
+                              Open
+                            </label>
+                            <TimeSelect
+                              value={
+                                hours?.openTime || ""
+                              }
+                              onChange={(val) =>
+                                updateHours(day, {
+                                  openTime: val
+                                })
+                              }
+                            />
+                          </div>
+                          <div>
+                            <label className="block
+                              text-xs text-gray-400 mb-1">
+                              Close
+                            </label>
+                            <TimeSelect
+                              value={
+                                hours?.closeTime || ""
+                              }
+                              onChange={(val) =>
+                                updateHours(day, {
+                                  closeTime: val
+                                })
+                              }
+                            />
+                          </div>
+                          <label className="flex
+                            items-center gap-2 text-xs
+                            text-gray-500 cursor-pointer
+                            col-span-2">
+                            <input
+                              type="checkbox"
+                              checked={
+                                hours?.closesNextDay ||
+                                false
+                              }
+                              onChange={(e) =>
+                                updateHours(day, {
+                                  closesNextDay:
+                                    e.target.checked
+                                })
+                              }
+                              className="w-3.5 h-3.5"
+                            />
+                            Closes after midnight
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Hours subject to change note */}
+                {(formData as any).hoursSubjectToChange && (
+                  <div className="mt-3 p-4 bg-amber-50
+                    border-2 border-amber-200 rounded-xl">
+                    <div className="flex items-start
+                      gap-2">
+                      <svg width="16" height="16"
+                        viewBox="0 0 24 24" fill="none"
+                        stroke="#d97706" strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="flex-shrink-0 mt-0.5">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8"
+                          x2="12" y2="12"/>
+                        <line x1="12" y1="16"
+                          x2="12.01" y2="16"/>
+                      </svg>
+                      <p className="text-xs
+                        text-amber-700">
+                        Hours subject to change due to
+                        weather, events, etc. will be
+                        displayed on your listing.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
-
-              {isAdded && !hours?.isClosed && (
-                <div className="px-4 pb-3 grid
-                  grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs
-                      text-gray-400 mb-1">
-                      Open
-                    </label>
-                    <input
-                      type="time"
-                      value={hours?.openTime || ""}
-                      onChange={(e) =>
-                        updateHours(day, {
-                          openTime: e.target.value
-                        })
-                      }
-                      className="w-full border-2
-                        border-gray-200 rounded-xl
-                        px-3 py-2 text-sm text-black
-                        focus:outline-none
-                        focus:border-black"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs
-                      text-gray-400 mb-1">
-                      Close
-                    </label>
-                    <input
-                      type="time"
-                      value={hours?.closeTime || ""}
-                      onChange={(e) =>
-                        updateHours(day, {
-                          closeTime: e.target.value
-                        })
-                      }
-                      className="w-full border-2
-                        border-gray-200 rounded-xl
-                        px-3 py-2 text-sm text-black
-                        focus:outline-none
-                        focus:border-black"
-                    />
-                  </div>
-                  <label className="flex items-center
-                    gap-2 text-xs text-gray-500
-                    cursor-pointer col-span-2">
-                    <input
-                      type="checkbox"
-                      checked={
-                        hours?.closesNextDay || false
-                      }
-                      onChange={(e) =>
-                        updateHours(day, {
-                          closesNextDay: e.target.checked
-                        })
-                      }
-                      className="w-3.5 h-3.5"
-                    />
-                    Closes after midnight
-                  </label>
-                </div>
-              )}
-            </div>
-          );
-        })}
-
-        {/* Note shown when hours subject to change */}
-        {(formData as any).hoursSubjectToChange && (
-          <div className="mt-3 p-4 bg-amber-50
-            border-2 border-amber-200 rounded-xl">
-            <div className="flex items-start gap-2">
-              <svg width="16" height="16"
-                viewBox="0 0 24 24" fill="none"
-                stroke="#d97706" strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="flex-shrink-0 mt-0.5">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="12" y1="8" x2="12" y2="12"/>
-                <line x1="12" y1="16"
-                  x2="12.01" y2="16"/>
-              </svg>
-              <p className="text-xs text-amber-700">
-                Hours subject to change due to
-                weather, events, etc. will be
-                displayed on your listing.
-              </p>
-            </div>
+            )}
           </div>
         )}
-      </div>
-    )}
-
-  </div>
-)}
-
 
         {/* Amenities — small business only */}
         {!isEvent && (
           <>
-            {/* Payment Options */}
             <AmenitySection
               title="Payment Options"
               options={PAYMENT_OPTIONS}
@@ -912,7 +1122,6 @@ export default function Step5Details({
               }
             />
 
-            {/* Ordering Methods */}
             <AmenitySection
               title="Ordering Methods"
               options={ORDERING_METHODS}
@@ -922,7 +1131,6 @@ export default function Step5Details({
               }
             />
 
-            {/* Dietary Options */}
             <AmenitySection
               title="Dietary Options"
               options={DIETARY_OPTIONS}
@@ -932,7 +1140,6 @@ export default function Step5Details({
               }
             />
 
-            {/* Business Amenities */}
             <AmenitySection
               title="Business Amenities"
               options={BUSINESS_AMENITIES}
@@ -942,7 +1149,6 @@ export default function Step5Details({
               }
             />
 
-            {/* Location Amenities — permanent only */}
             {isPermanent && (
               <AmenitySection
                 title="Location Amenities"
@@ -966,49 +1172,6 @@ export default function Step5Details({
           Continue
         </button>
 
-      </div>
-    </div>
-  );
-}
-
-// Reusable amenity checklist component
-function AmenitySection({
-  title,
-  options,
-  selected,
-  onToggle,
-}: {
-  title: string;
-  options: string[];
-  selected: string[];
-  onToggle: (value: string) => void;
-}) {
-  return (
-    <div>
-      <label className="block text-sm font-medium
-        text-black mb-3">
-        {title}
-        <span className="text-gray-400 text-xs
-          font-normal ml-2">
-          Optional
-        </span>
-      </label>
-      <div className="flex flex-wrap gap-2">
-        {options.map((option) => (
-          <button
-            key={option}
-            type="button"
-            onClick={() => onToggle(option)}
-            className={`px-4 py-2 rounded-full text-xs
-              font-medium border-2 transition
-              ${selected.includes(option)
-                ? "bg-black border-black text-white"
-                : "bg-white border-gray-200 text-black"
-              }`}
-          >
-            {option}
-          </button>
-        ))}
       </div>
     </div>
   );

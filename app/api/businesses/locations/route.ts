@@ -8,12 +8,12 @@ export async function GET() {
         b.id,
         b.slug,
         b.name,
+        b.type,
+        b.sub_type,
         b.category,
         b.price_tier,
         b.avg_rating,
         b.review_count,
-        b.type,
-        b.sub_type,
         ST_X(l.coordinates) as lng,
         ST_Y(l.coordinates) as lat,
         l.neighborhood,
@@ -22,6 +22,10 @@ export async function GET() {
       JOIN locations l ON l.business_id = b.id
       WHERE b.status = 'listed'
       AND l.coordinates IS NOT NULL
+      AND b.type IN (
+        'permanent_location',
+        'event'
+      )
     `;
 
     return NextResponse.json({ locations });

@@ -70,13 +70,15 @@ export default function HereMap({
 
   const getMarkerColor = (
     type: string,
-    subType: string
+    subType: string | null
   ): string | null => {
     if (subType === "street_vendor") return "#E63946";
     if (subType === "food_truck")    return "#1B4FE4";
     if (subType === "home_based")    return "#7B2D8B";
     if (subType === "pop_up")        return "#FF006E";
     if (subType === "market")        return "#2D6A4F";
+    if (type === "permanent_location") return "#E63946";
+
     return null;
   };
 

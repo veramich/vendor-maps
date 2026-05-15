@@ -7,6 +7,7 @@ type Business = {
   slug: string;
   name: string;
   category: string;
+  type: string;
   sub_type: string;
   price_tier: number;
   avg_rating: number;
@@ -71,16 +72,10 @@ export default function BusinessList() {
 function BusinessCard({ business }: { business: Business }) {
   const priceTier = "$".repeat(business.price_tier || 1);
 
-  const SUB_TYPE_LABELS: Record<string, string> = {
-    street_vendor:      "Street Vendor",
-    food_truck:         "Food Truck",
-    home_based:         "Home Based",
-    market_based:       "Market Based",
-    pop_up_based:       "Pop-Up Based",
-    catering_only:      "Catering",
-    shipping_only:      "Shipping",
+  const TYPE_LABELS: Record<string, string> = {
     permanent_location: "Permanent Location",
-  };
+    no_location:        "No Permanent Location",
+};
 
   return (
     <a
@@ -97,7 +92,7 @@ function BusinessCard({ business }: { business: Business }) {
           </p>
           <p className="text-xs text-gray-500 mb-2">
             {business.category} ·{" "}
-            {SUB_TYPE_LABELS[business.sub_type] || ""}
+            {TYPE_LABELS[business.type] || ""}
           </p>
           <div className="flex items-center gap-3">
             <span className="text-xs text-gray-500">

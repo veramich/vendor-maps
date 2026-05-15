@@ -31,6 +31,8 @@ export default function Step4Info({
 
   const charCount = formData.description.trim().length;
 
+  const isEvent = formData.type === "event";
+
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
@@ -44,23 +46,23 @@ export default function Step4Info({
       newErrors.name = "Name contains invalid characters";
     }
 
-    if (!formData.category) {
+    // Only require category for non-events
+    if (!isEvent && !formData.category) {
       newErrors.category = "Please select a category";
     }
 
     if (!formData.description.trim()) {
       newErrors.description = "Description is required";
-    } else if (charCount < 25) {
+    } else if (charCount < 10) {
       newErrors.description =
-        `${25 - charCount} more character${
-          25 - charCount === 1 ? "" : "s"
+        `${10 - charCount} more character${
+          10 - charCount === 1 ? "" : "s"
         } needed`;
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-
   const handleContinue = () => {
     if (validate()) nextStep();
   };
@@ -132,79 +134,81 @@ export default function Step4Info({
         </div>
 
         {/* Category */}
-        <div>
-          <label className="block text-sm font-medium
-            text-black mb-1">
-            Category
-            <span className="text-red-500 ml-1">*</span>
-          </label>
-          <button
-            type="button"
-            onClick={() => setShowCategories(!showCategories)}
-            className={`w-full border-2 rounded-xl px-4
-              py-3 text-sm text-left transition
-              flex items-center justify-between
-              ${errors.category
-                ? "border-red-400"
-                : formData.category
-                  ? "border-black"
-                  : "border-gray-200"
-              }`}
-          >
-            <span className={formData.category
-              ? "text-black"
-              : "text-gray-400"
-            }>
-              {formData.category || "Select a category"}
-            </span>
-            <svg
-              width="16" height="16"
-              viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2"
-              strokeLinecap="round" strokeLinejoin="round"
-              className={`transition-transform
-                ${showCategories ? "rotate-180" : ""}`}
+        {!isEvent && (
+          <div>
+            <label className="block text-sm font-medium
+              text-black mb-1">
+              Category
+              <span className="text-red-500 ml-1">*</span>
+            </label>
+            <button
+              type="button"
+              onClick={() => setShowCategories(!showCategories)}
+              className={`w-full border-2 rounded-xl px-4
+                py-3 text-sm text-left transition
+                flex items-center justify-between
+                ${errors.category
+                  ? "border-red-400"
+                  : formData.category
+                    ? "border-black"
+                    : "border-gray-200"
+                }`}
             >
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
-          </button>
+              <span className={formData.category
+                ? "text-black"
+                : "text-gray-400"
+              }>
+                {formData.category || "Select a category"}
+              </span>
+              <svg
+                width="16" height="16"
+                viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2"
+                strokeLinecap="round" strokeLinejoin="round"
+                className={`transition-transform
+                  ${showCategories ? "rotate-180" : ""}`}
+              >
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </button>
 
-          {showCategories && (
-            <div className="border-2 border-gray-200
-              rounded-xl mt-2 overflow-hidden max-h-64
-              overflow-y-auto">
-              {CATEGORIES.map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => {
-                    updateForm({ category: cat });
-                    setShowCategories(false);
-                    setErrors(prev => ({
-                      ...prev,
-                      category: ""
-                    }));
-                  }}
-                  className={`w-full px-4 py-3 text-sm
-                    text-left border-b border-gray-100
-                    last:border-0 transition
-                    ${formData.category === cat
-                      ? "bg-black text-white"
-                      : "text-black hover:bg-gray-50"
-                    }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-          )}
+            {showCategories && (
+              <div className="border-2 border-gray-200
+                rounded-xl mt-2 overflow-hidden max-h-64
+                overflow-y-auto">
+                {CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => {
+                      updateForm({ category: cat });
+                      setShowCategories(false);
+                      setErrors(prev => ({
+                        ...prev,
+                        category: ""
+                      }));
+                    }}
+                    className={`w-full px-4 py-3 text-sm
+                      text-left border-b border-gray-100
+                      last:border-0 transition
+                      ${formData.category === cat
+                        ? "bg-black text-white"
+                        : "text-black hover:bg-gray-50"
+                      }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            )}
 
-          {errors.category && (
-            <p className="text-red-500 text-xs mt-1">
-              {errors.category}
-            </p>
-          )}
-        </div>
+            {errors.category && (
+              <p className="text-red-500 text-xs mt-1">
+                {errors.category}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Description */}
         <div>
@@ -224,8 +228,10 @@ export default function Step4Info({
                 setErrors(prev => ({ ...prev, description: "" }));
               }
             }}
-            placeholder="Describe your business, what you
-              sell, your story, menu items, services..."
+            placeholder={isEvent
+              ? "Describe your event, what to expect, vendors, entertainment, admission details..."
+              : "Describe your business, what you sell, your story, menu items, services..."
+            }
             rows={5}
             className={`w-full border-2 rounded-xl px-4
               py-3 text-sm text-black focus:outline-none
@@ -242,14 +248,14 @@ export default function Step4Info({
               </p>
             ) : (
               <p className={`text-xs
-                ${charCount >= 25
+                ${charCount >= 10
                   ? "text-green-500"
                   : "text-gray-400"
                 }`}>
-                {charCount >= 25
+                {charCount >= 10
                   ? "✓ Minimum reached"
-                  : `${25 - charCount} more character${
-                      25 - charCount === 1 ? "" : "s"
+                  : `${10 - charCount} more character${
+                      10 - charCount === 1 ? "" : "s"
                     } needed`
                 }
               </p>
