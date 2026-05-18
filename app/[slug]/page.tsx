@@ -331,6 +331,14 @@ export default async function BusinessProfilePage({
               </Link>
             )}
 
+            {business.claim_status === "pending" && (
+              <span className="text-xs text-orange-500
+                border border-orange-200 rounded-lg
+                px-3 py-1.5 flex-shrink-0">
+                Claim Pending
+              </span>
+            )}
+
             {business.claim_status === "claimed" && (
               <div className="flex items-center
                 gap-1 flex-shrink-0">

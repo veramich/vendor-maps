@@ -3,12 +3,14 @@ import sql from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 
-// Get business data for owner
+// GET — fetch business data for owner
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+
     const session = await auth.api.getSession({
       headers: await headers(),
     });
@@ -20,7 +22,7 @@ export async function GET(
       );
     }
 
-    const [business] = await sql`
+    const result = await sql`
       SELECT
         b.*,
         l.id as location_id,
@@ -37,19 +39,24 @@ export async function GET(
       FROM businesses b
       LEFT JOIN locations l
         ON l.business_id = b.id
-      WHERE b.id = ${params.id}
+      WHERE b.id = ${id}
       AND b.claimed_by = ${session.user.id}
       AND b.claim_status = 'claimed'
     `;
 
-    if (!business) {
+    if (!result || result.length === 0) {
       return NextResponse.json(
         { error: "Business not found or unauthorized" },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ business, location: business });
+    const business = result[0];
+
+    return NextResponse.json({
+      business,
+      location: business,
+    });
 
   } catch (error) {
     console.error("Owner GET error:", error);
@@ -60,12 +67,14 @@ export async function GET(
   }
 }
 
-// Update business location settings
+// PATCH — update business location settings
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+
     const session = await auth.api.getSession({
       headers: await headers(),
     });
@@ -78,14 +87,14 @@ export async function PATCH(
     }
 
     // Verify ownership
-    const [business] = await sql`
+    const owned = await sql`
       SELECT id FROM businesses
-      WHERE id = ${params.id}
+      WHERE id = ${id}
       AND claimed_by = ${session.user.id}
       AND claim_status = 'claimed'
     `;
 
-    if (!business) {
+    if (!owned || owned.length === 0) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 403 }
@@ -100,17 +109,26 @@ export async function PATCH(
       exactZip,
     } = await req.json();
 
+    // Build full exact address string
+    const fullExactAddress =
+      showExactAddress && exactAddress
+        ? [
+            exactAddress,
+            exactCity,
+            exactState,
+            exactZip,
+          ]
+            .filter(Boolean)
+            .join(", ")
+        : null;
+
     // Update location
     await sql`
       UPDATE locations SET
-        show_exact_address = ${showExactAddress},
-        exact_address = ${
-          showExactAddress && exactAddress
-            ? `${exactAddress}, ${exactCity}, ${exactState} ${exactZip}`
-            : null
-        },
-        updated_at = NOW()
-      WHERE business_id = ${params.id}
+        show_exact_address = ${showExactAddress || false},
+        exact_address      = ${fullExactAddress},
+        updated_at         = NOW()
+      WHERE business_id = ${id}
     `;
 
     return NextResponse.json({ success: true });
