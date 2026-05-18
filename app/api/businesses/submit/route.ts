@@ -3,6 +3,8 @@ import sql from "@/lib/db";
 import { uploadImage } from "@/lib/utils/uploadImage";
 import { buildSocialUrls } from "@/lib/utils/buildSocialUrls";
 import { generateSlug } from "@/lib/utils/generateSlug";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,6 +20,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
+    // Get session if signed in
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    }).catch(() => null);
+
+    const submittedBy = session?.user?.id || null;
+
     // Get IP for spam prevention
     const ip =
       req.headers.get("x-forwarded-for") || "unknown";
@@ -30,7 +39,7 @@ export async function POST(req: NextRequest) {
       AND created_at > NOW() - INTERVAL '24 hours'
     `;
 
-    if (Number(recentSubmissions[0].count) >= 6) {
+    if (Number(recentSubmissions[0].count) >= 3) {
       return NextResponse.json(
         { error: "Too many submissions. Try again tomorrow." },
         { status: 429 }
@@ -91,7 +100,7 @@ export async function POST(req: NextRequest) {
     const isEventType = data.type === "event";
 
     const dbPriceTier = isEventType
-      ? null  // ← always null for events
+      ? null
       : data.priceTier || null;
 
     const dbPriceContext = isEventType
@@ -101,7 +110,6 @@ export async function POST(req: NextRequest) {
         ? `$${data.admissionPrice} admission`
         : null
       : data.priceContext || null;
-
 
     // Generate slug
     const slug = await generateSlug(
@@ -142,6 +150,7 @@ export async function POST(req: NextRequest) {
         status,
         claim_status,
         added_by,
+        submitted_by,
         submitter_ip
       ) VALUES (
         ${data.brandId || null},
@@ -165,7 +174,10 @@ export async function POST(req: NextRequest) {
         ${!isEventType ? data.paymentOptions || [] : []},
         ${!isEventType ? data.orderingMethods || [] : []},
         ${!isEventType ? data.dietaryOptions || [] : []},
-        ${!isEventType ? data.businessAmenities || [] : []},
+        ${!isEventType
+          ? data.businessAmenities || []
+          : []
+        },
         ${!isEventType
           ? data.hoursSubjectToChange || false
           : false
@@ -176,6 +188,7 @@ export async function POST(req: NextRequest) {
         'pending',
         'unclaimed',
         'user_submission',
+        ${submittedBy},
         ${ip}
       )
       RETURNING id
@@ -223,7 +236,6 @@ export async function POST(req: NextRequest) {
           )
         `;
       } else {
-        // No coordinates — save without map pin
         await sql`
           INSERT INTO locations (
             business_id,
@@ -325,20 +337,25 @@ export async function POST(req: NextRequest) {
       data.popUpEvent?.endTime
     ) {
       const { popUpEvent } = data;
+
       const startDateTime =
         `${popUpEvent.startDate} ${popUpEvent.startTime}`;
+
       let endDate =
         popUpEvent.endDate || popUpEvent.startDate;
-      
+
       if (popUpEvent.closesNextDay) {
         const start = new Date(popUpEvent.startDate);
         start.setDate(start.getDate() + 1);
         endDate = start.toISOString().split("T")[0];
-      } 
+      }
+
       const endDateTime =
         `${endDate} ${popUpEvent.endTime}`;
 
-      if (new Date(startDateTime) >= new Date(endDateTime)) {
+      if (
+        new Date(startDateTime) >= new Date(endDateTime)
+      ) {
         return NextResponse.json(
           { error: "Event end time must be after start time." },
           { status: 400 }
@@ -406,7 +423,7 @@ export async function POST(req: NextRequest) {
 
   } catch (error) {
     console.error("Submission error:", error);
-    
+
     const message =
       error instanceof Error
         ? error.message
