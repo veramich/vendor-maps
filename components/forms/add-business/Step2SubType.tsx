@@ -20,9 +20,9 @@ export default function Step2SubType({
   const smallBusinessOptions = [
     {
       value: "permanent_location",
-      title: "I have a permanent location",
+      title: "This business has a permanent location",
       description:
-        "Your cross streets will appear on the map and directory. Your exact address stays private",
+        "The cross streets will appear on the map and directory. The exact address stays private",
       icon: (
         <svg width="28" height="28" viewBox="0 0 24 24"
           fill="none" stroke="white" strokeWidth="1.8"
@@ -40,9 +40,9 @@ export default function Step2SubType({
     },
     {
       value: "no_location",
-      title: "I do not have a permanent location",
+      title: "This business does not have a permanent location",
       description:
-        "Your business will appear in the directory. No map location needed.",
+        "The business will appear in the directory. No map location needed.",
       icon: (
         <svg width="28" height="28" viewBox="0 0 24 24"
           fill="none" stroke="white" strokeWidth="1.8"
