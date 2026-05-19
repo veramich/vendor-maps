@@ -164,7 +164,29 @@ export default function AddBusinessPage() {
         body: formDataToSend,
       });
 
-      const result = await res.json();
+      if (res.status === 413) {
+        throw new Error(
+          "Your photos are too large to upload. " +
+          "Please reduce the number of photos or " +
+          "use smaller images (under 4 MB total) " +
+          "and try again."
+        );
+      }
+
+      if (!res.ok && res.status !== 500) {
+        throw new Error(
+          `Submission failed (${res.status}). Please try again.`
+        );
+      }
+
+      let result: any;
+      try {
+        result = await res.json();
+      } catch {
+        throw new Error(
+          "Unexpected server response. Please try again."
+        );
+      }
 
       if (!result.success) {
         throw new Error(
