@@ -27,9 +27,11 @@ export async function POST(req: NextRequest) {
 
     const submittedBy = session?.user?.id || null;
 
-    // Get IP for spam prevention
+    // Get IP for spam prevention (take only the first IP from x-forwarded-for)
     const ip =
-      req.headers.get("x-forwarded-for") || "unknown";
+      req.headers.get("x-forwarded-for")
+        ?.split(",")[0].trim()
+      || "unknown";
 
     // Rate limit — max 3 submissions per IP per day
     const recentSubmissions = await sql`
@@ -171,13 +173,10 @@ export async function POST(req: NextRequest) {
         ${data.email || null},
         ${data.phone || null},
         ${JSON.stringify(submittedOtherLinks)},
-        ${!isEventType ? data.paymentOptions || [] : []},
-        ${!isEventType ? data.orderingMethods || [] : []},
-        ${!isEventType ? data.dietaryOptions || [] : []},
-        ${!isEventType
-          ? data.businessAmenities || []
-          : []
-        },
+        ${sql.array(!isEventType ? data.paymentOptions || [] : [], 25)},
+        ${sql.array(!isEventType ? data.orderingMethods || [] : [], 25)},
+        ${sql.array(!isEventType ? data.dietaryOptions || [] : [], 25)},
+        ${sql.array(!isEventType ? data.businessAmenities || [] : [], 25)},
         ${!isEventType
           ? data.hoursSubjectToChange || false
           : false
@@ -230,7 +229,7 @@ export async function POST(req: NextRequest) {
             ${data.zip || null},
             'USA',
             ${data.neighborhood || null},
-            ${data.locationAmenities || []},
+            ${sql.array(data.locationAmenities || [], 25)},
             ST_MakePoint(${data.lng}, ${data.lat}),
             true
           )
@@ -261,7 +260,7 @@ export async function POST(req: NextRequest) {
             ${data.zip || null},
             'USA',
             ${data.neighborhood || null},
-            ${data.locationAmenities || []},
+            ${sql.array(data.locationAmenities || [], 25)},
             true
           )
         `;
@@ -423,6 +422,18 @@ export async function POST(req: NextRequest) {
 
   } catch (error) {
     console.error("Submission error:", error);
+
+    // Log full PostgreSQL error details if available
+    if (error && typeof error === "object" && "code" in error) {
+      console.error("DB error details:", {
+        code:    (error as any).code,
+        detail:  (error as any).detail,
+        hint:    (error as any).hint,
+        column:  (error as any).column,
+        table:   (error as any).table,
+        constraint: (error as any).constraint,
+      });
+    }
 
     const message =
       error instanceof Error
