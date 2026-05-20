@@ -134,8 +134,9 @@ export default function HereMap({
     );
     if (!color) return;
 
-    const iconFile =
-      CATEGORY_ICONS[location.category] || "other";
+    const iconFile = location.type === "event"
+      ? "event"
+      : (CATEGORY_ICONS[location.category] || "other");
     const base64Icon = await getIconBase64(iconFile);
 
     const svgMarkup = `<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><circle cx="20" cy="20" r="18" fill="${color}" stroke="white" stroke-width="3"/><image href="${base64Icon}" x="10" y="10" width="20" height="20"/></svg>`;
@@ -183,8 +184,9 @@ export default function HereMap({
       const offsetLng =
         location.lng + offsetDistance * Math.sin(angle);
 
-      const iconFile =
-        CATEGORY_ICONS[location.category] || "other";
+      const iconFile = location.type === "event"
+        ? "event"
+        : (CATEGORY_ICONS[location.category] || "other");
       const base64Icon = await getIconBase64(iconFile);
 
       const svgMarkup = `<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><circle cx="20" cy="20" r="18" fill="${color}" stroke="white" stroke-width="3"/><image href="${base64Icon}" x="10" y="10" width="20" height="20"/></svg>`;
