@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function NotFound() {
   return (
-    <main className="mx-auto flex min-h-[70vh] max-w-2xl flex-col items-center justify-center px-6 text-center">
+    <main className="mx-auto flex min-h-[70vh] max-w-2xl flex-col items-center justify-center px-6 text-center bg-gray-50">
       <h1 className="text-3xl font-semibold tracking-tight text-gray-900">Still in the works</h1>
       <p className="mt-4 text-base text-gray-600">
         This is still in the works! You are seeing a sneak peak to VendorMaps. At the moment,
