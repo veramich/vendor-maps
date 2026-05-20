@@ -166,10 +166,7 @@ export default function AddBusinessPage() {
 
       if (res.status === 413) {
         throw new Error(
-          "Your photos are too large to upload. " +
-          "Please reduce the number of photos or " +
-          "use smaller images (under 4 MB total) " +
-          "and try again."
+          "Upload is too large. Please remove some photos and try again."
         );
       }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import imageCompression from "browser-image-compression";
 import { BusinessFormData } from "@/lib/types/business";
 
 const sanitizeText = (value: string): string => {
@@ -23,6 +24,7 @@ export default function Step6Media({
 }: Step6MediaProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [previews, setPreviews] = useState<string[]>([]);
+  const [compressing, setCompressing] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   const isEvent =
@@ -85,7 +87,7 @@ export default function Step6Media({
     }
   };
 
-  const handleImageChange = (
+  const handleImageChange = async (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     const files = Array.from(e.target.files || []);
@@ -94,20 +96,37 @@ export default function Step6Media({
     const remaining = maxImages - formData.images.length;
     const toAdd = files.slice(0, remaining);
 
-    toAdd.forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviews(prev => [
-          ...prev,
-          reader.result as string
-        ]);
-      };
-      reader.readAsDataURL(file);
-    });
+    setCompressing(true);
+    try {
+      const compressed = await Promise.all(
+        toAdd.map(file =>
+          imageCompression(file, {
+            maxSizeMB: 1,
+            maxWidthOrHeight: 1920,
+            useWebWorker: true,
+            fileType: "image/jpeg",
+          })
+        )
+      );
 
-    updateForm({
-      images: [...formData.images, ...toAdd]
-    });
+      const newPreviews = await Promise.all(
+        compressed.map(file =>
+          new Promise<string>(resolve => {
+            const reader = new FileReader();
+            reader.onloadend = () =>
+              resolve(reader.result as string);
+            reader.readAsDataURL(file);
+          })
+        )
+      );
+
+      setPreviews(prev => [...prev, ...newPreviews]);
+      updateForm({
+        images: [...formData.images, ...compressed],
+      });
+    } finally {
+      setCompressing(false);
+    }
   };
 
   const removeImage = (index: number) => {
@@ -299,7 +318,7 @@ export default function Step6Media({
               <input
                 ref={imageInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
                 multiple
                 onChange={handleImageChange}
                 className="hidden"
@@ -309,30 +328,50 @@ export default function Step6Media({
                 onClick={() =>
                   imageInputRef.current?.click()
                 }
+                disabled={compressing}
                 className="w-full border-2 border-dashed
                   border-gray-200 rounded-xl py-8
                   flex flex-col items-center gap-2
-                  hover:border-gray-300 transition"
+                  hover:border-gray-300 transition
+                  disabled:opacity-50"
               >
-                <svg width="28" height="28"
-                  viewBox="0 0 24 24" fill="none"
-                  stroke="#9ca3af" strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round">
-                  <rect x="3" y="3" width="18"
-                    height="18" rx="2" ry="2"/>
-                  <circle cx="8.5" cy="8.5" r="1.5"/>
-                  <polyline points="21 15 16 10 5 21"/>
-                </svg>
-                <p className="text-sm text-gray-400">
-                  {previews.length === 0
-                    ? "Add photos"
-                    : `Add more (${previews.length}/${maxImages})`
-                  }
-                </p>
-                <p className="text-xs text-gray-300">
-                  PNG, JPG, WebP
-                </p>
+                {compressing ? (
+                  <>
+                    <svg width="28" height="28"
+                      viewBox="0 0 24 24" fill="none"
+                      stroke="#9ca3af" strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="animate-spin">
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                    </svg>
+                    <p className="text-sm text-gray-400">
+                      Optimizing photos…
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <svg width="28" height="28"
+                      viewBox="0 0 24 24" fill="none"
+                      stroke="#9ca3af" strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round">
+                      <rect x="3" y="3" width="18"
+                        height="18" rx="2" ry="2"/>
+                      <circle cx="8.5" cy="8.5" r="1.5"/>
+                      <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                    <p className="text-sm text-gray-400">
+                      {previews.length === 0
+                        ? "Add photos"
+                        : `Add more (${previews.length}/${maxImages})`
+                      }
+                    </p>
+                    <p className="text-xs text-gray-300">
+                      PNG, JPG, WebP, HEIC
+                    </p>
+                  </>
+                )}
               </button>
             </>
           )}
@@ -547,9 +586,11 @@ export default function Step6Media({
         {/* Continue button */}
         <button
           onClick={handleContinue}
+          disabled={compressing}
           className="w-full bg-black text-white
             rounded-xl py-4 text-sm font-medium
-            hover:bg-gray-800 transition"
+            hover:bg-gray-800 transition
+            disabled:opacity-50"
         >
           Continue
         </button>
