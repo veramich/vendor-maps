@@ -37,22 +37,45 @@ export default function Step6Media({
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
+    const attachPrefixForValidation = (
+      value: string,
+      prefix?: string
+    ): string => {
+      if (!value) return "";
+      if (!prefix) return value;
+
+      if (
+        value.startsWith("http://") ||
+        value.startsWith("https://")
+      ) {
+        return value;
+      }
+
+      return `https://${prefix}${value.replace(/^@/, "")}`;
+    };
+
     // Validate URL formats
     const urlFields = [
       { field: "website",   label: "Website" },
-      { field: "instagram", label: "Instagram" },
-      { field: "facebook",  label: "Facebook" },
-      { field: "tiktok",    label: "TikTok" },
-      { field: "twitter",   label: "Twitter" },
-      { field: "youtube",   label: "YouTube" },
+      { field: "instagram", label: "Instagram", prefix: "instagram.com/" },
+      { field: "facebook",  label: "Facebook",  prefix: "facebook.com/" },
+      { field: "tiktok",    label: "TikTok",    prefix: "tiktok.com/@" },
+      { field: "twitter",   label: "Twitter",   prefix: "twitter.com/" },
+      { field: "youtube",   label: "YouTube",   prefix: "youtube.com/@" },
       { field: "videoUrl",  label: "Video link" },
     ];
 
-    urlFields.forEach(({ field, label }) => {
+    urlFields.forEach(({ field, label, prefix }) => {
       const value = formData[
         field as keyof BusinessFormData
       ] as string;
-      if (value && !isValidUrl(value)) {
+
+      const fullUrl = attachPrefixForValidation(
+        value,
+        prefix
+      );
+
+      if (value && !isValidUrl(fullUrl)) {
         newErrors[field] =
           `${label} must be a valid URL`;
       }
