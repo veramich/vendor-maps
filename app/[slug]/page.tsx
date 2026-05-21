@@ -2,6 +2,10 @@ import { notFound } from "next/navigation";
 import sql from "@/lib/db";
 import Link from "next/link";
 import SaveButton from "@/components/ui/SaveButton";
+import OwnerResponse from "@/components/ui/OwnerResponse";
+import { headers } from "next/dist/server/request/headers";
+import { auth } from "@/lib/auth";
+
 
 async function getBusinessBySlug(slug: string) {
   try {
@@ -194,6 +198,10 @@ export default async function BusinessProfilePage({
 
   if (!data) notFound();
 
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  }).catch(() => null);
+
   const {
     business,
     images,
@@ -203,6 +211,10 @@ export default async function BusinessProfilePage({
     reviews,
     otherLocations,
   } = data;
+
+  const isOwner =
+    session?.user?.id === business.claimed_by &&
+    business.claim_status === "claimed";
 
   const address =
     business.show_exact_address && business.exact_address
@@ -320,48 +332,53 @@ export default async function BusinessProfilePage({
               )}
             </div>
 
-            {business.claim_status === "unclaimed" && (
-              <Link
-                href={`/claim/${business.id}`}
-                className="text-xs text-gray-400
-                  border border-gray-200 rounded-lg
-                  px-3 py-1.5 hover:bg-gray-50
-                  transition flex-shrink-0"
-              >
-                Claim
-              </Link>
-            )}
-
-            {business.claim_status === "pending" && (
-              <span className="text-xs text-orange-500
-                border border-orange-200 rounded-lg
-                px-3 py-1.5 flex-shrink-0">
-                Claim Pending
-              </span>
-            )}
-
-            {business.claim_status === "claimed" && (
-              <div className="flex items-center
-                gap-1 flex-shrink-0">
-                <svg width="14" height="14"
-                  viewBox="0 0 24 24" fill="none"
-                  stroke="#22c55e" strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round">
-                  <path d="M22 11.08V12a10 10 0 1
-                    1-5.93-9.14"/>
-                  <polyline
-                    points="22 4 12 14.01 9 11.01"/>
-                </svg>
+            {/* Claim / Verified */}
+            <div className="flex flex-col items-end
+              gap-2 flex-shrink-0">
+              {business.claim_status === "unclaimed" && (
+                <Link
+                  href={`/claim/${business.id}`}
+                  className="text-xs text-gray-400
+                    border border-gray-200 rounded-lg
+                    px-3 py-1.5 hover:bg-gray-50
+                    transition"
+                >
+                  Claim
+                </Link>
+              )}
+              {business.claim_status === "pending" && (
                 <span className="text-xs
-                  text-green-600">
-                  Verified
+                  text-orange-500 border
+                  border-orange-200 rounded-lg
+                  px-3 py-1.5">
+                  Claim Pending
                 </span>
-                <div className="flex items-center gap-2 mt-3">
-                  <SaveButton businessId={business.id} />
+              )}
+              {business.claim_status === "claimed" && (
+                <div className="flex items-center
+                  gap-1">
+                  <svg width="14" height="14"
+                    viewBox="0 0 24 24" fill="none"
+                    stroke="#22c55e" strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1
+                      1-5.93-9.14"/>
+                    <polyline
+                      points="22 4 12 14.01 9 11.01"/>
+                  </svg>
+                  <span className="text-xs
+                    text-green-600">
+                    Verified
+                  </span>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+          </div>
+
+          {/* Save button */}
+          <div className="mt-4">
+            <SaveButton businessId={business.id} />
           </div>
         </div>
 
@@ -841,8 +858,7 @@ export default async function BusinessProfilePage({
                         </span>
                       ))}
                     </div>
-                    <span className="text-xs
-                      text-gray-400">
+                    <span className="text-xs text-gray-400">
                       {new Date(review.created_at)
                         .toLocaleDateString("en-US", {
                           month: "short",
@@ -866,19 +882,14 @@ export default async function BusinessProfilePage({
                     </p>
                   )}
 
-                  {review.response_text && (
-                    <div className="mt-3 bg-gray-50
-                      rounded-xl p-3">
-                      <p className="text-xs font-medium
-                        text-black mb-1">
-                        Response from owner
-                      </p>
-                      <p className="text-xs
-                        text-gray-600">
-                        {review.response_text}
-                      </p>
-                    </div>
-                  )}
+                  <OwnerResponse
+                    reviewId={review.id}
+                    businessSlug={slug}
+                    existingResponse={
+                      review.response_text || undefined
+                    }
+                    isOwner={isOwner}
+                  />
                 </div>
               ))}
             </div>
