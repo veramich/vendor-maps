@@ -1,10 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
+'use server'
+
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import sql from "@/lib/db";
 import { generateSlug } from "@/lib/utils/generateSlug";
 
-export async function POST(req: NextRequest) {
+async function requireAdmin() {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -13,16 +15,15 @@ export async function POST(req: NextRequest) {
     !session ||
     session.user.id !== process.env.ADMIN_USER_ID
   ) {
-    return NextResponse.json(
-      { error: "Unauthorized" },
-      { status: 401 }
-    );
+    redirect("/");
   }
+}
 
-  const formData = await req.formData();
+export async function approveSubmission(formData: FormData) {
+  await requireAdmin();
+
   const businessId = formData.get("businessId") as string;
 
-  // Get business details for slug
   const [business] = await sql`
     SELECT b.name, l.city, l.neighborhood
     FROM businesses b
@@ -30,7 +31,6 @@ export async function POST(req: NextRequest) {
     WHERE b.id = ${businessId}
   `;
 
-  // Generate slug if not already set
   if (!business.slug) {
     const slug = await generateSlug(
       business.name,
@@ -52,7 +52,33 @@ export async function POST(req: NextRequest) {
     `;
   }
 
-  return NextResponse.redirect(
-    new URL("/admin/submissions", req.url)
-  );
+  redirect("/admin/submissions");
+}
+
+export async function rejectSubmission(formData: FormData) {
+  await requireAdmin();
+
+  const businessId = formData.get("businessId") as string;
+
+  await sql`
+    UPDATE businesses SET
+      status = 'rejected'
+    WHERE id = ${businessId}
+  `;
+
+  redirect("/admin/submissions");
+}
+
+export async function markDuplicate(formData: FormData) {
+  await requireAdmin();
+
+  const businessId = formData.get("businessId") as string;
+
+  await sql`
+    UPDATE businesses SET
+      status = 'duplicate'
+    WHERE id = ${businessId}
+  `;
+
+  redirect("/admin/submissions");
 }

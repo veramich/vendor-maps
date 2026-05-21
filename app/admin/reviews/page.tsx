@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/adminAuth";
 import sql from "@/lib/db";
+import { approveReview, rejectReview } from "./actions";
 
 export default async function AdminReviews() {
   await requireAdmin();
@@ -118,10 +119,7 @@ export default async function AdminReviews() {
 
               {/* Actions */}
               <div className="flex gap-2">
-                <form
-                  action="/api/admin/approve-review"
-                  method="POST"
-                >
+                <form action={approveReview}>
                   <input
                     type="hidden"
                     name="reviewId"
@@ -138,10 +136,7 @@ export default async function AdminReviews() {
                   </button>
                 </form>
 
-                <form
-                  action="/api/admin/reject-review"
-                  method="POST"
-                >
+                <form action={rejectReview}>
                   <input
                     type="hidden"
                     name="reviewId"

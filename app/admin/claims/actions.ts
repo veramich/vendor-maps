@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+'use server'
+
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import sql from "@/lib/db";
 
-export async function POST(req: NextRequest) {
+async function requireAdmin() {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -12,24 +14,16 @@ export async function POST(req: NextRequest) {
     !session ||
     session.user.id !== process.env.ADMIN_USER_ID
   ) {
-    return NextResponse.json(
-      { error: "Unauthorized" },
-      { status: 401 }
-    );
+    redirect("/");
   }
+}
 
-  const formData = await req.formData();
+export async function approveClaim(formData: FormData) {
+  await requireAdmin();
+
   const claimId    = formData.get("claimId") as string;
   const businessId = formData.get("businessId") as string;
   const userId     = formData.get("userId") as string;
-
-  // Approve claim
-  await sql`
-  UPDATE claims SET
-    status      = 'approved',
-    resolved_at = NOW()
-  WHERE id = ${claimId}
-`;
 
   await sql`
     UPDATE claims SET
@@ -45,7 +39,20 @@ export async function POST(req: NextRequest) {
     WHERE id = ${businessId}
   `;
 
-  return NextResponse.redirect(
-    new URL("/admin/claims", req.url)
-  );
+  redirect("/admin/claims");
+}
+
+export async function rejectClaim(formData: FormData) {
+  await requireAdmin();
+
+  const claimId = formData.get("claimId") as string;
+
+  await sql`
+    UPDATE claims SET
+      status      = 'rejected',
+      resolved_at = NOW()
+    WHERE id = ${claimId}
+  `;
+
+  redirect("/admin/claims");
 }

@@ -1,6 +1,7 @@
 import { requireAdmin } from "@/lib/adminAuth";
 import sql from "@/lib/db";
 import Link from "next/link";
+import { approveSubmission, rejectSubmission, markDuplicate } from "./actions";
 
 export default async function AdminSubmissions() {
   await requireAdmin();
@@ -104,8 +105,7 @@ export default async function AdminSubmissions() {
 
               {/* Actions */}
               <div className="flex gap-2">
-                <form action={`/api/admin/approve`}
-                  method="POST">
+                <form action={approveSubmission}>
                   <input type="hidden"
                     name="businessId" value={b.id}/>
                   <button
@@ -119,8 +119,7 @@ export default async function AdminSubmissions() {
                   </button>
                 </form>
 
-                <form action={`/api/admin/reject`}
-                  method="POST">
+                <form action={rejectSubmission}>
                   <input type="hidden"
                     name="businessId" value={b.id}/>
                   <button
@@ -134,8 +133,7 @@ export default async function AdminSubmissions() {
                   </button>
                 </form>
 
-                <form action={`/api/admin/duplicate`}
-                  method="POST">
+                <form action={markDuplicate}>
                   <input type="hidden"
                     name="businessId" value={b.id}/>
                   <button

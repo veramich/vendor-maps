@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/adminAuth";
 import sql from "@/lib/db";
+import { approveClaim, rejectClaim } from "./actions";
 
 export default async function AdminClaims() {
   await requireAdmin();
@@ -80,9 +81,7 @@ export default async function AdminClaims() {
               </div>
 
               <div className="flex gap-2">
-                <form
-                  action="/api/admin/approve-claim"
-                  method="POST">
+                <form action={approveClaim}>
                   <input type="hidden"
                     name="claimId" value={claim.id}/>
                   <input type="hidden"
@@ -101,9 +100,7 @@ export default async function AdminClaims() {
                   </button>
                 </form>
 
-                <form
-                  action="/api/admin/reject-claim"
-                  method="POST">
+                <form action={rejectClaim}>
                   <input type="hidden"
                     name="claimId" value={claim.id}/>
                   <button
