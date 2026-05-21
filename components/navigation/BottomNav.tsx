@@ -58,16 +58,46 @@ export default function BottomNav() {
         </Link>
 
         {/* Saved — only show if logged in */}
-        {session && (
+        {session ? (
           <Link
             href="/saved"
-            className={`flex flex-col items-center gap-1 px-3 py-1 rounded-lg transition
-              ${pathname === "/saved" ? "text-black" : "text-gray-400 hover:text-gray-600"}`}
+            className={`flex flex-col items-center
+              gap-1 text-xs transition
+              ${pathname === "/saved"
+                ? "text-black"
+                : "text-gray-400"
+              }`}
           >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+            <svg width="22" height="22"
+              viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0
+                1 2-2h10a2 2 0 0 1 2 2z"/>
             </svg>
-            <span className="text-xs">Saved</span>
+            Saved
+          </Link>
+        ) : (
+          <Link
+            href="/sign-in"
+            className={`flex flex-col items-center
+              gap-1 text-xs transition
+              ${pathname === "/sign-in"
+                ? "text-black"
+                : "text-gray-400"
+              }`}
+          >
+            <svg width="22" height="22"
+              viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4
+                0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+            Sign In
           </Link>
         )}
 

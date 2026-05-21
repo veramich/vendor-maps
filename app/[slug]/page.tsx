@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import sql from "@/lib/db";
 import Link from "next/link";
+import SaveButton from "@/components/ui/SaveButton";
 
 async function getBusinessBySlug(slug: string) {
   try {
@@ -356,6 +357,9 @@ export default async function BusinessProfilePage({
                   text-green-600">
                   Verified
                 </span>
+                <div className="flex items-center gap-2 mt-3">
+                  <SaveButton businessId={business.id} />
+                </div>
               </div>
             )}
           </div>
