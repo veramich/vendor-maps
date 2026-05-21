@@ -25,13 +25,19 @@ export async function POST(req: NextRequest) {
 
   // Approve claim
   await sql`
+  UPDATE claims SET
+    status      = 'approved',
+    resolved_at = NOW()
+  WHERE id = ${claimId}
+`;
+
+  await sql`
     UPDATE claims SET
       status      = 'approved',
       resolved_at = NOW()
     WHERE id = ${claimId}
   `;
 
-  // Link owner to business
   await sql`
     UPDATE businesses SET
       claim_status = 'claimed',

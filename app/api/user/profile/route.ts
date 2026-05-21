@@ -3,7 +3,7 @@ import sql from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 
-export async function GET(req: NextRequest) {
+export async function PATCH(req: NextRequest) {
   try {
     const session = await auth.api.getSession({
       headers: await headers(),
@@ -16,49 +16,36 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const userId = session.user.id;
+    const { name } = await req.json();
 
-    // Get submission count
-    const [submissionCount] = await sql`
-      SELECT COUNT(*) as count
-      FROM businesses
-      WHERE submitted_by = ${userId}
+    if (!name?.trim()) {
+      return NextResponse.json(
+        { error: "Name is required" },
+        { status: 400 }
+      );
+    }
+
+    if (name.trim().length < 2) {
+      return NextResponse.json(
+        { error: "Name must be at least 2 characters" },
+        { status: 400 }
+      );
+    }
+
+    await sql`
+      UPDATE "user"
+      SET
+        name       = ${name.trim()},
+        updated_at = NOW()
+      WHERE id = ${session.user.id}
     `;
 
-    // Get review count
-    const [reviewCount] = await sql`
-      SELECT COUNT(*) as count
-      FROM reviews
-      WHERE user_id = ${userId}
-    `;
-
-    // Get saved count
-    const [savedCount] = await sql`
-      SELECT COUNT(*) as count
-      FROM saved_businesses
-      WHERE user_id = ${userId}
-    `;
-
-    // Get claim count
-    const [claimCount] = await sql`
-      SELECT COUNT(*) as count
-      FROM claims
-      WHERE user_id = ${userId}
-    `;
-
-    return NextResponse.json({
-      stats: {
-        submissions: Number(submissionCount.count),
-        reviews:     Number(reviewCount.count),
-        saved:       Number(savedCount.count),
-        claims:      Number(claimCount.count),
-      },
-    });
+    return NextResponse.json({ success: true });
 
   } catch (error) {
-    console.error("Profile stats error:", error);
+    console.error("Profile PATCH error:", error);
     return NextResponse.json(
-      { error: "Failed to fetch stats" },
+      { error: "Failed to update name" },
       { status: 500 }
     );
   }
