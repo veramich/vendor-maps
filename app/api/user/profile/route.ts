@@ -3,6 +3,48 @@ import sql from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 
+export async function GET() {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const userId = session.user.id;
+
+    const [subResult, reviewResult, savedResult, claimResult] =
+      await Promise.all([
+        sql`SELECT COUNT(*) FROM businesses WHERE submitted_by = ${userId}`,
+        sql`SELECT COUNT(*) FROM reviews WHERE user_id = ${userId}`,
+        sql`SELECT COUNT(*) FROM saved_businesses WHERE user_id = ${userId}`,
+        sql`SELECT COUNT(*) FROM claims WHERE user_id = ${userId}`,
+      ]);
+
+    return NextResponse.json({
+      stats: {
+        submissions: Number(subResult[0].count),
+        reviews:     Number(reviewResult[0].count),
+        saved:       Number(savedResult[0].count),
+        claims:      Number(claimResult[0].count),
+      },
+      isAdmin: userId === process.env.ADMIN_USER_ID,
+    });
+
+  } catch (error) {
+    console.error("Profile GET error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch profile" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PATCH(req: NextRequest) {
   try {
     const session = await auth.api.getSession({

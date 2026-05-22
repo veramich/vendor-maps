@@ -23,6 +23,7 @@ export default function ProfilePage() {
   });
   const [loading, setLoading] = useState(true);
   const [signingOut, setSigningOut] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Name editing
   const [editingName, setEditingName] = useState(false);
@@ -52,6 +53,7 @@ export default function ProfilePage() {
         saved:       0,
         claims:      0,
       });
+      setIsAdmin(data.isAdmin || false);
     } catch (error) {
       console.error("Error fetching stats:", error);
     } finally {
@@ -387,6 +389,28 @@ export default function ProfilePage() {
             </Link>
           ))}
         </div>
+
+        {/* Admin */}
+        {isAdmin && (
+          <Link
+            href="/admin"
+            className="w-full flex items-center
+              justify-center gap-2 border-2
+              border-gray-200 text-black
+              rounded-2xl py-4 text-sm font-medium
+              hover:bg-gray-50 transition"
+          >
+            <svg width="18" height="18"
+              viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round">
+              <circle cx="12" cy="8" r="4"/>
+              <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+            </svg>
+            Admin Dashboard
+          </Link>
+        )}
 
         {/* Sign out */}
         <button

@@ -253,16 +253,6 @@ export default function MySubmissionsPage() {
                         business days.
                       </p>
                     )}
-                    {sub.status === "pending" && (
-                    <Link
-                      href={`/my-submissions/${sub.id}/edit`}
-                      className="text-xs border border-gray-200
-                        text-black px-3 py-1.5 rounded-lg
-                        hover:bg-gray-50 transition"
-                    >
-                      Edit
-                    </Link>
-                  )}
                     {sub.status === "listed" && (
                       <p>
                         Your listing is live on
