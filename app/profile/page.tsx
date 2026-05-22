@@ -260,7 +260,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Stats grid */}
+        {/* Stats grid — 3 items */}
         <div className="grid grid-cols-2 gap-3">
           <Link
             href="/my-submissions"
@@ -268,27 +268,11 @@ export default function ProfilePage() {
               rounded-2xl p-4 hover:border-gray-200
               transition"
           >
-            <p className="text-2xl font-bold
-              text-black">
+            <p className="text-2xl font-bold text-black">
               {stats.submissions}
             </p>
             <p className="text-xs text-gray-500 mt-1">
               Submissions
-            </p>
-          </Link>
-
-          <Link
-            href="/my-claims"
-            className="border-2 border-gray-100
-              rounded-2xl p-4 hover:border-gray-200
-              transition"
-          >
-            <p className="text-2xl font-bold
-              text-black">
-              {stats.claims}
-            </p>
-            <p className="text-xs text-gray-500 mt-1">
-              Claims
             </p>
           </Link>
 
@@ -298,8 +282,7 @@ export default function ProfilePage() {
               rounded-2xl p-4 hover:border-gray-200
               transition"
           >
-            <p className="text-2xl font-bold
-              text-black">
+            <p className="text-2xl font-bold text-black">
               {stats.saved}
             </p>
             <p className="text-xs text-gray-500 mt-1">
@@ -307,10 +290,10 @@ export default function ProfilePage() {
             </p>
           </Link>
 
-          <div className="border-2 border-gray-100
-            rounded-2xl p-4">
-            <p className="text-2xl font-bold
-              text-black">
+          {/* Reviews spans full width */}
+          <div className="col-span-2 border-2
+            border-gray-100 rounded-2xl p-4">
+            <p className="text-2xl font-bold text-black">
               {stats.reviews}
             </p>
             <p className="text-xs text-gray-500 mt-1">
@@ -358,23 +341,6 @@ export default function ProfilePage() {
                     x2="8" y2="13"/>
                   <line x1="16" y1="17"
                     x2="8" y2="17"/>
-                </svg>
-              ),
-            },
-            {
-              href:  "/my-claims",
-              label: "My Claims",
-              icon: (
-                <svg width="18" height="18"
-                  viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round">
-                  <path d="M22 11.08V12a10 10 0
-                    1 1-5.93-9.14"/>
-                  <polyline
-                    points="22 4 12 14.01 9 11.01"/>
                 </svg>
               ),
             },

@@ -151,20 +151,6 @@ export default function Header() {
                 My Submissions
               </MenuLink>
 
-              <MenuLink
-                href="/my-claims"
-                onClick={() => setMenuOpen(false)}
-                icon={
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                    <polyline points="22 4 12 14.01 9 11.01"/>
-                  </svg>
-                }
-              >
-                My Claims
-              </MenuLink>
-
-
               {/* Divider */}
               <div className="h-px bg-gray-100 my-3 mx-4" />
 
