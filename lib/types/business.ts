@@ -167,6 +167,9 @@ export type BusinessFormData = {
   isChainLocation:  boolean;
   brandId:          string | null;
   locationNickname: string;
+
+  // Server-side status (read-only, populated from API)
+  status: string;
 };
 
 export const INITIAL_FORM_DATA: BusinessFormData = {
@@ -215,6 +218,7 @@ export const INITIAL_FORM_DATA: BusinessFormData = {
   isChainLocation:  false,
   brandId:          null,
   locationNickname: "",
+  status:           "",
 };
 
 // Price tier labels per business sub type
