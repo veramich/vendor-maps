@@ -82,9 +82,7 @@ export default function MySubmissionsPage() {
       case "listed":   return "Live";
       case "pending":  return "Under Review";
       case "rejected": return "Rejected";
-      case "duplicate": return "Duplicate";
-      case "approved": return "Approved";
-      default:         return status;
+      case "duplicate": return "Duplicate";      default:         return status;
     }
   };
 
@@ -290,49 +288,58 @@ export default function MySubmissionsPage() {
 
                   {/* Actions */}
                   <div className="flex gap-2 flex-wrap">
-                    {sub.status === "listed" &&
-                      sub.slug && (
+                    {sub.status === "listed" && sub.slug && (
                       <Link
                         href={`/${sub.slug}`}
-                        className="text-xs bg-black
-                          text-white px-3 py-1.5
-                          rounded-lg"
+                        className="text-xs bg-black text-white
+                          px-3 py-1.5 rounded-lg"
                       >
                         View Listing
                       </Link>
                     )}
+
+                    {/* Edit for both pending and listed */}
+                    {(sub.status === "pending" ||
+                      sub.status === "listed") && (
+                      <Link
+                        href={`/my-submissions/${sub.id}/edit`}
+                        className="text-xs border border-gray-200
+                          text-black px-3 py-1.5 rounded-lg
+                          hover:bg-gray-50 transition"
+                      >
+                        Edit
+                      </Link>
+                    )}
+
                     {sub.status === "listed" &&
                       sub.claim_status === "unclaimed" && (
                       <Link
                         href={`/claim/${sub.id}`}
-                        className="text-xs border
-                          border-gray-200 text-black
-                          px-3 py-1.5 rounded-lg
+                        className="text-xs border border-gray-200
+                          text-black px-3 py-1.5 rounded-lg
                           hover:bg-gray-50 transition"
                       >
                         Claim as Owner
                       </Link>
                     )}
+
                     {sub.status === "listed" &&
                       sub.claim_status === "claimed" && (
                       <Link
-                        href={
-                          `/my-listings/${sub.id}/edit`
-                        }
-                        className="text-xs border
-                          border-gray-200 text-black
-                          px-3 py-1.5 rounded-lg
+                        href={`/my-listings/${sub.id}/edit`}
+                        className="text-xs border border-gray-200
+                          text-black px-3 py-1.5 rounded-lg
                           hover:bg-gray-50 transition"
                       >
                         Edit Listing
                       </Link>
                     )}
+
                     {sub.status === "rejected" && (
                       <Link
                         href="/add-business"
-                        className="text-xs border
-                          border-gray-200 text-black
-                          px-3 py-1.5 rounded-lg
+                        className="text-xs border border-gray-200
+                          text-black px-3 py-1.5 rounded-lg
                           hover:bg-gray-50 transition"
                       >
                         Submit Again

@@ -33,7 +33,6 @@ async function getBusinessBySlug(slug: string) {
       LEFT JOIN brands br
         ON br.id = b.brand_id
       WHERE b.slug = ${slug}
-      AND b.status = 'listed'
     `;
 
     if (!result || result.length === 0) return null;
@@ -201,6 +200,9 @@ export default async function BusinessProfilePage({
   const session = await auth.api.getSession({
     headers: await headers(),
   }).catch(() => null);
+
+  const isAdmin = session?.user?.id === process.env.ADMIN_USER_ID;
+  if (data.business.status !== "listed" && !isAdmin) notFound();
 
   const {
     business,

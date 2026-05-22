@@ -67,6 +67,8 @@ export default function EditSubmissionPage() {
     setFormData(prev => ({ ...prev, ...data }));
   };
 
+  const [saveMessage, setSaveMessage] = useState("");
+
   const handleSave = async () => {
     setSaving(true);
     setError("");
@@ -91,6 +93,11 @@ export default function EditSubmissionPage() {
       }
 
       setSaved(true);
+      setSaveMessage(
+        data.wasListed
+          ? "Changes submitted for review"
+          : "Changes saved"
+      );
       setTimeout(() => {
         router.push("/my-submissions");
       }, 1500);
@@ -169,13 +176,21 @@ export default function EditSubmissionPage() {
       </div>
 
       {/* Pending notice */}
-      <div className="bg-amber-50 border-b
-        border-amber-200 px-4 py-3">
-        <p className="text-xs text-amber-700
-          text-center max-w-lg mx-auto">
-          ⚠ This submission is pending review.
-          Changes will be saved and reviewed
-          by our team.
+      <div className={`border-b px-4 py-3
+        ${formData.status === "listed"
+          ? "bg-blue-50 border-blue-200"
+          : "bg-amber-50 border-amber-200"
+        }`}>
+        <p className={`text-xs text-center
+          max-w-lg mx-auto
+          ${formData.status === "listed"
+            ? "text-blue-700"
+            : "text-amber-700"
+          }`}>
+          {formData.status === "listed"
+            ? "ℹ️ Editing a live listing will submit it for review again before going live."
+            : "⚠ This submission is pending review. Changes will be saved and reviewed by our team."
+          }
         </p>
       </div>
 
@@ -239,9 +254,8 @@ export default function EditSubmissionPage() {
             </p>
           )}
           {saved && (
-            <p className="text-green-500 text-xs
-              flex-1">
-              ✓ Saved — redirecting...
+            <p className="text-green-500 text-xs flex-1">
+              ✓ {saveMessage} — redirecting...
             </p>
           )}
           <button
