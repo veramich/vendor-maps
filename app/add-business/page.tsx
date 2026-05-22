@@ -247,6 +247,10 @@ export default function AddBusinessPage() {
     );
   }
 
+  const goToStep = (step: number) => {
+    setStep(step);
+  };
+
   return (
     <div className="min-h-screen bg-white">
 
@@ -348,6 +352,7 @@ export default function AddBusinessPage() {
           <Step7Review
             formData={formData}
             onSubmit={handleSubmit}
+            onEditStep={goToStep}
           />
         )}
       </div>

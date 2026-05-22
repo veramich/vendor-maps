@@ -1,16 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { BusinessFormData, PRICE_TIERS } from "@/lib/types/business";
+import {
+  BusinessFormData,
+  PRICE_TIERS,
+} from "@/lib/types/business";
 
 interface Step7ReviewProps {
-  formData: BusinessFormData;
-  onSubmit: () => Promise<void>;
+  formData:    BusinessFormData;
+  onSubmit:    () => Promise<void>;
+  onEditStep:  (step: number) => void;
 }
 
 export default function Step7Review({
   formData,
   onSubmit,
+  onEditStep,
 }: Step7ReviewProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -41,6 +46,18 @@ export default function Step7Review({
     pop_up:             "Pop-Up Event",
   };
 
+  const DETAILED_SUB_TYPE_LABELS: Record<string, string> = {
+    street_vendor:      "Street Vendor",
+    food_truck:         "Food Truck",
+    home_based:         "Home Based",
+    market_based:       "Market Based",
+    pop_up_based:       "Pop-Up Based",
+    catering_only:      "Catering Only",
+    shipping_only:      "Shipping Only",
+    other_permanent:    "Other",
+    other_no_location:  "Other",
+  };
+
   const hasLocation =
     formData.subType === "permanent_location" ||
     formData.subType === "market" ||
@@ -57,14 +74,17 @@ export default function Step7Review({
         Review your listing
       </h2>
       <p className="text-gray-500 text-sm mb-8">
-        Make sure everything looks correct before
-        submitting
+        Make sure everything looks correct
+        before submitting
       </p>
 
-      <div className="space-y-6">
+      <div className="space-y-4">
 
-        {/* Business type */}
-        <ReviewSection title="Type">
+        {/* Type */}
+        <ReviewSection
+          title="Type"
+          onEdit={() => onEditStep(1)}
+        >
           <p className="text-sm text-black">
             {formData.type === "small_business"
               ? "Small Business"
@@ -72,13 +92,25 @@ export default function Step7Review({
             }
           </p>
           <p className="text-sm text-gray-500">
-            {SUB_TYPE_LABELS[formData.subType || ""] || ""}
+            {SUB_TYPE_LABELS[
+              formData.subType || ""
+            ] || ""}
           </p>
+          {formData.detailedSubType && (
+            <p className="text-sm text-gray-500">
+              {DETAILED_SUB_TYPE_LABELS[
+                formData.detailedSubType
+              ] || ""}
+            </p>
+          )}
         </ReviewSection>
 
         {/* Location */}
         {hasLocation && (
-          <ReviewSection title="Location">
+          <ReviewSection
+            title="Location"
+            onEdit={() => onEditStep(3)}
+          >
             <p className="text-sm text-black">
               {formData.subType === "permanent_location"
                 ? `${formData.street1} & ${formData.street2}`
@@ -90,15 +122,25 @@ export default function Step7Review({
                 ? `${formData.neighborhood}, `
                 : ""
               }
-              {formData.city}, {formData.stateCode}{" "}
-              {formData.zip}
+              {formData.city}, {formData.stateCode}
+              {formData.zip ? ` ${formData.zip}` : ""}
             </p>
+            {!formData.lat && !formData.lng && (
+              <p className="text-xs text-amber-600
+                mt-1">
+                ⚠ No map location — directory only
+              </p>
+            )}
           </ReviewSection>
         )}
 
         {/* Business info */}
-        <ReviewSection title="Business Info">
-          <div className="flex items-center gap-3 mb-2">
+        <ReviewSection
+          title="Business Info"
+          onEdit={() => onEditStep(4)}
+        >
+          <div className="flex items-center
+            gap-3 mb-2">
             {formData.logoUrl && (
               <img
                 src={formData.logoUrl}
@@ -112,234 +154,244 @@ export default function Step7Review({
                 text-black">
                 {formData.name}
               </p>
-              <p className="text-xs text-gray-500">
-                {formData.category}
-              </p>
+              {formData.category && (
+                <p className="text-xs text-gray-500">
+                  {formData.category}
+                </p>
+              )}
             </div>
           </div>
-          <p className="text-sm text-gray-600 leading-relaxed">
+          <p className="text-sm text-gray-600
+            leading-relaxed line-clamp-3">
             {formData.description}
           </p>
         </ReviewSection>
 
-        {/* Price tier */}
-        {priceTier && (
-          <ReviewSection title="Price Range">
-            <p className="text-sm text-black">
+        {/* Details */}
+        <ReviewSection
+          title={isEvent
+            ? "Event Details"
+            : "Business Details"
+          }
+          onEdit={() => onEditStep(5)}
+        >
+          {/* Price / Admission */}
+          {priceTier && (
+            <p className="text-sm text-black mb-1">
               {priceTier.label} — {priceTier.description}
             </p>
-            <p className="text-xs text-gray-500">
-              {formData.priceContext}
+          )}
+          {isEvent && (
+            <p className="text-sm text-black mb-1">
+              {(formData as any).isFreeEntry
+                ? "Free Entry"
+                : `$${(formData as any).admissionPrice} admission`
+              }
             </p>
-          </ReviewSection>
-        )}
+          )}
 
-        {/* Hours */}
-        {formData.hours.length > 0 && (
-          <ReviewSection title="Hours">
-            {formData.hours.some(h => h.hoursVary) ? (
-              <p className="text-sm text-gray-500">
-                Hours posted weekly on social media
-              </p>
-            ) : (
-              <div className="space-y-1">
-                {formData.hours.map((h) => (
-                  <div key={h.dayOfWeek}
-                    className="flex justify-between
-                      text-sm">
-                    <span className="capitalize
-                      text-black">
-                      {h.dayOfWeek}
-                    </span>
-                    <span className="text-gray-500">
-                      {h.isClosed
-                        ? "Closed"
-                        : `${h.openTime} — ${h.closeTime}
-                          ${h.closesNextDay
-                            ? "(next day)"
-                            : ""
-                          }`
-                      }
-                    </span>
-                  </div>
-                ))}
-                {(formData as any).hoursSubjectToChange && (
-                  <p className="text-xs text-amber-600
-                    mt-2">
-                    ⚠ Hours subject to change
-                  </p>
-                )}
-              </div>
-            )}
-          </ReviewSection>
-        )}
+          {/* Hours */}
+          {formData.hours.length > 0 && (
+            <div className="mt-2">
+              {formData.hours.some(h => h.hoursVary) ? (
+                <p className="text-xs text-gray-500">
+                  Hours posted weekly on social media
+                </p>
+              ) : (
+                <div className="space-y-1">
+                  {formData.hours
+                    .slice(0, 3)
+                    .map((h) => (
+                    <div
+                      key={h.dayOfWeek}
+                      className="flex justify-between
+                        text-xs"
+                    >
+                      <span className="capitalize
+                        text-black">
+                        {h.dayOfWeek}
+                      </span>
+                      <span className="text-gray-500">
+                        {h.isClosed
+                          ? "Closed"
+                          : `${h.openTime} — ${h.closeTime}`
+                        }
+                      </span>
+                    </div>
+                  ))}
+                  {formData.hours.length > 3 && (
+                    <p className="text-xs text-gray-400">
+                      +{formData.hours.length - 3} more days
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
-        {/* Market schedule */}
-        {isEvent && formData.marketSchedules.length > 0 && (
-          <ReviewSection title="Schedule">
-            {formData.marketSchedules.map((s, i) => (
-              <div key={i} className="text-sm mb-2">
-                <p className="text-black capitalize font-medium">
+          {/* Market schedule */}
+          {isEvent &&
+            formData.marketSchedules.length > 0 && (
+            <div className="mt-2 space-y-1">
+              {formData.marketSchedules.map((s, i) => (
+                <p key={i}
+                  className="text-xs text-black
+                    capitalize">
                   {s.dayOfWeek} —{" "}
                   {s.recurrenceType === "weekly"
                     ? "Every week"
-                    : s.recurrenceType === "biweekly"
-                    ? "Every other week"
-                    : s.recurrenceType
-                        .replace("monthly_", "")
-                        .replace("_", " ") + " of month"
-                  }
+                    : "Every other week"
+                  } · {s.startTime} — {s.endTime}
                 </p>
-                <p className="text-gray-500">
-                  {s.startTime} — {s.endTime}
-                  {s.isNightMarket && " 🌙"}
-                </p>
-              </div>
-            ))}
-          </ReviewSection>
-        )}
+              ))}
+            </div>
+          )}
 
-        {/* Pop-up event */}
-        {formData.subType === "pop_up" &&
-          formData.popUpEvent && (
-          <ReviewSection title="Event Details">
-            <p className="text-sm font-medium text-black">
-              {formData.popUpEvent.eventName}
-            </p>
-            <p className="text-sm text-gray-500">
-              {formData.popUpEvent.startDate}
-              {formData.popUpEvent.endDate !==
-                formData.popUpEvent.startDate &&
-                ` — ${formData.popUpEvent.endDate}`
-              }
-            </p>
-            <p className="text-sm text-gray-500">
-              {formData.popUpEvent.startTime} —{" "}
-              {formData.popUpEvent.endTime}
-              {formData.popUpEvent.closesNextDay &&
-                " (next day)"
-              }
-              {formData.popUpEvent.isNightMarket &&
-                " 🌙"
-              }
-            </p>
-          </ReviewSection>
-        )}
+          {/* Pop-up event */}
+          {formData.subType === "pop_up" &&
+            formData.popUpEvent && (
+            <div className="mt-2">
+              <p className="text-xs font-medium
+                text-black">
+                {formData.popUpEvent.eventName}
+              </p>
+              <p className="text-xs text-gray-500">
+                {formData.popUpEvent.startDate}
+                {" · "}
+                {formData.popUpEvent.startTime} —{" "}
+                {formData.popUpEvent.endTime}
+              </p>
+            </div>
+          )}
 
-        {/* Amenities */}
-        {(formData.paymentOptions.length > 0 ||
-          formData.orderingMethods.length > 0 ||
-          formData.dietaryOptions.length > 0 ||
-          formData.businessAmenities.length > 0 ||
-          formData.locationAmenities.length > 0) && (
-          <ReviewSection title="Amenities">
-            <div className="space-y-2">
-              {formData.paymentOptions.length > 0 && (
-                <AmenityRow
-                  label="Payment"
-                  items={formData.paymentOptions}
-                />
-              )}
-              {formData.orderingMethods.length > 0 && (
-                <AmenityRow
-                  label="Ordering"
-                  items={formData.orderingMethods}
-                />
-              )}
-              {formData.dietaryOptions.length > 0 && (
-                <AmenityRow
-                  label="Dietary"
-                  items={formData.dietaryOptions}
-                />
-              )}
-              {formData.businessAmenities.length > 0 && (
-                <AmenityRow
-                  label="Business"
-                  items={formData.businessAmenities}
-                />
-              )}
-              {formData.locationAmenities.length > 0 && (
-                <AmenityRow
-                  label="Location"
-                  items={formData.locationAmenities}
-                />
+          {/* Amenities summary */}
+          {!isEvent && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {[
+                ...formData.paymentOptions,
+                ...formData.orderingMethods,
+                ...formData.dietaryOptions,
+              ].slice(0, 5).map(item => (
+                <span
+                  key={item}
+                  className="text-xs bg-gray-100
+                    text-gray-600 px-2 py-0.5
+                    rounded-full"
+                >
+                  {item}
+                </span>
+              ))}
+              {(
+                formData.paymentOptions.length +
+                formData.orderingMethods.length +
+                formData.dietaryOptions.length
+              ) > 5 && (
+                <span className="text-xs
+                  text-gray-400">
+                  +{(
+                    formData.paymentOptions.length +
+                    formData.orderingMethods.length +
+                    formData.dietaryOptions.length
+                  ) - 5} more
+                </span>
               )}
             </div>
-          </ReviewSection>
-        )}
+          )}
+        </ReviewSection>
 
-        {/* Photos */}
-        {formData.images.length > 0 && (
-          <ReviewSection title="Photos">
-            <div className="grid grid-cols-3 gap-2">
-              {Array.from(formData.images).map((img, i) => (
-                <div key={i}
-                  className="relative aspect-square">
+        {/* Photos and contact */}
+        <ReviewSection
+          title="Photos & Contact"
+          onEdit={() => onEditStep(6)}
+        >
+          {/* Images */}
+          {formData.images.length > 0 && (
+            <div className="flex gap-2 mb-3">
+              {Array.from(formData.images)
+                .slice(0, 3)
+                .map((img, i) => (
+                <div
+                  key={i}
+                  className="relative w-16 h-16
+                    rounded-xl overflow-hidden
+                    flex-shrink-0"
+                >
                   <img
                     src={URL.createObjectURL(img)}
                     alt={`Photo ${i + 1}`}
-                    className="w-full h-full object-cover
-                      rounded-xl"
+                    className="w-full h-full
+                      object-cover"
                   />
                   {i === 0 && (
-                    <span className="absolute top-1
-                      left-1 bg-black text-white
-                      text-xs px-1.5 py-0.5 rounded-md">
+                    <span className="absolute top-0.5
+                      left-0.5 bg-black text-white
+                      text-xs px-1 rounded">
                       Cover
                     </span>
                   )}
                 </div>
               ))}
+              {formData.images.length > 3 && (
+                <div className="w-16 h-16 rounded-xl
+                  bg-gray-100 flex items-center
+                  justify-center flex-shrink-0">
+                  <p className="text-xs text-gray-500">
+                    +{formData.images.length - 3}
+                  </p>
+                </div>
+              )}
             </div>
-          </ReviewSection>
-        )}
+          )}
 
-        {/* Contact */}
-        <ReviewSection title="Contact & Social">
+          {/* Contact */}
           <div className="space-y-1">
             {formData.phone && (
-              <p className="text-sm text-gray-600">
+              <p className="text-xs text-gray-600">
                 📞 {formData.phone}
               </p>
             )}
             {formData.email && (
-              <p className="text-sm text-gray-600">
+              <p className="text-xs text-gray-600">
                 ✉️ {formData.email}
               </p>
             )}
             {formData.website && (
-              <p className="text-sm text-gray-600">
+              <p className="text-xs text-gray-600
+                truncate">
                 🌐 {formData.website}
               </p>
             )}
             {formData.instagram && (
-              <p className="text-sm text-gray-600">
+              <p className="text-xs text-gray-600">
                 Instagram: {formData.instagram}
               </p>
             )}
-            {formData.facebook && (
-              <p className="text-sm text-gray-600">
-                Facebook: {formData.facebook}
-              </p>
-            )}
             {formData.tiktok && (
-              <p className="text-sm text-gray-600">
+              <p className="text-xs text-gray-600">
                 TikTok: {formData.tiktok}
               </p>
             )}
+            {formData.facebook && (
+              <p className="text-xs text-gray-600">
+                Facebook: {formData.facebook}
+              </p>
+            )}
             {formData.twitter && (
-              <p className="text-sm text-gray-600">
+              <p className="text-xs text-gray-600">
                 Twitter: {formData.twitter}
               </p>
             )}
             {formData.youtube && (
-              <p className="text-sm text-gray-600">
+              <p className="text-xs text-gray-600">
                 YouTube: {formData.youtube}
               </p>
             )}
-            {formData.videoUrl && (
-              <p className="text-sm text-gray-600">
-                🎥 {formData.videoUrl}
+            {!formData.phone &&
+              !formData.email &&
+              !formData.website &&
+              !formData.instagram && (
+              <p className="text-xs text-red-500">
+                No contact info added
               </p>
             )}
           </div>
@@ -347,8 +399,8 @@ export default function Step7Review({
 
         {/* Error */}
         {error && (
-          <div className="bg-red-50 border border-red-200
-            rounded-xl px-4 py-3">
+          <div className="bg-red-50 border
+            border-red-200 rounded-xl px-4 py-3">
             <p className="text-red-500 text-sm">
               {error}
             </p>
@@ -381,50 +433,33 @@ export default function Step7Review({
   );
 }
 
-// Reusable section wrapper
 function ReviewSection({
   title,
   children,
+  onEdit,
 }: {
-  title: string;
+  title:    string;
   children: React.ReactNode;
+  onEdit:   () => void;
 }) {
   return (
     <div className="border-2 border-gray-100
       rounded-2xl p-4">
-      <p className="text-xs font-medium text-gray-400
-        uppercase tracking-wide mb-3">
-        {title}
-      </p>
-      {children}
-    </div>
-  );
-}
-
-// Reusable amenity row
-function AmenityRow({
-  label,
-  items,
-}: {
-  label: string;
-  items: string[];
-}) {
-  return (
-    <div>
-      <p className="text-xs text-gray-400 mb-1">
-        {label}
-      </p>
-      <div className="flex flex-wrap gap-1">
-        {items.map(item => (
-          <span
-            key={item}
-            className="text-xs bg-gray-100
-              text-gray-700 px-2 py-1 rounded-full"
-          >
-            {item}
-          </span>
-        ))}
+      <div className="flex items-center
+        justify-between mb-3">
+        <p className="text-xs font-medium
+          text-gray-400 uppercase tracking-wide">
+          {title}
+        </p>
+        <button
+          onClick={onEdit}
+          className="text-xs text-black underline
+            hover:text-gray-600 transition"
+        >
+          Edit
+        </button>
       </div>
+      {children}
     </div>
   );
 }

@@ -1,0 +1,263 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useSession } from "@/lib/auth-client";
+import { useRouter, useParams } from "next/navigation";
+import {
+  BusinessFormData,
+  INITIAL_FORM_DATA,
+} from "@/lib/types/business";
+import Step4Info from
+  "@/components/forms/add-business/Step4Info";
+import Step5Details from
+  "@/components/forms/add-business/Step5Details";
+import Step6Media from
+  "@/components/forms/add-business/Step6Media";
+
+export default function EditSubmissionPage() {
+  const { data: session, isPending } = useSession();
+  const router = useRouter();
+  const params = useParams();
+  const businessId = params.id as string;
+
+  const [formData, setFormData] =
+    useState<BusinessFormData>(INITIAL_FORM_DATA);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+  const [step, setStep] = useState(4);
+
+  useEffect(() => {
+    if (!isPending && !session) {
+      router.push("/sign-in");
+      return;
+    }
+    if (session) fetchSubmission();
+  }, [session, isPending]);
+
+  const fetchSubmission = async () => {
+    try {
+      const res = await fetch(
+        `/api/user/submissions/${businessId}`
+      );
+      const data = await res.json();
+
+      if (data.error) {
+        setError(data.error);
+        return;
+      }
+
+      // Pre-fill form with existing data
+      setFormData(prev => ({
+        ...prev,
+        ...data.business,
+      }));
+
+    } catch (err) {
+      setError("Failed to load submission");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateForm = (
+    data: Partial<BusinessFormData>
+  ) => {
+    setFormData(prev => ({ ...prev, ...data }));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError("");
+
+    try {
+      const res = await fetch(
+        `/api/user/submissions/${businessId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(formData),
+        }
+      );
+
+      const data = await res.json();
+
+      if (data.error) {
+        setError(data.error);
+        return;
+      }
+
+      setSaved(true);
+      setTimeout(() => {
+        router.push("/my-submissions");
+      }, 1500);
+
+    } catch (err) {
+      setError("Failed to save changes");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const STEPS = [
+    { num: 4, label: "Info" },
+    { num: 5, label: "Details" },
+    { num: 6, label: "Photos & Contact" },
+  ];
+
+  if (isPending || loading) {
+    return (
+      <div className="flex items-center justify-center
+        min-h-screen">
+        <div className="w-6 h-6 border-2
+          border-gray-200 border-t-black
+          rounded-full animate-spin"/>
+      </div>
+    );
+  }
+
+  if (error && !formData.name) {
+    return (
+      <div className="flex flex-col items-center
+        justify-center min-h-screen px-4 text-center">
+        <p className="text-red-500 text-sm mb-4">
+          {error}
+        </p>
+        <button
+          onClick={() => router.back()}
+          className="text-black underline text-sm"
+        >
+          Go back
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-white">
+
+      {/* Header */}
+      <div className="px-4 py-4 border-b
+        border-gray-100">
+        <div className="max-w-lg mx-auto flex
+          items-center gap-4">
+          <button
+            onClick={() => router.back()}
+            className="text-gray-500"
+          >
+            <svg width="20" height="20"
+              viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+          </button>
+          <div>
+            <h1 className="text-lg font-semibold
+              text-black">
+              Edit Submission
+            </h1>
+            <p className="text-sm text-gray-400">
+              {formData.name}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Pending notice */}
+      <div className="bg-amber-50 border-b
+        border-amber-200 px-4 py-3">
+        <p className="text-xs text-amber-700
+          text-center max-w-lg mx-auto">
+          ⚠ This submission is pending review.
+          Changes will be saved and reviewed
+          by our team.
+        </p>
+      </div>
+
+      {/* Step tabs */}
+      <div className="border-b border-gray-100">
+        <div className="max-w-lg mx-auto px-4">
+          <div className="flex gap-6">
+            {STEPS.map((s) => (
+              <button
+                key={s.num}
+                onClick={() => setStep(s.num)}
+                className={`py-3 text-sm font-medium
+                  border-b-2 transition
+                  ${step === s.num
+                    ? "border-black text-black"
+                    : "border-transparent text-gray-400"
+                  }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Step content */}
+      <div className="max-w-lg mx-auto px-4 py-6">
+        {step === 4 && (
+          <Step4Info
+            formData={formData}
+            updateForm={updateForm}
+            nextStep={() => setStep(5)}
+          />
+        )}
+        {step === 5 && (
+          <Step5Details
+            formData={formData}
+            updateForm={updateForm}
+            nextStep={() => setStep(6)}
+          />
+        )}
+        {step === 6 && (
+          <Step6Media
+            formData={formData}
+            updateForm={updateForm}
+            nextStep={handleSave}
+          />
+        )}
+      </div>
+
+      {/* Save bar */}
+      <div className="fixed bottom-16 left-0
+        right-0 bg-white border-t border-gray-100
+        px-4 py-3">
+        <div className="max-w-lg mx-auto flex
+          items-center gap-3">
+          {error && (
+            <p className="text-red-500 text-xs
+              flex-1">
+              {error}
+            </p>
+          )}
+          {saved && (
+            <p className="text-green-500 text-xs
+              flex-1">
+              ✓ Saved — redirecting...
+            </p>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={saving || saved}
+            className="ml-auto bg-black text-white
+              px-6 py-2.5 rounded-xl text-sm
+              font-medium hover:bg-gray-800
+              transition disabled:opacity-50
+              disabled:cursor-not-allowed"
+          >
+            {saving ? "Saving..." : "Save Changes"}
+          </button>
+        </div>
+      </div>
+
+    </div>
+  );
+}
