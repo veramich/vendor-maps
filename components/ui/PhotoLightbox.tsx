@@ -2,13 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 
-interface Photo {
-  id: string | number;
-  cloudinary_url: string;
-}
-
 interface Props {
-  photos: Photo[];
+  photos: any[];
   businessName: string;
 }
 
