@@ -3,6 +3,7 @@ import sql from "@/lib/db";
 import Link from "next/link";
 import SaveButton from "@/components/ui/SaveButton";
 import OwnerResponse from "@/components/ui/OwnerResponse";
+import PhotoLightbox from "@/components/ui/PhotoLightbox";
 import { headers } from "next/dist/server/request/headers";
 import { auth } from "@/lib/auth";
 
@@ -633,22 +634,10 @@ export default async function BusinessProfilePage({
               text-black mb-3">
               Photos
             </h2>
-            <div className="grid grid-cols-3 gap-2">
-              {images.map((img: any) => (
-                <div
-                  key={img.id}
-                  className="aspect-square rounded-xl
-                    overflow-hidden bg-gray-100"
-                >
-                  <img
-                    src={img.cloudinary_url}
-                    alt={business.name}
-                    className="w-full h-full
-                      object-cover"
-                  />
-                </div>
-              ))}
-            </div>
+            <PhotoLightbox
+              photos={images}
+              businessName={business.name}
+            />
           </div>
         )}
 
