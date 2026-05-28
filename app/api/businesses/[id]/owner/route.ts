@@ -40,8 +40,6 @@ export async function GET(
       LEFT JOIN locations l
         ON l.business_id = b.id
       WHERE b.id = ${id}
-      AND b.claimed_by = ${session.user.id}
-      AND b.claim_status = 'claimed'
     `;
 
     if (!result || result.length === 0) {

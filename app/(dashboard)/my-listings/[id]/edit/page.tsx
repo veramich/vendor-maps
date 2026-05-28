@@ -12,6 +12,7 @@ export default function EditListingPage() {
 
   const [business, setBusiness] = useState<any>(null);
   const [location, setLocation] = useState<any>(null);
+  const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -47,6 +48,10 @@ export default function EditListingPage() {
 
       setBusiness(data.business);
       setLocation(data.location);
+      setIsOwner(
+        data.business?.claim_status === "claimed" &&
+        data.business?.claimed_by === session?.user?.id
+      );
       setShowExactAddress(
         data.location?.show_exact_address || false
       );
@@ -155,26 +160,28 @@ export default function EditListingPage() {
         space-y-6">
 
         {/* Verified owner badge */}
-        <div className="flex items-center gap-2
-          bg-green-50 border border-green-200
-          rounded-xl px-4 py-3">
-          <svg width="16" height="16"
-            viewBox="0 0 24 24" fill="none"
-            stroke="#22c55e" strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93
-              -9.14"/>
-            <polyline points="22 4 12 14.01 9 11.01"/>
-          </svg>
-          <p className="text-sm text-green-700
-            font-medium">
-            Verified Owner
-          </p>
-        </div>
+        {isOwner && (
+          <div className="flex items-center gap-2
+            bg-green-50 border border-green-200
+            rounded-xl px-4 py-3">
+            <svg width="16" height="16"
+              viewBox="0 0 24 24" fill="none"
+              stroke="#22c55e" strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93
+                -9.14"/>
+              <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+            <p className="text-sm text-green-700
+              font-medium">
+              Verified Owner
+            </p>
+          </div>
+        )}
 
-        {/* Location section */}
-        {location && (
+        {/* Location section — owner only */}
+        {isOwner && location && (
           <div className="border-2 border-gray-100
             rounded-2xl p-5">
 
@@ -366,26 +373,28 @@ export default function EditListingPage() {
           </div>
         )}
 
-        {/* Save button */}
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className={`w-full rounded-xl py-4
-            text-sm font-medium transition
-            ${saved
-              ? "bg-green-500 text-white"
-              : "bg-black text-white hover:bg-gray-800"
+        {/* Save button — owner only */}
+        {isOwner && (
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className={`w-full rounded-xl py-4
+              text-sm font-medium transition
+              ${saved
+                ? "bg-green-500 text-white"
+                : "bg-black text-white hover:bg-gray-800"
+              }
+              disabled:opacity-50
+              disabled:cursor-not-allowed`}
+          >
+            {saving
+              ? "Saving..."
+              : saved
+              ? "✓ Saved"
+              : "Save Changes"
             }
-            disabled:opacity-50
-            disabled:cursor-not-allowed`}
-        >
-          {saving
-            ? "Saving..."
-            : saved
-            ? "✓ Saved"
-            : "Save Changes"
-          }
-        </button>
+          </button>
+        )}
 
       </div>
     </div>
