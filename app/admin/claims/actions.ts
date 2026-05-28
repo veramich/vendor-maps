@@ -45,13 +45,20 @@ export async function approveClaim(formData: FormData) {
 export async function rejectClaim(formData: FormData) {
   await requireAdmin();
 
-  const claimId = formData.get("claimId") as string;
+  const claimId    = formData.get("claimId") as string;
+  const businessId = formData.get("businessId") as string;
 
   await sql`
     UPDATE claims SET
       status      = 'rejected',
       resolved_at = NOW()
     WHERE id = ${claimId}
+  `;
+
+  await sql`
+    UPDATE businesses SET
+      claim_status = 'unclaimed'
+    WHERE id = ${businessId}
   `;
 
   redirect("/admin/claims");

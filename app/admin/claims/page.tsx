@@ -103,6 +103,8 @@ export default async function AdminClaims() {
                 <form action={rejectClaim}>
                   <input type="hidden"
                     name="claimId" value={claim.id}/>
+                  <input type="hidden"
+                    name="businessId" value={claim.business_id}/>
                   <button
                     type="submit"
                     className="px-4 py-2 bg-red-500

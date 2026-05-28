@@ -18,25 +18,34 @@ export default function Header() {
     <>
       {/* Header Bar */}
       <header className="fixed top-0 left-0 right-0 z-50" style={{ backgroundColor: "var(--primary)" }}>
-        <div className="flex items-center justify-between px-4 max-w-lg mx-auto" style={{ height: "56px" }}>
+        <div className="relative flex items-center px-4 max-w-lg mx-auto" style={{ height: "56px" }}>
 
-          {/* Logo */}
-          <Link href="/">
+          {/* Left spacer — balances the hamburger */}
+          <div className="w-10" />
+
+          {/* Logo + name — centered */}
+          <Link
+            href="/"
+            className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2"
+          >
             <Image
               src="/vmapsLOGO.png"
-              alt="vMaps"
-              width={48}
-              height={48}
+              alt="Vendor Maps"
+              width={32}
+              height={32}
               className="object-contain"
-              style={{ width: 48, height: "auto" }}
+              style={{ width: 32, height: "auto" }}
               priority
             />
+            <span className="text-white font-semibold text-base tracking-tight">
+              Vendor Maps
+            </span>
           </Link>
 
-          {/* Hamburger Button */}
+          {/* Hamburger Button — right */}
           <button
             onClick={() => setMenuOpen(true)}
-            className="p-2 rounded-lg hover:bg-orange-600 transition text-white"
+            className="ml-auto p-2 rounded-lg hover:bg-orange-600 transition text-white"
             aria-label="Open menu"
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
