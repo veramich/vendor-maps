@@ -9,7 +9,7 @@ export default function ConstructionBanner() {
 
   return (
     <div
-      style={{ background: "#FF7300" }}
+      style={{ background: "var(--primary)" }}
       className="fixed top-0 left-0 right-0 z-[100]
         px-4 py-2.5"
     >

@@ -79,9 +79,9 @@ export default function Step2SubType({
       ),
       color: "#111",
       background: "#FFF4EC",
-      border: "#FF7300",
-      iconBg: "#FF7300",
-      chevron: "#FF7300",
+      border: "var(--primary)",
+      iconBg: "var(--primary)",
+      chevron: "var(--primary)",
     },
     {
       value: "pop_up",
@@ -99,9 +99,9 @@ export default function Step2SubType({
       ),
       color: "#111",
       background: "#FFF4EC",
-      border: "#FF7300",
-      iconBg: "#FF7300",
-      chevron: "#FF7300",
+      border: "var(--primary)",
+      iconBg: "var(--primary)",
+      chevron: "var(--primary)",
     },
   ];
 

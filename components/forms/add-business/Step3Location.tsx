@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+
+const PRIMARY = "#FF7300";
 import { BusinessFormData } from "@/lib/types/business";
 
 interface Step3LocationProps {
@@ -167,7 +169,7 @@ export default function Step3Location({
           }
         );
 
-        const svgMarkup = `<svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg"><circle cx="18" cy="18" r="16" fill="#FF7300" stroke="white" stroke-width="3"/></svg>`;
+        const svgMarkup = `<svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg"><circle cx="18" cy="18" r="16" fill="${PRIMARY}" stroke="white" stroke-width="3"/></svg>`;
 
         const icon = new H.map.Icon(
           `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`,
@@ -760,7 +762,7 @@ export default function Step3Location({
                   items-center gap-2">
                   <svg width="14" height="14"
                     viewBox="0 0 24 24" fill="none"
-                    stroke="#FF7300" strokeWidth="2"
+                    stroke="var(--primary)" strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round">
                     <path d="M21 10c0 7-9 13-9 13S3

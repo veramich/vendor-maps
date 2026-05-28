@@ -379,9 +379,28 @@ export default async function BusinessProfilePage({
             </div>
           </div>
 
-          {/* Save button */}
-          <div className="mt-4">
+          {/* Save + Edit buttons */}
+          <div className="mt-4 flex items-center gap-3">
             <SaveButton businessId={business.id} />
+            <Link
+              href={`/my-listings/${business.id}/edit`}
+              className="flex items-center gap-1.5 text-xs
+                text-gray-500 border border-gray-200
+                rounded-lg px-3 py-1.5 hover:bg-gray-50
+                transition"
+            >
+              <svg width="12" height="12"
+                viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2
+                  2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1
+                  3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+              Edit
+            </Link>
           </div>
         </div>
 
@@ -396,7 +415,7 @@ export default async function BusinessProfilePage({
             <div className="flex items-start gap-2">
               <svg width="16" height="16"
                 viewBox="0 0 24 24" fill="none"
-                stroke="#FF7300" strokeWidth="2"
+                stroke="var(--primary)" strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 className="flex-shrink-0 mt-0.5">
@@ -472,7 +491,7 @@ export default async function BusinessProfilePage({
                         ? "Closed"
                         : h.hours_vary
                         ? "Varies"
-                        : `${h.open_time} — ${h.close_time}${h.closes_next_day ? " (next day)" : ""}`
+                        : `${formatTime12h(h.open_time)} – ${formatTime12h(h.close_time)}${h.closes_next_day ? " (next day)" : ""}`
                       }
                     </span>
                   </div>
@@ -514,7 +533,7 @@ export default async function BusinessProfilePage({
                     {s.is_night_market && " 🌙"}
                   </p>
                   <p className="text-xs text-gray-500">
-                    {s.start_time} — {s.end_time}
+                    {formatTime12h(s.start_time)} – {formatTime12h(s.end_time)}
                   </p>
                   {(s.season_start || s.season_end) && (
                     <p className="text-xs text-gray-400">
@@ -890,6 +909,18 @@ export default async function BusinessProfilePage({
       </div>
     </div>
   );
+}
+
+function formatTime12h(time: string): string {
+  if (!time) return "";
+  const [hourStr, minStr] = time.split(":");
+  const hour = parseInt(hourStr, 10);
+  const min = parseInt(minStr || "0", 10);
+  const period = hour >= 12 ? "PM" : "AM";
+  const hour12 = hour % 12 || 12;
+  return min === 0
+    ? `${hour12} ${period}`
+    : `${hour12}:${String(min).padStart(2, "0")} ${period}`;
 }
 
 function AmenityGroup({

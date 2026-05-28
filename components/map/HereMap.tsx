@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+
+const PRIMARY = "#FF7300";
 import { getIconBase64 } from "@/lib/getIconBase64";
 
 const CATEGORY_ICONS: Record<string, string> = {
@@ -93,11 +95,11 @@ export default function HereMap({
         viewBox="0 0 50 50"
         xmlns="http://www.w3.org/2000/svg">
         <circle cx="25" cy="25" r="22"
-          fill="#FF7300" fill-opacity="0.35"
-          stroke="#FF7300" stroke-width="2"
+          fill="${PRIMARY}" fill-opacity="0.35"
+          stroke="${PRIMARY}" stroke-width="2"
           stroke-opacity="0.6"/>
         <circle cx="25" cy="25" r="15"
-          fill="#FF7300" fill-opacity="0.7"/>
+          fill="${PRIMARY}" fill-opacity="0.7"/>
         <text x="25" y="30"
           text-anchor="middle"
           font-family="sans-serif"

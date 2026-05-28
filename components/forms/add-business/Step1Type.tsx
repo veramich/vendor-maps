@@ -83,14 +83,14 @@ export default function Step1Type({
             transition active:scale-95"
           style={{
             background: "#FFF4EC",
-            border: "2px solid #FF7300",
+            border: "2px solid var(--primary)",
           }}
         >
           <div className="flex items-center gap-4">
             <div
               className="w-14 h-14 rounded-xl flex
                 items-center justify-center flex-shrink-0"
-              style={{ background: "#FF7300" }}
+              style={{ background: "var(--primary)" }}
             >
               <svg width="28" height="28"
                 viewBox="0 0 24 24" fill="none"
@@ -116,7 +116,7 @@ export default function Step1Type({
               className="ml-auto flex-shrink-0"
               width="20" height="20"
               viewBox="0 0 24 24" fill="none"
-              stroke="#FF7300" strokeWidth="2"
+              stroke="var(--primary)" strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round">
               <polyline points="9 18 15 12 9 6"/>

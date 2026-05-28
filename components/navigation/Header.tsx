@@ -2,11 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import Image from "next/image";
 import { useSession, signOut } from "@/lib/auth-client";
 
 export default function Header() {
-  const pathname = usePathname();
   const { data: session } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -18,24 +17,29 @@ export default function Header() {
   return (
     <>
       {/* Header Bar */}
-      <header className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-50">
-        <div className="flex items-center justify-between px-4 py-3 max-w-lg mx-auto">
+      <header className="fixed top-0 left-0 right-0 z-50" style={{ backgroundColor: "var(--primary)" }}>
+        <div className="flex items-center justify-between px-4 max-w-lg mx-auto" style={{ height: "56px" }}>
 
           {/* Logo */}
-          <Link
-            href="/"
-            className="text-lg font-medium text-black"
-          >
-            Vendor Maps
+          <Link href="/">
+            <Image
+              src="/vmapsLOGO.png"
+              alt="vMaps"
+              width={48}
+              height={48}
+              className="object-contain"
+              style={{ width: 48, height: "auto" }}
+              priority
+            />
           </Link>
 
           {/* Hamburger Button */}
           <button
             onClick={() => setMenuOpen(true)}
-            className="p-2 rounded-lg hover:bg-gray-100 transition text-gray-700"
+            className="p-2 rounded-lg hover:bg-orange-600 transition text-white"
             aria-label="Open menu"
           >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <line x1="3" y1="6" x2="21" y2="6"/>
               <line x1="3" y1="12" x2="21" y2="12"/>
               <line x1="3" y1="18" x2="21" y2="18"/>

@@ -23,6 +23,15 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon.png",
   },
+  openGraph: {
+    title: "Vendor Maps",
+    description: "Find local vendors, markets and pop-ups near you",
+    images: [{ url: "/og-image.png", width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: ["/og-image.png"],
+  },
 };
 
 export default function RootLayout({
@@ -47,7 +56,7 @@ export default function RootLayout({
       >
         <ConstructionBannerWrapper />
         <HeaderWrapper />
-        <main className="pt-24 pb-20">
+        <main className="pt-14 pb-20">
           {children}
         </main>
         <BottomNavWrapper />
