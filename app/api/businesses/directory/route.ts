@@ -1,8 +1,32 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { parseFilters, buildFilterClause } from "@/lib/businessFilterSql";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const q = req.nextUrl.searchParams.get("q")?.trim() || "";
+  const category = req.nextUrl.searchParams.get("category") || "";
+
   try {
+    const searchFrag = q
+      ? sql`AND (
+          b.name ILIKE ${"%" + q + "%"}
+          OR b.description ILIKE ${"%" + q + "%"}
+          OR l.street_address ILIKE ${"%" + q + "%"}
+          OR l.city ILIKE ${"%" + q + "%"}
+          OR l.state ILIKE ${"%" + q + "%"}
+          OR l.state_code ILIKE ${"%" + q + "%"}
+          OR l.zip ILIKE ${"%" + q + "%"}
+        )`
+      : sql``;
+
+    const categoryFrag = category
+      ? sql`AND b.category = ${category}`
+      : sql``;
+
+    const filterFrag = buildFilterClause(
+      parseFilters(req.nextUrl.searchParams)
+    );
+
     const businesses = await sql`
       SELECT
         b.id,
@@ -24,6 +48,9 @@ export async function GET() {
         'permanent_location',
         'no_location'
       )
+      ${searchFrag}
+      ${categoryFrag}
+      ${filterFrag}
       ORDER BY b.created_at DESC
     `;
 

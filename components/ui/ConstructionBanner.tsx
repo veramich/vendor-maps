@@ -1,15 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function ConstructionBanner() {
   const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDismissed(true);
+    }, 30000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, []);
 
   if (dismissed) return null;
 
   return (
     <div
-      style={{ background: "var(--primary)" }}
+      style={{ background: "var(--background)" }}
       className="fixed top-0 left-0 right-0 z-[100]
         px-4 py-2.5"
     >

@@ -1,14 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { parseFilters, buildFilterClause } from "@/lib/businessFilterSql";
 
 export async function GET(req: NextRequest) {
-  const date = req.nextUrl.searchParams.get("date") || "all";
-  const time = req.nextUrl.searchParams.get("time") || "all";
+  const q = req.nextUrl.searchParams.get("q")?.trim() || "";
 
   try {
+    const searchFrag = q
+      ? sql`AND (
+          b.name ILIKE ${"%" + q + "%"}
+          OR b.description ILIKE ${"%" + q + "%"}
+          OR l.city ILIKE ${"%" + q + "%"}
+          OR l.street_address ILIKE ${"%" + q + "%"}
+          OR l.neighborhood ILIKE ${"%" + q + "%"}
+        )`
+      : sql``;
+
+    const filterFrag = buildFilterClause(
+      parseFilters(req.nextUrl.searchParams)
+    );
+
     const events = await sql`
       SELECT
         b.id,
+        b.slug,
         b.name,
         b.category,
         b.sub_type,
@@ -30,6 +45,8 @@ export async function GET(req: NextRequest) {
       LEFT JOIN vendor_spaces vs ON vs.business_id = b.id
       WHERE b.status = 'listed'
       AND b.sub_type IN ('market', 'pop_up')
+      ${searchFrag}
+      ${filterFrag}
       ORDER BY b.created_at DESC
     `;
 

@@ -4,6 +4,11 @@ import { useEffect, useRef } from "react";
 
 const PRIMARY = "#FF7300";
 import { getIconBase64 } from "@/lib/getIconBase64";
+import {
+  BusinessFilters,
+  EMPTY_FILTERS,
+  filtersToParams,
+} from "@/lib/businessFilters";
 
 const CATEGORY_ICONS: Record<string, string> = {
   "Food":             "food",
@@ -42,9 +47,7 @@ const loadScript = (src: string): Promise<void> => {
     script.src = src;
     script.type = "text/javascript";
     script.onload = () => resolve();
-    script.onerror = () => reject(
-      new Error(`Failed to load: ${src}`)
-    );
+    script.onerror = () => reject(new Error(`Failed to load: ${src}`));
     document.head.appendChild(script);
   });
 };
@@ -57,18 +60,37 @@ const loadCSS = (href: string): void => {
   document.head.appendChild(link);
 };
 
-const wait = (ms: number) =>
-  new Promise(resolve => setTimeout(resolve, ms));
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 interface HereMapProps {
   onMarkerTap: (location: any) => void;
+  searchQuery?: string;
+  categoryFilter?: string;
+  filters?: BusinessFilters;
 }
 
 export default function HereMap({
   onMarkerTap,
+  searchQuery = "",
+  categoryFilter = "",
+  filters = EMPTY_FILTERS,
 }: HereMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
+  const hRef = useRef<any>(null);
+  const locationsRef = useRef<any[]>([]);
+  const onMarkerTapRef = useRef(onMarkerTap);
+  // Monotonic token: every render request bumps it. A render only touches the
+  // map if it is still the latest request, so stale/overlapping renders abort
+  // instead of racing each other's removeObjects/addObjects.
+  const renderGenRef = useRef(0);
+  // tracks whether the last render was in cluster mode so we only
+  // re-render from the viewport listener when crossing the threshold
+  const lastWasClusteredRef = useRef<boolean | null>(null);
+
+  useEffect(() => {
+    onMarkerTapRef.current = onMarkerTap;
+  }, [onMarkerTap]);
 
   const getMarkerColor = (
     type: string,
@@ -80,7 +102,6 @@ export default function HereMap({
     if (subType === "pop_up")        return "#FF006E";
     if (subType === "market")        return "#2D6A4F";
     if (type === "permanent_location") return "#E63946";
-
     return null;
   };
 
@@ -110,156 +131,89 @@ export default function HereMap({
         </text>
       </svg>
     `;
-
     const icon = new H.map.Icon(
       `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`,
-      {
-        size: { w: 50, h: 50 },
-        anchor: { x: 25, y: 25 },
-      }
+      { size: { w: 50, h: 50 }, anchor: { x: 25, y: 25 } }
     );
-
-    return new H.map.Marker(
-      { lat, lng },
-      { icon }
-    );
+    return new H.map.Marker({ lat, lng }, { icon });
   };
 
-  const addSingleMarker = async (
+  // Builds a single business marker (off-map). Returns null if the location
+  // has no color mapping. Does NOT add anything to the map.
+  const buildMarker = async (
     H: any,
-    map: any,
-    location: any
+    location: any,
+    lat: number,
+    lng: number
   ) => {
-    const color = getMarkerColor(
-      location.type,
-      location.sub_type
-    );
-    if (!color) return;
+    const color = getMarkerColor(location.type, location.sub_type);
+    if (!color) return null;
 
-    const iconFile = location.type === "event"
-      ? "event"
-      : (CATEGORY_ICONS[location.category] || "other");
+    const iconFile =
+      location.type === "event"
+        ? "event"
+        : CATEGORY_ICONS[location.category] || "other";
     const base64Icon = await getIconBase64(iconFile);
 
     const svgMarkup = `<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><circle cx="20" cy="20" r="18" fill="${color}" stroke="white" stroke-width="3"/><image href="${base64Icon}" x="10" y="10" width="20" height="20"/></svg>`;
 
     const icon = new H.map.Icon(
       `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`,
-      {
-        size: { w: 40, h: 40 },
-        anchor: { x: 20, y: 20 },
-      }
+      { size: { w: 40, h: 40 }, anchor: { x: 20, y: 20 } }
     );
 
-    const marker = new H.map.Marker(
-      { lat: location.lat, lng: location.lng },
-      { icon }
-    );
-
+    const marker = new H.map.Marker({ lat, lng }, { icon });
     marker.setData(location);
     marker.addEventListener("tap", (evt: any) => {
-      onMarkerTap(evt.target.getData());
+      onMarkerTapRef.current(evt.target.getData());
     });
-
-    map.addObject(marker);
+    return marker;
   };
 
-  const addOffsetMarkers = async (
-    H: any,
-    map: any,
-    locations: any[]
-  ) => {
+  // Builds fanned-out markers for locations that share the exact same point,
+  // plus a small center dot. Returns the array of objects (off-map).
+  const buildOffsetMarkers = async (H: any, locations: any[]) => {
     const offsetDistance = 0.0002;
 
-    for (let i = 0; i < locations.length; i++) {
-      const location = locations[i];
-      const color = getMarkerColor(
-        location.type,
-        location.sub_type
-      );
-      if (!color) continue;
+    const built = await Promise.all(
+      locations.map((location, i) => {
+        const angle = (i / locations.length) * 2 * Math.PI;
+        const offsetLat = location.lat + offsetDistance * Math.cos(angle);
+        const offsetLng = location.lng + offsetDistance * Math.sin(angle);
+        return buildMarker(H, location, offsetLat, offsetLng);
+      })
+    );
 
-      const angle =
-        (i / locations.length) * 2 * Math.PI;
-      const offsetLat =
-        location.lat + offsetDistance * Math.cos(angle);
-      const offsetLng =
-        location.lng + offsetDistance * Math.sin(angle);
+    const objects: any[] = built.filter(Boolean);
 
-      const iconFile = location.type === "event"
-        ? "event"
-        : (CATEGORY_ICONS[location.category] || "other");
-      const base64Icon = await getIconBase64(iconFile);
-
-      const svgMarkup = `<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><circle cx="20" cy="20" r="18" fill="${color}" stroke="white" stroke-width="3"/><image href="${base64Icon}" x="10" y="10" width="20" height="20"/></svg>`;
-
-      const icon = new H.map.Icon(
-        `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`,
-        {
-          size: { w: 40, h: 40 },
-          anchor: { x: 20, y: 20 },
-        }
-      );
-
-      const marker = new H.map.Marker(
-        { lat: offsetLat, lng: offsetLng },
-        { icon }
-      );
-
-      marker.setData(location);
-      marker.addEventListener("tap", (evt: any) => {
-        onMarkerTap(evt.target.getData());
-      });
-
-      map.addObject(marker);
-    }
-
-    // Small dot at actual intersection
     const dotSvg = `<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg"><circle cx="6" cy="6" r="5" fill="white" stroke="#ccc" stroke-width="1.5"/></svg>`;
-
     const dotIcon = new H.map.Icon(
       `data:image/svg+xml;charset=utf-8,${encodeURIComponent(dotSvg)}`,
       { size: { w: 12, h: 12 }, anchor: { x: 6, y: 6 } }
     );
-
-    const dot = new H.map.Marker(
-      { lat: locations[0].lat, lng: locations[0].lng },
-      { icon: dotIcon }
+    objects.push(
+      new H.map.Marker(
+        { lat: locations[0].lat, lng: locations[0].lng },
+        { icon: dotIcon }
+      )
     );
-
-    map.addObject(dot);
+    return objects;
   };
 
-  const renderClusters = async (
-    H: any,
-    map: any,
-    locations: any[]
-  ) => {
+  // Builds cluster bubbles + standalone markers (off-map).
+  const buildClusterObjects = async (H: any, map: any, locations: any[]) => {
     const gridSize = 0.05;
-    const clusters: Record<string, {
-      lats: number[];
-      lngs: number[];
-      count: number;
-      locations: any[];
-    }> = {};
+    const clusters: Record<
+      string,
+      { lats: number[]; lngs: number[]; count: number; locations: any[] }
+    > = {};
 
-    locations.forEach(location => {
-      // Use grid only as a grouping key
-      const gridLat = Math.round(
-        location.lat / gridSize
-      ) * gridSize;
-      const gridLng = Math.round(
-        location.lng / gridSize
-      ) * gridSize;
+    locations.forEach((location) => {
+      const gridLat = Math.round(location.lat / gridSize) * gridSize;
+      const gridLng = Math.round(location.lng / gridSize) * gridSize;
       const key = `${gridLat},${gridLng}`;
-
       if (!clusters[key]) {
-        clusters[key] = {
-          lats:      [],
-          lngs:      [],
-          count:     0,
-          locations: [],
-        };
+        clusters[key] = { lats: [], lngs: [], count: 0, locations: [] };
       }
       clusters[key].lats.push(location.lat);
       clusters[key].lngs.push(location.lng);
@@ -267,135 +221,143 @@ export default function HereMap({
       clusters[key].locations.push(location);
     });
 
+    const objects: any[] = [];
+
     for (const cluster of Object.values(clusters)) {
-      // Use average position of all locations
-      // in this cluster instead of grid center
       const avgLat =
-        cluster.lats.reduce((a, b) => a + b, 0) /
-        cluster.lats.length;
+        cluster.lats.reduce((a, b) => a + b, 0) / cluster.lats.length;
       const avgLng =
-        cluster.lngs.reduce((a, b) => a + b, 0) /
-        cluster.lngs.length;
+        cluster.lngs.reduce((a, b) => a + b, 0) / cluster.lngs.length;
 
       if (cluster.count === 1) {
-        await addSingleMarker(
-          H, map, cluster.locations[0]
-        );
+        const loc = cluster.locations[0];
+        const m = await buildMarker(H, loc, loc.lat, loc.lng);
+        if (m) objects.push(m);
       } else {
-        const clusterMarker = createClusterMarker(
-          H,
-          avgLat,  // actual average position
-          avgLng,  // actual average position
-          cluster.count
-        );
-
+        const clusterMarker = createClusterMarker(H, avgLat, avgLng, cluster.count);
         clusterMarker.addEventListener("tap", () => {
           map.getViewModel().setLookAtData(
             {
               position: { lat: avgLat, lng: avgLng },
               zoom: CLUSTER_ZOOM_THRESHOLD + 1,
             },
-            true // animate
+            true
           );
         });
-
-        map.addObject(clusterMarker);
+        objects.push(clusterMarker);
       }
     }
+    return objects;
   };
 
+  // Builds the full marker set off-map, then performs a single atomic swap.
+  // `gen` guards against stale renders: if a newer request started while we
+  // were building, we abort before touching the map.
   const renderMarkers = async (
     H: any,
     map: any,
     locations: any[],
-    zoom: number
+    zoom: number,
+    gen: number
   ) => {
-    map.removeObjects(map.getObjects());
+    let objects: any[] = [];
 
-    if (zoom < CLUSTER_ZOOM_THRESHOLD) {
-      await renderClusters(H, map, locations);
-    } else {
-      const grouped: Record<string, any[]> = {};
-
-      for (const location of locations) {
-        const key = `${location.lat},${location.lng}`;
-        if (!grouped[key]) grouped[key] = [];
-        grouped[key].push(location);
-      }
-
-      for (const group of Object.values(grouped)) {
-        if (group.length === 1) {
-          await addSingleMarker(H, map, group[0]);
-        } else {
-          await addOffsetMarkers(H, map, group);
+    if (locations.length) {
+      if (zoom < CLUSTER_ZOOM_THRESHOLD) {
+        objects = await buildClusterObjects(H, map, locations);
+      } else {
+        const grouped: Record<string, any[]> = {};
+        for (const location of locations) {
+          const key = `${location.lat},${location.lng}`;
+          if (!grouped[key]) grouped[key] = [];
+          grouped[key].push(location);
         }
+        const built = await Promise.all(
+          Object.values(grouped).map((group) =>
+            group.length === 1
+              ? buildMarker(H, group[0], group[0].lat, group[0].lng).then(
+                  (m) => (m ? [m] : [])
+                )
+              : buildOffsetMarkers(H, group)
+          )
+        );
+        objects = built.flat();
       }
     }
+
+    // A newer render superseded us while we were building — drop this one.
+    if (gen !== renderGenRef.current) return;
+
+    map.removeObjects(map.getObjects());
+    if (objects.length) map.addObjects(objects);
   };
 
-  const addMarkers = async (H: any, map: any) => {
+  const fetchLocations = async (
+    query: string,
+    category: string,
+    activeFilters: BusinessFilters
+  ) => {
+    const H = hRef.current;
+    const map = mapInstance.current;
+    if (!H || !map) return;
+
+    const gen = ++renderGenRef.current;
+
     try {
+      const params = filtersToParams(activeFilters);
+      if (query) params.set("q", query);
+      // "Events" filters by business type rather than category.
+      if (category === "Events") {
+        params.set("type", "event");
+      } else if (category) {
+        params.set("category", category);
+      }
+      const qs = params.toString();
       const res = await fetch(
-        "/api/businesses/locations"
+        `/api/businesses/locations${qs ? `?${qs}` : ""}`
       );
       const { locations } = await res.json();
 
-      if (!locations || locations.length === 0) {
-        console.log("No locations found");
-        return;
-      }
+      // A newer fetch started while this one was in flight — abandon it.
+      if (gen !== renderGenRef.current) return;
 
-      const currentZoom = map.getZoom();
-      await renderMarkers(
-        H, map, locations, currentZoom
-      );
+      const next = locations || [];
+      locationsRef.current = next;
+      const zoom = map.getZoom();
+      lastWasClusteredRef.current = next.length
+        ? zoom < CLUSTER_ZOOM_THRESHOLD
+        : null;
 
-      map.addEventListener(
-        "mapviewchangeend",
-        async () => {
-          const zoom = map.getZoom();
-          await renderMarkers(
-            H, map, locations, zoom
-          );
-        }
-      );
-
+      await renderMarkers(H, map, next, zoom, gen);
     } catch (error) {
-      console.error("Error adding markers:", error);
+      console.error("Error fetching locations:", error);
     }
   };
 
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
 
+    // initMap is async and slow (script loads), so it sets mapInstance.current
+    // late. Under React Strict Mode the effect runs twice; this flag lets the
+    // first run abort once it has been cleaned up, so only ONE map is created.
+    let cancelled = false;
+
     const initMap = async () => {
       try {
-        loadCSS(
-          "https://js.api.here.com/v3/3.1/mapsjs-ui.css"
-        );
+        loadCSS("https://js.api.here.com/v3/3.1/mapsjs-ui.css");
 
-        await loadScript(
-          "https://js.api.here.com/v3/3.1/mapsjs-core.js"
-        );
+        await loadScript("https://js.api.here.com/v3/3.1/mapsjs-core.js");
         await wait(100);
-
-        await loadScript(
-          "https://js.api.here.com/v3/3.1/mapsjs-service.js"
-        );
+        await loadScript("https://js.api.here.com/v3/3.1/mapsjs-service.js");
         await wait(100);
-
-        await loadScript(
-          "https://js.api.here.com/v3/3.1/mapsjs-ui.js"
-        );
+        await loadScript("https://js.api.here.com/v3/3.1/mapsjs-ui.js");
         await wait(100);
-
-        await loadScript(
-          "https://js.api.here.com/v3/3.1/mapsjs-mapevents.js"
-        );
+        await loadScript("https://js.api.here.com/v3/3.1/mapsjs-mapevents.js");
         await wait(300);
 
-        const H = (window as any).H;
+        if (cancelled || mapInstance.current) return;
 
+        const H = (window as any).H;
         if (!H || !H.mapevents) {
           console.error("HERE Maps not available");
           return;
@@ -403,11 +365,7 @@ export default function HereMap({
 
         const positronLayer = new H.map.layer.TileLayer(
           new H.map.provider.ImageTileProvider({
-            getURL: (
-              col: number,
-              row: number,
-              zoom: number
-            ) =>
+            getURL: (col: number, row: number, zoom: number) =>
               `https://a.basemaps.cartocdn.com/light_all/${zoom}/${col}/${row}@2x.png`,
             min: 0,
             max: 19,
@@ -416,15 +374,17 @@ export default function HereMap({
           })
         );
 
-        const map = new H.Map(
-          mapRef.current,
-          positronLayer,
-          {
-            zoom: 11,
-            center: { lat: 34.0522, lng: -118.2437 },
-            pixelRatio: window.devicePixelRatio || 1,
-          }
-        );
+        const map = new H.Map(mapRef.current, positronLayer, {
+          zoom: 11,
+          center: { lat: 34.0522, lng: -118.2437 },
+          pixelRatio: window.devicePixelRatio || 1,
+        });
+
+        // Cleaned up while constructing — tear down and bail.
+        if (cancelled) {
+          map.dispose();
+          return;
+        }
 
         const mapEvents = new H.mapevents.MapEvents(map);
         new H.mapevents.Behavior(mapEvents);
@@ -433,12 +393,27 @@ export default function HereMap({
           map.getViewPort().resize();
         });
 
+        hRef.current = H;
         mapInstance.current = map;
 
-        await addMarkers(H, map);
+        // Only re-render when crossing the cluster/individual threshold,
+        // never on plain pans. Generation token keeps it from racing fetches.
+        map.addEventListener("mapviewchangeend", async () => {
+          if (!locationsRef.current.length) return;
+
+          const zoom = map.getZoom();
+          const isClustered = zoom < CLUSTER_ZOOM_THRESHOLD;
+
+          if (lastWasClusteredRef.current === isClustered) return;
+          lastWasClusteredRef.current = isClustered;
+
+          const gen = ++renderGenRef.current;
+          await renderMarkers(hRef.current, map, locationsRef.current, zoom, gen);
+        });
+
+        await fetchLocations(searchQuery, categoryFilter, filters);
 
         console.log("HERE Maps initialized");
-
       } catch (error) {
         console.error("HERE Maps error:", error);
       }
@@ -447,25 +422,23 @@ export default function HereMap({
     initMap();
 
     return () => {
+      cancelled = true;
       if (mapInstance.current) {
         mapInstance.current.dispose();
         mapInstance.current = null;
+        hRef.current = null;
       }
     };
   }, []);
 
+  // Re-fetch markers whenever search, category, or filters change
+  useEffect(() => {
+    fetchLocations(searchQuery, categoryFilter, filters);
+  }, [searchQuery, categoryFilter, filters]);
+
   return (
-    <div
-      style={{
-        width: "100%",
-        height: "100%",
-        position: "relative",
-      }}
-    >
-      <div
-        ref={mapRef}
-        style={{ width: "100%", height: "100%" }}
-      />
+    <div style={{ width: "100%", height: "100%", position: "relative" }}>
+      <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
     </div>
   );
 }

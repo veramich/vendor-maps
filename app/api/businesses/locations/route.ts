@@ -1,8 +1,35 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { parseFilters, buildFilterClause } from "@/lib/businessFilterSql";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const q = req.nextUrl.searchParams.get("q")?.trim() || "";
+  const category = req.nextUrl.searchParams.get("category") || "";
+  const type = req.nextUrl.searchParams.get("type") || "";
+
   try {
+    const filterFrag = buildFilterClause(
+      parseFilters(req.nextUrl.searchParams)
+    );
+
+    const searchFrag = q
+      ? sql`AND (
+          b.name ILIKE ${"%" + q + "%"}
+          OR b.description ILIKE ${"%" + q + "%"}
+          OR l.street_address ILIKE ${"%" + q + "%"}
+          OR l.city ILIKE ${"%" + q + "%"}
+          OR l.state ILIKE ${"%" + q + "%"}
+          OR l.state_code ILIKE ${"%" + q + "%"}
+          OR l.zip ILIKE ${"%" + q + "%"}
+        )`
+      : sql``;
+
+    const categoryFrag = category
+      ? sql`AND b.category = ${category}`
+      : sql``;
+
+    const typeFrag = type === "event" ? sql`AND b.type = 'event'` : sql``;
+
     const locations = await sql`
       SELECT
         b.id,
@@ -26,6 +53,10 @@ export async function GET() {
         'permanent_location',
         'event'
       )
+      ${searchFrag}
+      ${categoryFrag}
+      ${typeFrag}
+      ${filterFrag}
     `;
 
     return NextResponse.json({ locations });

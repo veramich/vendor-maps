@@ -1,6 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import SearchBar from "@/components/ui/SearchBar";
+import FilterPanel from "@/components/ui/FilterPanel";
+import {
+  BusinessFilters,
+  EMPTY_FILTERS,
+  filtersToParams,
+} from "@/lib/businessFilters";
 
 type Business = {
   id: string;
@@ -16,14 +23,50 @@ type Business = {
   city: string;
 };
 
+const CATEGORIES = [
+  "All",
+  "Food",
+  "Coffee",
+  "Desserts",
+  "Beverages",
+  "Fresh Fruit",
+  "Candy",
+  "Produce",
+  "Personal Care",
+  "Wellness",
+  "Fitness",
+  "Handmade",
+  "Art",
+  "Jewelry",
+  "Apparel",
+  "Merchandise",
+  "Flowers",
+  "General Services",
+  "Event Services",
+  "Custom Designs",
+  "Collectables",
+  "Other",
+];
+
 export default function BusinessList() {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [loading, setLoading] = useState(true);
+  const [inputValue, setInputValue] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [filters, setFilters] = useState<BusinessFilters>(EMPTY_FILTERS);
 
   useEffect(() => {
     const fetchBusinesses = async () => {
+      setLoading(true);
       try {
-        const res = await fetch("/api/businesses/directory");
+        const params = filtersToParams(filters);
+        if (searchQuery) params.set("q", searchQuery);
+        if (categoryFilter) params.set("category", categoryFilter);
+        const qs = params.toString();
+        const res = await fetch(
+          `/api/businesses/directory${qs ? `?${qs}` : ""}`
+        );
         const data = await res.json();
         setBusinesses(data.businesses || []);
       } catch (error) {
@@ -34,37 +77,90 @@ export default function BusinessList() {
     };
 
     fetchBusinesses();
-  }, []);
+  }, [searchQuery, categoryFilter, filters]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center
-        py-20">
-        <div className="w-6 h-6 border-2 border-gray-200
-          border-t-black rounded-full animate-spin"/>
-      </div>
-    );
-  }
+  const handleSearch = (q: string) => {
+    setSearchQuery(q.trim());
+  };
 
-  if (businesses.length === 0) {
-    return (
-      <div className="flex flex-col items-center
-        justify-center py-20 px-4 text-center">
-        <p className="text-gray-400 text-sm">
-          No businesses listed yet
-        </p>
-      </div>
-    );
-  }
+  const handleClearFilters = () => {
+    setInputValue("");
+    setSearchQuery("");
+    setCategoryFilter("");
+    setFilters(EMPTY_FILTERS);
+  };
+
+  const hasFilters =
+    searchQuery || categoryFilter || filters !== EMPTY_FILTERS;
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-4 space-y-3">
-      {businesses.map((business) => (
-        <BusinessCard
-          key={business.id}
-          business={business}
-        />
-      ))}
+    <div>
+      {/* Search + Category filters */}
+      <div className="sticky top-28 bg-white z-10 border-b border-gray-100">
+        <div className="px-4 pt-3 pb-2 flex items-center gap-2">
+          <SearchBar
+            value={inputValue}
+            onChange={setInputValue}
+            onSearch={handleSearch}
+            placeholder="Search by name, city, zip, keyword..."
+            className="flex-1"
+          />
+          <FilterPanel value={filters} onChange={setFilters} />
+        </div>
+        <div className="px-4 pb-3 overflow-x-auto">
+          <div className="flex gap-2 min-w-max">
+            {CATEGORIES.map((cat) => {
+              const isActive =
+                cat === "All" ? categoryFilter === "" : categoryFilter === cat;
+              return (
+                <button
+                  key={cat}
+                  onClick={() =>
+                    setCategoryFilter(cat === "All" ? "" : cat)
+                  }
+                  className={`px-4 py-2 rounded-full text-xs font-medium
+                    transition whitespace-nowrap
+                    ${isActive
+                      ? "bg-black text-white"
+                      : "bg-gray-100 text-gray-600"
+                    }`}
+                >
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Results */}
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="w-6 h-6 border-2 border-gray-200 border-t-black rounded-full animate-spin" />
+        </div>
+      ) : businesses.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+          <p className="text-gray-400 text-sm">
+            {hasFilters
+              ? "No businesses found for this search"
+              : "No businesses listed yet"}
+          </p>
+          {hasFilters && (
+            <button
+              onClick={handleClearFilters}
+              className="text-black text-sm underline mt-2"
+            >
+              Clear search
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="max-w-lg mx-auto px-4 py-4 space-y-3">
+          {businesses.map((business) => (
+            <BusinessCard key={business.id} business={business} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -74,8 +170,8 @@ function BusinessCard({ business }: { business: Business }) {
 
   const TYPE_LABELS: Record<string, string> = {
     permanent_location: "Permanent Location",
-    no_location:        "No Permanent Location",
-};
+    no_location: "No Permanent Location",
+  };
 
   return (
     <a
@@ -84,8 +180,7 @@ function BusinessCard({ business }: { business: Business }) {
         p-4 hover:border-gray-200 transition
         active:scale-99"
     >
-      <div className="flex items-start justify-between
-        gap-3">
+      <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
           <p className="font-semibold text-black text-sm mb-1">
             {business.name}
@@ -95,9 +190,7 @@ function BusinessCard({ business }: { business: Business }) {
             {TYPE_LABELS[business.type] || ""}
           </p>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-500">
-              {priceTier}
-            </span>
+            <span className="text-xs text-gray-500">{priceTier}</span>
             {business.avg_rating > 0 && (
               <span className="text-xs text-gray-500">
                 ★ {Number(business.avg_rating).toFixed(1)}
@@ -110,11 +203,17 @@ function BusinessCard({ business }: { business: Business }) {
           </div>
         </div>
 
-        <svg width="16" height="16"
-          viewBox="0 0 24 24" fill="none"
-          stroke="#9ca3af" strokeWidth="2"
-          strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="9 18 15 12 9 6"/>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#9ca3af"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <polyline points="9 18 15 12 9 6" />
         </svg>
       </div>
     </a>
