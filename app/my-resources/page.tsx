@@ -10,6 +10,7 @@ type MyResource = {
   resource_type:    string;
   title:            string;
   status:           string;
+  timing_type:      string;
   always_available: boolean;
   start_date:       string | null;
   end_date:         string | null;
@@ -29,7 +30,12 @@ function fmtDate(d: string | null): string {
 }
 
 function timeRange(r: MyResource): string {
-  if (r.always_available) return "Always available";
+  if (r.always_available || r.timing_type === "always")
+    return "Always available";
+  if (r.timing_type === "deadline")
+    return r.end_date ? `Apply by ${fmtDate(r.end_date)}` : "";
+  if (r.timing_type === "window" && r.start_date && r.end_date)
+    return `${fmtDate(r.start_date)} – ${fmtDate(r.end_date)}`;
   if (r.start_date && r.end_date)
     return `${fmtDate(r.start_date)} – ${fmtDate(r.end_date)}`;
   if (r.end_date) return `Through ${fmtDate(r.end_date)}`;

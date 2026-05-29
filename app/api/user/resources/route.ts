@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
         resource_type,
         title,
         status,
+        timing_type,
         always_available,
         start_date,
         end_date,

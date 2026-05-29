@@ -46,6 +46,85 @@ function parseDate(value: unknown): string | null {
   return value;
 }
 
+function parseDeliveryMode(value: unknown): "online" | "in_person" | "both" {
+  return value === "online" || value === "in_person" ? value : "both";
+}
+
+type TimingType = "deadline" | "range" | "window" | "always";
+
+function parseTimingType(value: unknown): TimingType {
+  return value === "range" || value === "window" || value === "always"
+    ? value
+    : "deadline";
+}
+
+// Timing type for the edit form: trust the stored column
+// (it alone distinguishes range vs. window), falling back
+// to the dates for older rows that predate the column.
+function deriveTimingType(r: any): TimingType {
+  if (
+    r.timing_type === "deadline" ||
+    r.timing_type === "range" ||
+    r.timing_type === "window" ||
+    r.timing_type === "always"
+  )
+    return r.timing_type;
+  if (r.always_available) return "always";
+  if (r.start_date && r.end_date) return "range";
+  return "deadline";
+}
+
+// Resolve timing type + raw dates into stored columns, or
+// an error. Mirrors the resources_timing_type_dates check.
+function resolveTiming(
+  timingType: TimingType,
+  rawStart: unknown,
+  rawEnd: unknown
+):
+  | { error: string }
+  | { alwaysAvailable: boolean; startDate: string | null; endDate: string | null } {
+  if (timingType === "always") {
+    return { alwaysAvailable: true, startDate: null, endDate: null };
+  }
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const endDate = parseDate(rawEnd);
+
+  if (timingType === "deadline") {
+    if (!endDate) return { error: "A deadline date is required." };
+    if (endDate < todayIso)
+      return { error: "The deadline has already passed." };
+    return { alwaysAvailable: false, startDate: null, endDate };
+  }
+
+  const startDate = parseDate(rawStart);
+  if (!startDate)
+    return {
+      error:
+        timingType === "window"
+          ? "An opening date is required."
+          : "A start date is required.",
+    };
+  if (!endDate)
+    return {
+      error:
+        timingType === "window"
+          ? "A closing date is required."
+          : "An end date is required.",
+    };
+  if (endDate < startDate)
+    return {
+      error:
+        timingType === "window"
+          ? "The closing date must be on or after the opening date."
+          : "The end date must be on or after the start date.",
+    };
+  if (endDate < todayIso)
+    return { error: "That date range has already ended." };
+
+  return { alwaysAvailable: false, startDate, endDate };
+}
+
 // Load a resource the caller is allowed to edit, or null.
 async function loadOwned(id: string, userId: string) {
   const rows = await sql`
@@ -89,6 +168,8 @@ export async function GET(
       resourceType:       r.resource_type || "",
       title:              r.title || "",
       description:        r.description || "",
+      deliveryMode:       parseDeliveryMode(r.delivery_mode),
+      timingType:         deriveTimingType(r),
       alwaysAvailable:    r.always_available,
       startDate:          toIso(r.start_date),
       endDate:            toIso(r.end_date),
@@ -181,34 +262,12 @@ export async function PATCH(
         { status: 400 }
       );
 
-    // --- Time range ---
-    const alwaysAvailable = Boolean(data.alwaysAvailable);
-    let startDate: string | null = null;
-    let endDate: string | null = null;
-
-    if (!alwaysAvailable) {
-      startDate = parseDate(data.startDate);
-      endDate = parseDate(data.endDate);
-      if (!endDate)
-        return NextResponse.json(
-          {
-            error:
-              "An end date is required unless the resource is always available.",
-          },
-          { status: 400 }
-        );
-      if (startDate && endDate < startDate)
-        return NextResponse.json(
-          { error: "End date must be on or after the start date." },
-          { status: 400 }
-        );
-      const todayIso = new Date().toISOString().slice(0, 10);
-      if (endDate < todayIso)
-        return NextResponse.json(
-          { error: "The end date has already passed." },
-          { status: 400 }
-        );
-    }
+    // --- Timing (deadline / range / window / always) ---
+    const timingType = parseTimingType(data.timingType);
+    const timing = resolveTiming(timingType, data.startDate, data.endDate);
+    if ("error" in timing)
+      return NextResponse.json({ error: timing.error }, { status: 400 });
+    const { alwaysAvailable, startDate, endDate } = timing;
 
     const availabilityCutoff = data.hasCutoff
       ? parseDate(data.availabilityCutoff)
@@ -225,6 +284,7 @@ export async function PATCH(
 
     const walkInWelcome = Boolean(data.walkInWelcome);
     const description = cleanText(data.description, 2000);
+    const deliveryMode = parseDeliveryMode(data.deliveryMode);
 
     const streetAddress = cleanText(data.streetAddress, 250);
     const city = cleanText(data.city, 120);
@@ -289,6 +349,8 @@ export async function PATCH(
         resource_type      = ${resourceType},
         title              = ${title},
         description        = ${description},
+        delivery_mode      = ${deliveryMode},
+        timing_type        = ${timingType},
         always_available   = ${alwaysAvailable},
         start_date         = ${startDate},
         end_date           = ${endDate},

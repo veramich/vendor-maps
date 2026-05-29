@@ -10,6 +10,9 @@ import {
   ResourceFlyer,
   INITIAL_RESOURCE_FORM,
   RESOURCE_TYPE_SUGGESTIONS,
+  DELIVERY_MODES,
+  TIMING_TYPES,
+  TimingType,
   MAX_FLYERS,
   MAX_CONTACTS,
   MAX_WEBSITES,
@@ -85,6 +88,19 @@ export default function ResourceForm({
   const update = (data: Partial<ResourceFormData>) =>
     setForm((prev) => ({ ...prev, ...data }));
 
+  // Switching timing type clears any dates that no
+  // longer apply and keeps alwaysAvailable in sync.
+  const selectTimingType = (timingType: TimingType) => {
+    update({
+      timingType,
+      alwaysAvailable: timingType === "always",
+      startDate: "",
+      endDate: "",
+    });
+    clearError("startDate");
+    clearError("endDate");
+  };
+
   const clearError = (key: string) => {
     if (errors[key]) {
       setErrors((prev) => ({ ...prev, [key]: "" }));
@@ -153,17 +169,36 @@ export default function ResourceForm({
     if (!form.availability.trim())
       next.availability = "Please describe availability";
 
-    if (!form.alwaysAvailable) {
+    if (form.timingType !== "always") {
+      const needsStart =
+        form.timingType === "range" || form.timingType === "window";
+
+      if (needsStart && !form.startDate)
+        next.startDate =
+          form.timingType === "window"
+            ? "Add the opening date"
+            : "Add the start date";
+
       if (!form.endDate)
-        next.endDate = "Add an end date, or mark it always available";
+        next.endDate =
+          form.timingType === "deadline"
+            ? "Add the deadline"
+            : form.timingType === "window"
+            ? "Add the closing date"
+            : "Add the end date";
+
       if (
         form.startDate &&
         form.endDate &&
         form.endDate < form.startDate
       )
-        next.endDate = "End date must be on or after the start date";
+        next.endDate =
+          form.timingType === "window"
+            ? "Closing date must be on or after the opening date"
+            : "End date must be on or after the start date";
+
       if (form.endDate && form.endDate < todayIso())
-        next.endDate = "End date can't be in the past";
+        next.endDate = "That date can't be in the past";
     }
 
     if (form.signupOnline) {
@@ -227,6 +262,8 @@ export default function ResourceForm({
     resourceType: form.resourceType,
     title: form.title,
     description: form.description,
+    deliveryMode: form.deliveryMode,
+    timingType: form.timingType,
     alwaysAvailable: form.alwaysAvailable,
     startDate: form.startDate,
     endDate: form.endDate,
@@ -525,51 +562,111 @@ export default function ResourceForm({
             />
           </div>
 
-          {/* Time Range */}
+          {/* Delivery mode — online / in person / both */}
           <div>
             <label className="block text-sm font-medium text-black mb-1">
-              Time range
+              Online or in person
               <span className="text-red-400 ml-1">*</span>
             </label>
             <p className="text-xs text-gray-400 mb-3">
-              Dated resources are automatically removed after the end date
+              How people take part in this resource
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {DELIVERY_MODES.map((mode) => (
+                <button
+                  key={mode.value}
+                  type="button"
+                  onClick={() => update({ deliveryMode: mode.value })}
+                  className={`text-sm font-medium px-4 py-2 rounded-full
+                    border-2 transition ${
+                      form.deliveryMode === mode.value
+                        ? "border-black bg-black text-white"
+                        : "border-gray-200 text-gray-600 hover:border-gray-300"
+                    }`}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Timing */}
+          <div>
+            <label className="block text-sm font-medium text-black mb-1">
+              Timing
+              <span className="text-red-400 ml-1">*</span>
+            </label>
+            <p className="text-xs text-gray-400 mb-3">
+              Dated resources are automatically removed after their
+              last date
             </p>
 
-            <button
-              type="button"
-              onClick={() =>
-                update({
-                  alwaysAvailable: !form.alwaysAvailable,
-                  startDate: "",
-                  endDate: "",
-                })
-              }
-              className="flex items-center gap-2 mb-3"
-            >
-              <span
-                className={`w-5 h-5 rounded-md border-2 flex items-center
-                  justify-center transition ${
-                    form.alwaysAvailable
-                      ? "bg-black border-black"
-                      : "border-gray-300"
-                  }`}
-              >
-                {form.alwaysAvailable && (
-                  <svg width="12" height="12" viewBox="0 0 24 24"
-                    fill="none" stroke="white" strokeWidth="3"
-                    strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12"/>
-                  </svg>
-                )}
-              </span>
-              <span className="text-sm text-black">Always available</span>
-            </button>
+            {/* Timing type picker */}
+            <div className="space-y-2">
+              {TIMING_TYPES.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => selectTimingType(t.value)}
+                  className={`w-full text-left flex items-start gap-3
+                    rounded-xl border-2 px-4 py-3 transition ${
+                      form.timingType === t.value
+                        ? "border-black bg-gray-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                >
+                  <span
+                    className={`mt-0.5 w-4 h-4 rounded-full border-2
+                      flex-shrink-0 flex items-center justify-center
+                      transition ${
+                        form.timingType === t.value
+                          ? "border-black"
+                          : "border-gray-300"
+                      }`}
+                  >
+                    {form.timingType === t.value && (
+                      <span className="w-2 h-2 rounded-full bg-black" />
+                    )}
+                  </span>
+                  <span>
+                    <span className="block text-sm font-medium text-black">
+                      {t.label}
+                    </span>
+                    <span className="block text-xs text-gray-400">
+                      {t.hint}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
 
-            {!form.alwaysAvailable && (
-              <div className="grid grid-cols-2 gap-3">
+            {/* Date inputs — shape depends on timing type */}
+            {form.timingType === "deadline" && (
+              <div className="mt-3">
+                <label className="block text-xs text-gray-500 mb-1">
+                  Deadline
+                </label>
+                <input
+                  type="date"
+                  value={form.endDate}
+                  min={todayIso()}
+                  onChange={(e) => {
+                    update({ endDate: e.target.value });
+                    clearError("endDate");
+                  }}
+                  className={inputClass("endDate")}
+                />
+              </div>
+            )}
+
+            {(form.timingType === "range" ||
+              form.timingType === "window") && (
+              <div className="grid grid-cols-2 gap-3 mt-3">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">
-                    Start date
+                    {form.timingType === "window"
+                      ? "Opens"
+                      : "Start date"}
                   </label>
                   <input
                     type="date"
@@ -577,6 +674,7 @@ export default function ResourceForm({
                     min={todayIso()}
                     onChange={(e) => {
                       update({ startDate: e.target.value });
+                      clearError("startDate");
                       clearError("endDate");
                     }}
                     className={inputClass("startDate")}
@@ -584,7 +682,9 @@ export default function ResourceForm({
                 </div>
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">
-                    End date
+                    {form.timingType === "window"
+                      ? "Closes"
+                      : "End date"}
                   </label>
                   <input
                     type="date"
@@ -599,6 +699,12 @@ export default function ResourceForm({
                 </div>
               </div>
             )}
+
+            {errors.startDate && (
+              <p className="text-red-500 text-xs mt-1">
+                {errors.startDate}
+              </p>
+            )}
             {errors.endDate && (
               <p className="text-red-500 text-xs mt-1">{errors.endDate}</p>
             )}
@@ -611,7 +717,7 @@ export default function ResourceForm({
               <span className="text-red-400 ml-1">*</span>
             </label>
             <p className="text-xs text-gray-400 mb-2">
-              e.g. First come first serve, Limited spots, Cut-off date
+              e.g. First come first serve, Limited spots, By appointment
             </p>
             <input
               type="text"
@@ -628,49 +734,6 @@ export default function ResourceForm({
               <p className="text-red-500 text-xs mt-1">
                 {errors.availability}
               </p>
-            )}
-
-            {/* Optional structured cut-off date */}
-            <button
-              type="button"
-              onClick={() =>
-                update({
-                  hasCutoff: !form.hasCutoff,
-                  availabilityCutoff: "",
-                })
-              }
-              className="flex items-center gap-2 mt-3"
-            >
-              <span
-                className={`w-5 h-5 rounded-md border-2 flex items-center
-                  justify-center transition ${
-                    form.hasCutoff
-                      ? "bg-black border-black"
-                      : "border-gray-300"
-                  }`}
-              >
-                {form.hasCutoff && (
-                  <svg width="12" height="12" viewBox="0 0 24 24"
-                    fill="none" stroke="white" strokeWidth="3"
-                    strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12"/>
-                  </svg>
-                )}
-              </span>
-              <span className="text-sm text-gray-600">
-                There&apos;s a sign-up cut-off date
-              </span>
-            </button>
-            {form.hasCutoff && (
-              <input
-                type="date"
-                value={form.availabilityCutoff}
-                min={todayIso()}
-                onChange={(e) =>
-                  update({ availabilityCutoff: e.target.value })
-                }
-                className={`${inputClass("availabilityCutoff")} mt-2`}
-              />
             )}
           </div>
 

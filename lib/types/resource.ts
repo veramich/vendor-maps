@@ -7,12 +7,63 @@ export type ResourceFlyer = {
   publicId: string;
 };
 
+// How a resource is delivered / attended.
+export type DeliveryMode = "online" | "in_person" | "both";
+
+export const DELIVERY_MODES: { value: DeliveryMode; label: string }[] = [
+  { value: "online",    label: "Online" },
+  { value: "in_person", label: "In person" },
+  { value: "both",      label: "Online & in person" },
+];
+
+export function deliveryModeLabel(mode: string): string {
+  return (
+    DELIVERY_MODES.find((m) => m.value === mode)?.label ?? "Online & in person"
+  );
+}
+
+// What shape the resource's dates take.
+//   deadline — a single last day (e.g. grant apply-by)
+//   range    — runs across start..end (e.g. a 3-day seminar)
+//   window   — applications open then close (start..end)
+//   always   — no dates, always available
+export type TimingType = "deadline" | "range" | "window" | "always";
+
+export const TIMING_TYPES: {
+  value: TimingType;
+  label: string;
+  hint: string;
+}[] = [
+  {
+    value: "deadline",
+    label: "Deadline to apply",
+    hint: "A single last day to apply or sign up",
+  },
+  {
+    value: "range",
+    label: "Runs on set dates",
+    hint: "Happens across a span of days, like a seminar",
+  },
+  {
+    value: "window",
+    label: "Application window",
+    hint: "Applications open on one date and close on another",
+  },
+  {
+    value: "always",
+    label: "Always available",
+    hint: "No specific dates",
+  },
+];
+
 // Shape returned to public listing / cards
 export type Resource = {
   id:              string;
   resourceType:    string;
   title:           string;
   description:     string | null;
+  deliveryMode:    DeliveryMode;
+  timingType:      TimingType;
   alwaysAvailable: boolean;
   startDate:       string | null;  // ISO date (YYYY-MM-DD)
   endDate:         string | null;
@@ -40,14 +91,21 @@ export type ResourceFormData = {
   resourceType:    string;
   title:           string;
   description:     string;
+  deliveryMode:    DeliveryMode;
 
-  // Time range
+  // Timing
+  // timingType drives which date inputs show and how
+  // they're labelled; alwaysAvailable / startDate /
+  // endDate are the values actually stored.
+  timingType:      TimingType;
   alwaysAvailable: boolean;
   startDate:       string;
   endDate:         string;
 
   // Availability
   availability:    string;
+  // Legacy structured cut-off — folded into timingType
+  // in the UI, kept so older data round-trips cleanly.
   hasCutoff:       boolean;
   availabilityCutoff: string;
 
@@ -82,6 +140,8 @@ export const INITIAL_RESOURCE_FORM: ResourceFormData = {
   resourceType:       "",
   title:              "",
   description:        "",
+  deliveryMode:       "both",
+  timingType:         "deadline",
   alwaysAvailable:    false,
   startDate:          "",
   endDate:            "",

@@ -18,9 +18,11 @@ function fmtDate(d: any): string {
 }
 
 function timeRange(r: any): string {
-  if (r.always_available) return "Always available";
+  if (r.always_available || r.timing_type === "always")
+    return "Always available";
   const start = fmtDate(r.start_date);
   const end = fmtDate(r.end_date);
+  if (r.timing_type === "deadline") return end ? `Apply by ${end}` : "";
   if (start && end) return `${start} – ${end}`;
   if (end) return `Through ${end}`;
   return "";

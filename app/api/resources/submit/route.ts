@@ -58,6 +58,76 @@ function parseDate(value: unknown): string | null {
   return value;
 }
 
+// Online / in person / both — defaults to "both".
+function parseDeliveryMode(value: unknown): "online" | "in_person" | "both" {
+  return value === "online" || value === "in_person" ? value : "both";
+}
+
+type TimingType = "deadline" | "range" | "window" | "always";
+
+function parseTimingType(value: unknown): TimingType {
+  return value === "range" || value === "window" || value === "always"
+    ? value
+    : "deadline";
+}
+
+// Resolve timing type + raw dates into the stored
+// columns, or return an error message. Mirrors the
+// resources_timing_type_dates DB constraint:
+//   always   -> no dates
+//   deadline -> end only (the last day to apply)
+//   range    -> start + end (event span)
+//   window   -> start + end (opens .. closes)
+function resolveTiming(
+  timingType: TimingType,
+  rawStart: unknown,
+  rawEnd: unknown
+):
+  | { error: string }
+  | { alwaysAvailable: boolean; startDate: string | null; endDate: string | null } {
+  if (timingType === "always") {
+    return { alwaysAvailable: true, startDate: null, endDate: null };
+  }
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const endDate = parseDate(rawEnd);
+
+  if (timingType === "deadline") {
+    if (!endDate) return { error: "A deadline date is required." };
+    if (endDate < todayIso)
+      return { error: "The deadline has already passed." };
+    return { alwaysAvailable: false, startDate: null, endDate };
+  }
+
+  // range | window — both dates required
+  const startDate = parseDate(rawStart);
+  if (!startDate)
+    return {
+      error:
+        timingType === "window"
+          ? "An opening date is required."
+          : "A start date is required.",
+    };
+  if (!endDate)
+    return {
+      error:
+        timingType === "window"
+          ? "A closing date is required."
+          : "An end date is required.",
+    };
+  if (endDate < startDate)
+    return {
+      error:
+        timingType === "window"
+          ? "The closing date must be on or after the opening date."
+          : "The end date must be on or after the start date.",
+    };
+  if (endDate < todayIso)
+    return { error: "That date range has already ended." };
+
+  return { alwaysAvailable: false, startDate, endDate };
+}
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
@@ -124,41 +194,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // --- Time range ---
-    const alwaysAvailable = Boolean(data.alwaysAvailable);
-    let startDate: string | null = null;
-    let endDate: string | null = null;
-
-    if (!alwaysAvailable) {
-      startDate = parseDate(data.startDate);
-      endDate = parseDate(data.endDate);
-
-      if (!endDate) {
-        return NextResponse.json(
-          {
-            error:
-              "An end date is required unless the resource is always available.",
-          },
-          { status: 400 }
-        );
-      }
-      if (startDate && endDate < startDate) {
-        return NextResponse.json(
-          { error: "End date must be on or after the start date." },
-          { status: 400 }
-        );
-      }
-      // Reject a range that has already ended
-      const todayIso = new Date().toISOString().slice(0, 10);
-      if (endDate < todayIso) {
-        return NextResponse.json(
-          { error: "The end date has already passed." },
-          { status: 400 }
-        );
-      }
+    // --- Timing (deadline / range / window / always) ---
+    const timingType = parseTimingType(data.timingType);
+    const timing = resolveTiming(timingType, data.startDate, data.endDate);
+    if ("error" in timing) {
+      return NextResponse.json({ error: timing.error }, { status: 400 });
     }
+    const { alwaysAvailable, startDate, endDate } = timing;
 
     // --- Availability cut off (optional, structured) ---
+    // Folded into the timing model in the UI; kept here so
+    // older clients still round-trip.
     const availabilityCutoff = data.hasCutoff
       ? parseDate(data.availabilityCutoff)
       : null;
@@ -189,6 +235,7 @@ export async function POST(req: NextRequest) {
     // --- Optional contact / links ---
     const walkInWelcome = Boolean(data.walkInWelcome);
     const description = cleanText(data.description, 2000);
+    const deliveryMode = parseDeliveryMode(data.deliveryMode);
 
     // Contacts — repeatable free-text lines, cleaned & de-blanked
     const contacts = Array.isArray(data.contacts)
@@ -238,6 +285,8 @@ export async function POST(req: NextRequest) {
         resource_type,
         title,
         description,
+        delivery_mode,
+        timing_type,
         always_available,
         start_date,
         end_date,
@@ -262,6 +311,8 @@ export async function POST(req: NextRequest) {
         ${resourceType},
         ${title},
         ${description},
+        ${deliveryMode},
+        ${timingType},
         ${alwaysAvailable},
         ${startDate},
         ${endDate},
