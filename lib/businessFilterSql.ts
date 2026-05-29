@@ -87,6 +87,49 @@ export function parseFilters(params: URLSearchParams): ParsedFilters {
 
 const MILES_TO_METERS = 1609.34;
 
+// Boolean predicate: is business `b` open at the given local day/time? Open if
+// any of business_hours / market_schedules / popup_events covers it. Handles
+// windows that close after midnight via the previous day's closes_next_day
+// rows. Used both as an "open now" filter and as an is_open projection in the
+// directory list, so the two always agree.
+export function openNowPredicate(
+  nowDay: string,
+  prevDay: string,
+  nowTime: string
+) {
+  const t = sql`${nowTime}::time`;
+  return sql`(
+    EXISTS (
+      SELECT 1 FROM business_hours bh
+      WHERE bh.business_id = b.id
+      AND bh.is_closed = false
+      AND (
+        (bh.day_of_week = ${nowDay} AND (
+          (bh.closes_next_day = false AND bh.open_time <= ${t} AND bh.close_time > ${t})
+          OR (bh.closes_next_day = true AND bh.open_time <= ${t})
+        ))
+        OR (bh.day_of_week = ${prevDay} AND bh.closes_next_day = true AND bh.close_time > ${t})
+      )
+    )
+    OR EXISTS (
+      SELECT 1 FROM market_schedules ms
+      WHERE ms.business_id = b.id
+      AND (
+        (ms.day_of_week = ${nowDay} AND (
+          (ms.closes_next_day = false AND ms.start_time <= ${t} AND ms.end_time > ${t})
+          OR (ms.closes_next_day = true AND ms.start_time <= ${t})
+        ))
+        OR (ms.day_of_week = ${prevDay} AND ms.closes_next_day = true AND ms.end_time > ${t})
+      )
+    )
+    OR EXISTS (
+      SELECT 1 FROM popup_events pe
+      WHERE pe.business_id = b.id
+      AND pe.event_range @> NOW()::timestamp
+    )
+  )`;
+}
+
 // Time-of-day bands as [lo, hi) windows. An event matches a band when its
 // open interval overlaps the band, so an 11:00–17:00 event hits both morning
 // and afternoon. Evening runs to 24:00.
@@ -120,39 +163,9 @@ export function buildFilterClause(f: ParsedFilters) {
   // covers the current local day+time. Handles windows that close after
   // midnight via the previous day's closes_next_day rows.
   if (f.openNow && f.nowDay && f.prevDay && f.nowTime) {
-    const t = sql`${f.nowTime}::time`;
-    frags.push(sql`
-      AND (
-        EXISTS (
-          SELECT 1 FROM business_hours bh
-          WHERE bh.business_id = b.id
-          AND bh.is_closed = false
-          AND (
-            (bh.day_of_week = ${f.nowDay} AND (
-              (bh.closes_next_day = false AND bh.open_time <= ${t} AND bh.close_time > ${t})
-              OR (bh.closes_next_day = true AND bh.open_time <= ${t})
-            ))
-            OR (bh.day_of_week = ${f.prevDay} AND bh.closes_next_day = true AND bh.close_time > ${t})
-          )
-        )
-        OR EXISTS (
-          SELECT 1 FROM market_schedules ms
-          WHERE ms.business_id = b.id
-          AND (
-            (ms.day_of_week = ${f.nowDay} AND (
-              (ms.closes_next_day = false AND ms.start_time <= ${t} AND ms.end_time > ${t})
-              OR (ms.closes_next_day = true AND ms.start_time <= ${t})
-            ))
-            OR (ms.day_of_week = ${f.prevDay} AND ms.closes_next_day = true AND ms.end_time > ${t})
-          )
-        )
-        OR EXISTS (
-          SELECT 1 FROM popup_events pe
-          WHERE pe.business_id = b.id
-          AND pe.event_range @> NOW()::timestamp
-        )
-      )
-    `);
+    frags.push(
+      sql`AND ${openNowPredicate(f.nowDay, f.prevDay, f.nowTime)}`
+    );
   }
 
   // Days open — business has a non-closed schedule on any selected day. Covers

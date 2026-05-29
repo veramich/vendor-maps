@@ -8,7 +8,7 @@ export default function ConstructionBanner() {
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setDismissed(true);
-    }, 30000);
+    }, 10000);
 
     return () => {
       window.clearTimeout(timeoutId);
@@ -19,7 +19,7 @@ export default function ConstructionBanner() {
 
   return (
     <div
-      style={{ background: "var(--background)" }}
+      style={{ background: "var(--foreground)" }}
       className="fixed top-0 left-0 right-0 z-[100]
         px-4 py-2.5"
     >

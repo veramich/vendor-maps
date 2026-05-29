@@ -61,6 +61,7 @@ export type BusinessHours = {
 export type MarketSchedule = {
   dayOfWeek:      string;
   recurrenceType: string;
+  anchorDate:     string;  // next/first occurrence the vendor picked
   startTime:      string;
   endTime:        string;
   closesNextDay:  boolean;

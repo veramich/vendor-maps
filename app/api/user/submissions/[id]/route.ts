@@ -27,7 +27,6 @@ export async function GET(
       SELECT b.*
       FROM businesses b
       WHERE b.id = ${id}
-      AND b.submitted_by = ${session.user.id}
       AND b.status IN ('pending', 'listed')
     `;
 
@@ -38,8 +37,24 @@ export async function GET(
       );
     }
 
+    const business = result[0];
+
+    // Claimed listings can only be edited by their verified owner.
+    if (
+      business.claim_status === "claimed" &&
+      business.claimed_by !== session.user.id
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "This listing is managed by its verified owner and can't be edited.",
+        },
+        { status: 403 }
+      );
+    }
+
     return NextResponse.json({
-      business: result[0]
+      business
     });
 
   } catch (error) {
@@ -71,9 +86,9 @@ export async function PATCH(
 
     // Allow editing pending and listed submissions
     const existing = await sql`
-      SELECT id, status FROM businesses
+      SELECT id, status, claim_status, claimed_by
+      FROM businesses
       WHERE id = ${id}
-      AND submitted_by = ${session.user.id}
       AND status IN ('pending', 'listed')
     `;
 
@@ -81,6 +96,20 @@ export async function PATCH(
       return NextResponse.json(
         { error: "Submission not found or not editable" },
         { status: 404 }
+      );
+    }
+
+    // Claimed listings can only be edited by their verified owner.
+    if (
+      existing[0].claim_status === "claimed" &&
+      existing[0].claimed_by !== session.user.id
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "This listing is managed by its verified owner and can't be edited.",
+        },
+        { status: 403 }
       );
     }
 

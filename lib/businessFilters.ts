@@ -143,6 +143,23 @@ function eventWindow(date: EventDateFilter): {
   return { from: todayStart, to, days: [...DAY_NAMES] };
 }
 
+// The caller's local day/time, used to resolve open/closed against the user's
+// timezone. now_day/prev_day/now_time are read server-side by openNowPredicate.
+export function localNowParams(): {
+  now_day: string;
+  prev_day: string;
+  now_time: string;
+} {
+  const now = new Date();
+  return {
+    now_day: DAY_NAMES[now.getDay()],
+    prev_day: DAY_NAMES[(now.getDay() + 6) % 7],
+    now_time: `${String(now.getHours()).padStart(2, "0")}:${String(
+      now.getMinutes()
+    ).padStart(2, "0")}`,
+  };
+}
+
 // Serializes filters into query params. "Open now" is resolved against the
 // caller's local clock here, so day/time reflect the user's timezone.
 export function filtersToParams(f: BusinessFilters): URLSearchParams {
@@ -155,16 +172,11 @@ export function filtersToParams(f: BusinessFilters): URLSearchParams {
   }
 
   if (f.openNow) {
-    const now = new Date();
-    const day = DAY_NAMES[now.getDay()];
-    const prevDay = DAY_NAMES[(now.getDay() + 6) % 7];
-    const time = `${String(now.getHours()).padStart(2, "0")}:${String(
-      now.getMinutes()
-    ).padStart(2, "0")}`;
+    const { now_day, prev_day, now_time } = localNowParams();
     params.set("open_now", "1");
-    params.set("now_day", day);
-    params.set("prev_day", prevDay);
-    params.set("now_time", time);
+    params.set("now_day", now_day);
+    params.set("prev_day", prev_day);
+    params.set("now_time", now_time);
   }
 
   if (f.days.length) params.set("days", f.days.join(","));

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "@/lib/auth-client";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import {
   BusinessFormData,
   INITIAL_FORM_DATA,
@@ -18,7 +18,14 @@ export default function EditSubmissionPage() {
   const { data: session, isPending } = useSession();
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const businessId = params.id as string;
+
+  // Allow deep-linking to a step (e.g. the directory "Add a photo" CTA → step 6).
+  const initialStep = (() => {
+    const s = Number(searchParams.get("step"));
+    return s >= 4 && s <= 6 ? s : 4;
+  })();
 
   const [formData, setFormData] =
     useState<BusinessFormData>(INITIAL_FORM_DATA);
@@ -26,7 +33,7 @@ export default function EditSubmissionPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
-  const [step, setStep] = useState(4);
+  const [step, setStep] = useState(initialStep);
 
   useEffect(() => {
     if (!isPending && !session) {

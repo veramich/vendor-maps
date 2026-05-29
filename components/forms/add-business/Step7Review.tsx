@@ -6,6 +6,15 @@ import {
   PRICE_TIERS,
 } from "@/lib/types/business";
 
+const RECURRENCE_LABELS: Record<string, string> = {
+  weekly: "Every week",
+  biweekly: "Every other week",
+  monthly_first: "First of month",
+  monthly_second: "Second of month",
+  monthly_third: "Third of month",
+  monthly_last: "Last of month",
+};
+
 interface Step7ReviewProps {
   formData:    BusinessFormData;
   onSubmit:    () => Promise<void>;
@@ -238,10 +247,10 @@ export default function Step7Review({
                   className="text-xs text-black
                     capitalize">
                   {s.dayOfWeek} —{" "}
-                  {s.recurrenceType === "weekly"
-                    ? "Every week"
-                    : "Every other week"
-                  } · {s.startTime} — {s.endTime}
+                  {RECURRENCE_LABELS[s.recurrenceType] ||
+                    s.recurrenceType}
+                  {s.anchorDate ? ` · from ${s.anchorDate}` : ""}
+                  {" · "}{s.startTime} — {s.endTime}
                 </p>
               ))}
             </div>

@@ -191,6 +191,19 @@ export default function Step5Details({
         "Please add at least one schedule";
     }
 
+    // Each recurring schedule needs an anchor date so we can compute exact
+    // upcoming dates (and resolve biweekly cadence).
+    if (isMarket) {
+      formData.marketSchedules.forEach((s, i) => {
+        if (!s.anchorDate) {
+          newErrors[`anchorDate_${i}`] =
+            s.recurrenceType.startsWith("monthly")
+              ? "Pick the first date this happens"
+              : "Pick the next date this happens";
+        }
+      });
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -217,6 +230,7 @@ export default function Step5Details({
         {
           dayOfWeek:      "saturday",
           recurrenceType: "weekly",
+          anchorDate:     "",
           startTime:      "08:00",
           endTime:        "14:00",
           closesNextDay:  false,
@@ -799,6 +813,52 @@ export default function Step5Details({
                       Last of month
                     </option>
                   </select>
+                </div>
+
+                {/* Anchor date — the next/first occurrence. Lets us show exact
+                    upcoming dates and resolve biweekly cadence. */}
+                <div className="mb-3">
+                  <label className="block text-xs
+                    text-gray-500 mb-1">
+                    {schedule.recurrenceType.startsWith("monthly")
+                      ? "First date this happens"
+                      : "Next date this happens"}
+                  </label>
+                  <input
+                    type="date"
+                    value={schedule.anchorDate || ""}
+                    min={
+                      new Date().toISOString().split("T")[0]
+                    }
+                    onChange={(e) => {
+                      updateSchedule(i, {
+                        anchorDate: e.target.value
+                      });
+                      if (errors[`anchorDate_${i}`]) {
+                        setErrors(prev => ({
+                          ...prev,
+                          [`anchorDate_${i}`]: ""
+                        }));
+                      }
+                    }}
+                    className={`w-full border-2 rounded-xl
+                      px-4 py-3 text-sm text-black
+                      focus:outline-none transition
+                      ${errors[`anchorDate_${i}`]
+                        ? "border-red-400"
+                        : "border-gray-200 focus:border-black"
+                      }`}
+                  />
+                  {errors[`anchorDate_${i}`] && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors[`anchorDate_${i}`]}
+                    </p>
+                  )}
+                  <p className="text-gray-400 text-xs mt-1">
+                    {schedule.recurrenceType === "biweekly"
+                      ? "We'll repeat every 2 weeks from this date."
+                      : "Used to show your next upcoming date."}
+                  </p>
                 </div>
 
                 {/* Time */}
