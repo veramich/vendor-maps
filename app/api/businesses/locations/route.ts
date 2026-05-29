@@ -38,6 +38,7 @@ export async function GET(req: NextRequest) {
         b.type,
         b.sub_type,
         b.category,
+        cat.icon_name,
         b.price_tier,
         b.avg_rating,
         b.review_count,
@@ -47,6 +48,7 @@ export async function GET(req: NextRequest) {
         l.city
       FROM businesses b
       JOIN locations l ON l.business_id = b.id
+      LEFT JOIN categories cat ON cat.name = b.category
       WHERE b.status = 'listed'
       AND l.coordinates IS NOT NULL
       AND b.type IN (

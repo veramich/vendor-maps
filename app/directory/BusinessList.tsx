@@ -201,7 +201,7 @@ function StarRating({ rating }: { rating: number }) {
           width="16"
           height="16"
           viewBox="0 0 24 24"
-          className={i <= rounded ? "fill-primary" : "fill-white/80"}
+          className={i <= rounded ? "fill-red-500" : "fill-white/80"}
         >
           <path d="M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 17.8 5.9 20.4l1.5-6.8L2.2 9l6.9-.7z" />
         </svg>
@@ -273,29 +273,30 @@ function BusinessCard({ business }: { business: Business }) {
           </a>
         )}
 
-        {/* Top-left: logo or category icon badge (decorative overlay) */}
-        <div className="pointer-events-none absolute top-2.5 left-2.5 w-11 h-11
-          rounded-full bg-primary ring-2 ring-white overflow-hidden
-          flex items-center justify-center">
-          {logo ? (
+        {/* Top-left: logo badge OR plain icon overlay (no circle background) */}
+        {logo ? (
+          <div className="pointer-events-none absolute top-2.5 left-2.5 w-11 h-11
+            rounded-full bg-primary ring-2 ring-white overflow-hidden
+            flex items-center justify-center">
             <img src={logo} alt="" className="w-full h-full object-cover" />
-          ) : iconSrc ? (
-            <img src={iconSrc} alt="" className="w-7 h-7 object-contain invert" />
-          ) : (
+          </div>
+        ) : iconSrc ? (
+          <img
+            src={iconSrc}
+            alt=""
+            className="pointer-events-none absolute top-3 left-3 w-8 h-8 object-contain
+              [filter:brightness(0)_invert(1)_drop-shadow(0_1px_2px_rgba(0,0,0,0.7))]"
+          />
+        ) : (
+          <div className="pointer-events-none absolute top-2.5 left-2.5 w-10 h-10
+            rounded-full bg-black/35 backdrop-blur-sm flex items-center justify-center">
             <span className="text-white text-sm font-semibold">
               {business.name.charAt(0)}
             </span>
-          )}
-        </div>
-
-        {/* Top-right: category pill */}
-        {business.category && (
-          <span className="pointer-events-none absolute top-2.5 right-2.5
-            px-2.5 py-1 rounded-full text-[11px] font-medium text-white
-            bg-black/45 backdrop-blur-sm">
-            {business.category}
-          </span>
+          </div>
         )}
+
+
 
         {/* Bottom-left: rating */}
         {business.avg_rating > 0 && (

@@ -30,6 +30,12 @@ export default async function AdminDashboard() {
     WHERE status = 'pending'
   `;
 
+  const [resources] = await sql`
+    SELECT COUNT(*) as count
+    FROM resources
+    WHERE status = 'pending'
+  `;
+
   const byType = await sql`
     SELECT type, COUNT(*) as count
     FROM businesses
@@ -71,6 +77,12 @@ export default async function AdminDashboard() {
       value:  reviews.count,
       href:   "/admin/reviews",
       urgent: Number(reviews.count) > 0,
+    },
+    {
+      label:  "Pending Resources",
+      value:  resources.count,
+      href:   "/admin/resources",
+      urgent: Number(resources.count) > 0,
     },
   ];
 
