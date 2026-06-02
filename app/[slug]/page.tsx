@@ -171,6 +171,8 @@ const SUB_TYPE_LABELS: Record<string, string> = {
   home_based:         "Home Based",
   market_based:       "Market Based",
   pop_up_based:       "Pop-Up Based",
+  other:              "Other",
+  // Legacy values kept for businesses submitted before the type list change
   catering_only:      "Catering",
   shipping_only:      "Shipping",
   permanent_location: "Permanent Location",

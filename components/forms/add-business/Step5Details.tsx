@@ -130,8 +130,13 @@ export default function Step5Details({
   const isPermanent =
     formData.subType === "permanent_location";
 
+  // Small business price context keys off the chosen detailedSubType
+  // (subType is only derived from the location step at submit time);
+  // events still key off subType ("market" | "pop_up").
   const priceContext =
-    PRICE_CONTEXT[formData.subType || ""] || "per item";
+    PRICE_CONTEXT[
+      formData.detailedSubType || formData.subType || ""
+    ] || "per item";
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -857,7 +862,7 @@ export default function Step5Details({
                   <p className="text-gray-400 text-xs mt-1">
                     {schedule.recurrenceType === "biweekly"
                       ? "We'll repeat every 2 weeks from this date."
-                      : "Used to show your next upcoming date."}
+                      : "Used to show the next upcoming date."}
                   </p>
                 </div>
 
@@ -1160,7 +1165,7 @@ export default function Step5Details({
                         text-amber-700">
                         Hours subject to change due to
                         weather, events, etc. will be
-                        displayed on your listing.
+                        displayed on the listing.
                       </p>
                     </div>
                   </div>

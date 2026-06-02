@@ -21,6 +21,17 @@ const EVENT_TIMES = new Set([
   "night_market",
 ]);
 
+// Small-business sub types selectable in the filter panel. Event sub types
+// (market / pop_up) are handled by the event date/time filter instead.
+const VALID_SUB_TYPES = new Set([
+  "street_vendor",
+  "food_truck",
+  "home_based",
+  "market_based",
+  "pop_up_based",
+  "other",
+]);
+
 export type ParsedFilters = {
   radiusMi: number | null;
   lat: number | null;
@@ -34,6 +45,10 @@ export type ParsedFilters = {
   priceTiers: number[];
   amenities: string[];
   dietary: string[];
+  payment: string[];
+  ordering: string[];
+  categories: string[];
+  subTypes: string[];
   eventFrom: string | null;
   eventTo: string | null;
   eventDays: string[];
@@ -78,6 +93,10 @@ export function parseFilters(params: URLSearchParams): ParsedFilters {
     priceTiers,
     amenities: list("amenities"),
     dietary: list("dietary"),
+    payment: list("payment"),
+    ordering: list("ordering"),
+    categories: list("categories"),
+    subTypes: list("sub_types").filter((s) => VALID_SUB_TYPES.has(s)),
     eventFrom: params.get("event_from"),
     eventTo: params.get("event_to"),
     eventDays: list("event_days").filter((d) => VALID_DAYS.has(d)),
@@ -209,6 +228,23 @@ export function buildFilterClause(f: ParsedFilters) {
 
   if (f.dietary.length) {
     frags.push(sql`AND b.dietary_options @> ${f.dietary}::text[]`);
+  }
+
+  if (f.payment.length) {
+    frags.push(sql`AND b.payment_options @> ${f.payment}::text[]`);
+  }
+
+  if (f.ordering.length) {
+    frags.push(sql`AND b.ordering_methods @> ${f.ordering}::text[]`);
+  }
+
+  // Category / business sub type — single-valued columns, match ANY selected.
+  if (f.categories.length) {
+    frags.push(sql`AND b.category = ANY(${f.categories})`);
+  }
+
+  if (f.subTypes.length) {
+    frags.push(sql`AND b.sub_type = ANY(${f.subTypes})`);
   }
 
   // Event date/time — narrows to event-type businesses with a matching market

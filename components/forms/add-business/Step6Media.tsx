@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import imageCompression from "browser-image-compression";
 import { BusinessFormData } from "@/lib/types/business";
 
@@ -23,9 +23,48 @@ export default function Step6Media({
   nextStep,
 }: Step6MediaProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [previews, setPreviews] = useState<string[]>([]);
   const [compressing, setCompressing] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
+
+  // Previews are derived from formData.images (the source of truth) so that
+  // existing photos reappear when this step is revisited from Review — and so
+  // we never show fewer thumbnails than will actually be submitted. Computed
+  // synchronously to avoid a flash, with the object URLs revoked on the next
+  // change / unmount to avoid leaks.
+  const previews = useMemo(
+    () => formData.images.map(file => URL.createObjectURL(file)),
+    [formData.images]
+  );
+
+  useEffect(() => {
+    return () => {
+      previews.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [previews]);
+
+  // Unified gallery: already-uploaded photos first (edit flow), then newly
+  // added files. The first item is the cover. Each entry knows which list it
+  // belongs to so removal targets the right one.
+  const gallery = useMemo(
+    () => [
+      ...formData.existingImages.map(img => ({
+        key:      img.id,
+        url:      img.url,
+        kind:     "existing" as const,
+        id:       img.id,
+      })),
+      ...previews.map((url, i) => ({
+        key:      `new-${i}`,
+        url,
+        kind:     "new" as const,
+        index:    i,
+      })),
+    ],
+    [formData.existingImages, previews]
+  );
+
+  const totalImages =
+    formData.existingImages.length + formData.images.length;
 
   const isEvent =
     formData.subType === "market" ||
@@ -116,7 +155,7 @@ export default function Step6Media({
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
-    const remaining = maxImages - formData.images.length;
+    const remaining = maxImages - totalImages;
     const toAdd = files.slice(0, remaining);
 
     setCompressing(true);
@@ -132,18 +171,7 @@ export default function Step6Media({
         )
       );
 
-      const newPreviews = await Promise.all(
-        compressed.map(file =>
-          new Promise<string>(resolve => {
-            const reader = new FileReader();
-            reader.onloadend = () =>
-              resolve(reader.result as string);
-            reader.readAsDataURL(file);
-          })
-        )
-      );
-
-      setPreviews(prev => [...prev, ...newPreviews]);
+      // previews are derived from formData.images by the memo above
       updateForm({
         images: [...formData.images, ...compressed],
       });
@@ -152,10 +180,17 @@ export default function Step6Media({
     }
   };
 
-  const removeImage = (index: number) => {
-    setPreviews(prev => prev.filter((_, i) => i !== index));
+  const removeNewImage = (index: number) => {
     updateForm({
       images: formData.images.filter((_, i) => i !== index)
+    });
+  };
+
+  const removeExistingImage = (id: string) => {
+    updateForm({
+      existingImages: formData.existingImages.filter(
+        img => img.id !== id
+      ),
     });
   };
 
@@ -282,7 +317,7 @@ export default function Step6Media({
         Photos & contact
       </h2>
       <p className="text-gray-500 text-sm mb-8">
-        Help customers find and connect with you
+        Help customers find and connect with the business
       </p>
 
       <div className="space-y-8">
@@ -298,17 +333,17 @@ export default function Step6Media({
             </span>
           </label>
           <p className="text-xs text-gray-400 mb-3">
-            First photo will be your cover image
+            First photo will be the cover image
           </p>
 
           {/* Image previews */}
-          {previews.length > 0 && (
+          {gallery.length > 0 && (
             <div className="grid grid-cols-3 gap-2 mb-3">
-              {previews.map((preview, i) => (
-                <div key={i} className="relative
+              {gallery.map((item, i) => (
+                <div key={item.key} className="relative
                   aspect-square">
                   <img
-                    src={preview}
+                    src={item.url}
                     alt={`Photo ${i + 1}`}
                     className="w-full h-full object-cover
                       rounded-xl"
@@ -322,7 +357,11 @@ export default function Step6Media({
                   )}
                   <button
                     type="button"
-                    onClick={() => removeImage(i)}
+                    onClick={() =>
+                      item.kind === "existing"
+                        ? removeExistingImage(item.id)
+                        : removeNewImage(item.index)
+                    }
                     className="absolute top-1 right-1
                       bg-black bg-opacity-60 text-white
                       w-6 h-6 rounded-full flex items-center
@@ -336,7 +375,7 @@ export default function Step6Media({
           )}
 
           {/* Upload button */}
-          {previews.length < maxImages && (
+          {totalImages < maxImages && (
             <>
               <input
                 ref={imageInputRef}
@@ -385,9 +424,9 @@ export default function Step6Media({
                       <polyline points="21 15 16 10 5 21"/>
                     </svg>
                     <p className="text-sm text-gray-400">
-                      {previews.length === 0
+                      {totalImages === 0
                         ? "Add photos"
-                        : `Add more (${previews.length}/${maxImages})`
+                        : `Add more (${totalImages}/${maxImages})`
                       }
                     </p>
                     <p className="text-xs text-gray-300">
@@ -452,7 +491,7 @@ export default function Step6Media({
             </span>
           </label>
           <p className="text-xs text-gray-400 mb-3">
-            Add ways for customers to reach you
+            Add ways for customers to reach the business
           </p>
 
           <div className="space-y-3">

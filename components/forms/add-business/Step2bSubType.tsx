@@ -12,87 +12,54 @@ export default function Step2bSubType({
   nextStep,
 }: Step2bSubTypeProps) {
 
-  const isPermanent =
-    formData.subType === "permanent_location";
-
   const handleSelect = (detailedSubType: string) => {
     updateForm({
-      detailedSubType: detailedSubType as DetailedSubType
+      detailedSubType: detailedSubType as DetailedSubType,
     });
-    nextStep(formData.subType ?? undefined);
+    nextStep();
   };
 
-  const permanentOptions = [
+  const options = [
     {
       value:       "street_vendor",
       title:       "Street Vendor",
-      description: "You operate from a cart, stand or stall at a fixed spot",
+      description: "Operates from a cart, stand or stall",
     },
     {
       value:       "food_truck",
       title:       "Food Truck",
-      description: "You operate from a truck or trailer at a fixed spot",
+      description: "Operates from a truck or trailer",
     },
     {
       value:       "home_based",
       title:       "Home Based",
-      description: "You operate from your home or private property",
+      description: "Operates from a home or private property",
     },
-    {
-      value:       "other_permanent",
-      title:       "Other",
-      description: "Another type of permanent location business",
-    },
-  ];
-
-  const noLocationOptions = [
     {
       value:       "market_based",
       title:       "Market Based",
-      description: "You primarily sell at markets and events",
+      description: "Primarily sells at recurring markets",
     },
     {
       value:       "pop_up_based",
       title:       "Pop-Up Based",
-      description: "You host or attend pop-up events",
+      description: "Hosts or attends pop-up events",
     },
     {
-      value:       "catering_only",
-      title:       "Catering Only",
-      description: "You provide catering services",
-    },
-    {
-      value:       "shipping_only",
-      title:       "Shipping Only",
-      description: "You sell and ship products online",
-    },
-    {
-      value:       "other_no_location",
+      value:       "other",
       title:       "Other",
-      description: "Another type of mobile or online business",
+      description: "Another type of small business",
     },
   ];
-
-  const options = isPermanent
-    ? permanentOptions
-    : noLocationOptions;
-
-  const title = isPermanent
-    ? "What type of permanent business?"
-    : "How do you primarily operate?";
-
-  const subtitle = isPermanent
-    ? "This determines how your marker appears on the map"
-    : "This helps us show your listing correctly";
 
   return (
     <div>
       <h2 className="text-2xl font-semibold mb-2
         text-black">
-        {title}
+        What type of business is this?
       </h2>
       <p className="text-gray-500 text-sm mb-8">
-        {subtitle}
+        This helps us show the listing correctly
       </p>
 
       <div className="space-y-3">
@@ -100,10 +67,13 @@ export default function Step2bSubType({
           <button
             key={option.value}
             onClick={() => handleSelect(option.value)}
-            className="w-full rounded-2xl p-5
+            className={`w-full rounded-2xl p-5
               text-left transition active:scale-95
-              border-2 border-gray-200
-              hover:border-gray-300 bg-white"
+              border-2 bg-white
+              ${formData.detailedSubType === option.value
+                ? "border-black"
+                : "border-gray-200 hover:border-gray-300"
+              }`}
           >
             <div className="flex items-center gap-4">
               <div className="flex-1">

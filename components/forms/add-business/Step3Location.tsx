@@ -88,7 +88,8 @@ export default function Step3Location({
   const [results, setResults] = useState<LocationResult[]>([]);
   const [selectedResult, setSelectedResult] =
     useState<LocationResult | null>(null);
-  const [notOnMap, setNotOnMap] = useState(false);
+  const [notOnMap, setNotOnMap] =
+    useState(formData.noFixedLocation);
   const [showResults, setShowResults] = useState(false);
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
@@ -325,6 +326,7 @@ export default function Step3Location({
     updateForm({
       lat:          result.lat,
       lng:          result.lng,
+      noFixedLocation: false,
       neighborhood: result.neighborhood,
       city:         result.city || formData.city,
       state:        result.state || formData.state,
@@ -342,8 +344,15 @@ export default function Step3Location({
         mapInstance.current.dispose();
         mapInstance.current = null;
       }
-      // Clear coordinates
-      updateForm({ lat: null, lng: null });
+      // Directory-only: clear coords and flag it as the source of truth
+      // for the derived subType at submit.
+      updateForm({
+        lat: null,
+        lng: null,
+        noFixedLocation: true,
+      });
+    } else {
+      updateForm({ noFixedLocation: false });
     }
   };
 
@@ -353,7 +362,7 @@ export default function Step3Location({
     setSelectedResult(null);
     setNotOnMap(false);
     setSearchError("");
-    updateForm({ lat: null, lng: null });
+    updateForm({ lat: null, lng: null, noFixedLocation: false });
     if (mapInstance.current) {
       mapInstance.current.dispose();
       mapInstance.current = null;
@@ -377,13 +386,17 @@ export default function Step3Location({
         text-black">
         {isEvent
           ? "Where is this event located?"
-          : "Where is your business located?"
+          : "Where is the business located?"
         }
       </h2>
       <p className="text-gray-500 text-sm mb-8">
         {isEvent
           ? "Enter the venue address"
-          : "Enter your main cross streets"
+          : <>
+              We will not ask for the address, just the cross streets.
+              <br />
+              This helps us place it on the map.
+            </>
         }
       </p>
 
@@ -392,8 +405,62 @@ export default function Step3Location({
         {/* Address fields */}
         {!showResults && (
           <>
-            {/* Cross streets */}
+            {/* Directory-only opt-out — placed first so vendors without a
+                fixed spot can skip the address entirely. Checking it
+                collapses the rest of this section. */}
             {!isEvent && (
+              <label className="flex items-center gap-2
+                cursor-pointer mb-2">
+                <input
+                  type="checkbox"
+                  checked={notOnMap}
+                  onChange={(e) =>
+                    handleNotOnMap(e.target.checked)
+                  }
+                  className="w-4 h-4 rounded flex-shrink-0"
+                />
+                <span className="text-sm text-gray-600">
+                  This business has no fixed location
+                </span>
+              </label>
+            )}
+
+            {/* When directory-only is checked, the address fields collapse
+                and a Continue button is shown instead. */}
+            {notOnMap && !isEvent && (
+              <div className="bg-gray-50 rounded-xl p-4
+                space-y-4">
+                <div className="flex items-start gap-2">
+                  <svg width="16" height="16"
+                    viewBox="0 0 24 24" fill="none"
+                    stroke="#6b7280" strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="flex-shrink-0 mt-0.5">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16"
+                      x2="12.01" y2="16"/>
+                  </svg>
+                  <p className="text-xs text-gray-500">
+                    No address needed. The business will
+                    appear in the directory but not as a pin
+                    on the map.
+                  </p>
+                </div>
+                <button
+                  onClick={nextStep}
+                  className="w-full bg-black text-white
+                    rounded-xl py-4 text-sm font-medium
+                    hover:bg-gray-800 transition"
+                >
+                  Continue
+                </button>
+              </div>
+            )}
+
+            {/* Cross streets */}
+            {!notOnMap && !isEvent && (
               <>
                 <div>
                   <label className="block text-sm
@@ -496,6 +563,9 @@ export default function Step3Location({
               </div>
             )}
 
+            {/* Shared location fields + search (hidden when directory-only) */}
+            {!notOnMap && (
+            <>
             {/* City */}
             <div>
               <label className="block text-sm
@@ -588,29 +658,6 @@ export default function Step3Location({
               />
             </div>
 
-            {/* Privacy note */}
-            {!isEvent && (
-              <div className="bg-gray-50 rounded-xl p-4">
-                <div className="flex items-start gap-2">
-                  <svg width="16" height="16"
-                    viewBox="0 0 24 24" fill="none"
-                    stroke="#6b7280" strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="flex-shrink-0 mt-0.5">
-                    <circle cx="12" cy="12" r="10"/>
-                    <line x1="12" y1="8"
-                      x2="12" y2="12"/>
-                    <line x1="12" y1="16"
-                      x2="12.01" y2="16"/>
-                  </svg>
-                  <p className="text-xs text-gray-500">
-                    Only cross streets are shown publicly.
-                    Your exact location stays private.
-                  </p>
-                </div>
-              </div>
-            )}
 
             {/* Search button */}
             <button
@@ -627,6 +674,8 @@ export default function Step3Location({
                 : "Find Location"
               }
             </button>
+            </>
+            )}
           </>
         )}
 
@@ -723,14 +772,14 @@ export default function Step3Location({
               </div>
             )}
 
-            {/* Cannot find on map checkbox */}
-            <label className="flex items-start gap-3
+            {/* Directory-only checkbox */}
+            <label className={`flex items-start gap-3
               cursor-pointer p-4 border-2 rounded-xl
               transition
               ${notOnMap
-                ? 'border-black bg-gray-50'
-                : 'border-gray-200'
-              }">
+                ? "border-black bg-gray-50"
+                : "border-gray-200"
+              }`}>
               <input
                 type="checkbox"
                 checked={notOnMap}
@@ -743,12 +792,12 @@ export default function Step3Location({
               <div>
                 <p className="text-sm font-medium
                   text-black">
-                  My location is not listed above
+                  The business location is not listed above
                 </p>
                 <p className="text-xs text-gray-400
                   mt-0.5">
-                  Your business will be added to the
-                  directory only without a map marker
+                  The business will appear in the directory
+                  but not as a pin on the map.
                 </p>
               </div>
             </label>
@@ -770,7 +819,7 @@ export default function Step3Location({
                     <circle cx="12" cy="10" r="3"/>
                   </svg>
                   <p className="text-xs text-gray-500">
-                    Your marker will appear here
+                    The marker will appear here
                   </p>
                 </div>
                 <div

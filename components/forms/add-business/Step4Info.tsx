@@ -17,12 +17,16 @@ interface Step4InfoProps {
   formData: BusinessFormData;
   updateForm: (data: Partial<BusinessFormData>) => void;
   nextStep: () => void;
+  // Logo upload is reserved for claimed businesses (community submitters
+  // won't have the business's logo). Defaults to hidden.
+  allowLogo?: boolean;
 }
 
 export default function Step4Info({
   formData,
   updateForm,
   nextStep,
+  allowLogo = false,
 }: Step4InfoProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -83,10 +87,10 @@ export default function Step4Info({
   return (
     <div>
       <h2 className="text-2xl font-semibold mb-2 text-black">
-        Tell us about your business
+        {isEvent ? "Tell us about the event" : "Tell us about the business"}
       </h2>
       <p className="text-gray-500 text-sm mb-8">
-        This information will appear on your listing
+        This information will appear on the listing
       </p>
 
       <div className="space-y-6">
@@ -229,8 +233,8 @@ export default function Step4Info({
               }
             }}
             placeholder={isEvent
-              ? "Describe your event, what to expect, vendors, entertainment, admission details..."
-              : "Describe your business, what you sell, your story, menu items, services..."
+              ? "Describe the event, what to expect, vendors, entertainment, admission details..."
+              : "Describe the business, what it sells, its story, menu items, services..."
             }
             rows={5}
             className={`w-full border-2 rounded-xl px-4
@@ -266,7 +270,8 @@ export default function Step4Info({
           </div>
         </div>
 
-        {/* Logo — optional */}
+        {/* Logo — optional, claimed businesses only */}
+        {allowLogo && (
         <div>
           <label className="block text-sm font-medium
             text-black mb-1">
@@ -344,6 +349,7 @@ export default function Step4Info({
             </button>
           )}
         </div>
+        )}
 
         {/* Continue button */}
         <button

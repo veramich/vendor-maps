@@ -8,6 +8,10 @@ import {
   DAY_OPTIONS,
   AMENITY_OPTIONS,
   DIETARY_FILTER_OPTIONS,
+  PAYMENT_FILTER_OPTIONS,
+  ORDERING_FILTER_OPTIONS,
+  CATEGORY_FILTER_OPTIONS,
+  BUSINESS_TYPE_FILTER_OPTIONS,
   PRICE_OPTIONS,
   EVENT_DATE_OPTIONS,
   EVENT_TIME_OPTIONS,
@@ -36,7 +40,16 @@ const DAY_LABEL: Record<string, string> = {
   sunday: "Sun",
 };
 
-type GeoStatus = "idle" | "locating" | "granted" | "denied";
+// "blocked" means the browser has denied geolocation at the permission level
+// (PERMISSION_DENIED) — retrying won't help, the user must re-enable it in
+// their browser/site settings. "denied" is a soft failure (timeout / position
+// unavailable) where retrying is worthwhile.
+type GeoStatus =
+  | "idle"
+  | "locating"
+  | "granted"
+  | "denied"
+  | "blocked";
 
 export default function FilterPanel({
   value,
@@ -66,11 +79,45 @@ export default function FilterPanel({
     if (open) onChange(draft);
   }, [draft]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Pre-check the geolocation permission when the panel opens (and we don't
+  // already have a fix). The Permissions API lets us surface "blocked" guidance
+  // up front instead of after a failed prompt. It's best-effort: some browsers
+  // (older Safari) lack navigator.permissions, in which case we stay "idle" and
+  // fall back to prompting on demand.
+  useEffect(() => {
+    if (!open || value.lat != null) return;
+    if (!navigator.permissions?.query) return;
+
+    let cancelled = false;
+    navigator.permissions
+      .query({ name: "geolocation" })
+      .then((status) => {
+        const apply = () => {
+          if (cancelled) return;
+          // Only reflect a hard "denied" up front; "granted"/"prompt" still go
+          // through getCurrentPosition so we actually obtain coordinates.
+          setGeoStatus((s) =>
+            s === "locating" ? s : status.state === "denied" ? "blocked" : "idle"
+          );
+        };
+        apply();
+        // React to the user changing the setting while the panel is open.
+        status.onchange = apply;
+      })
+      .catch(() => {
+        /* permission name unsupported — ignore, prompt on demand */
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const count = activeFilterCount(value);
 
   const requestLocation = () => {
     if (!("geolocation" in navigator)) {
-      setGeoStatus("denied");
+      setGeoStatus("blocked");
       return;
     }
     setGeoStatus("locating");
@@ -83,7 +130,12 @@ export default function FilterPanel({
           lng: pos.coords.longitude,
         }));
       },
-      () => setGeoStatus("denied"),
+      (err) => {
+        // PERMISSION_DENIED (1) is a hard block — the user must re-enable
+        // access in browser settings, so retrying is pointless. Other codes
+        // (POSITION_UNAVAILABLE, TIMEOUT) are transient and worth a retry.
+        setGeoStatus(err.code === err.PERMISSION_DENIED ? "blocked" : "denied");
+      },
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
     );
   };
@@ -172,7 +224,7 @@ export default function FilterPanel({
                 )}
                 {draft.radiusMi != null && geoStatus === "denied" && (
                   <p className="text-xs text-red-500 mt-2">
-                    Location access is needed for distance.{" "}
+                    Couldn’t get your location.{" "}
                     <button
                       onClick={requestLocation}
                       className="underline"
@@ -182,6 +234,60 @@ export default function FilterPanel({
                     </button>
                   </p>
                 )}
+                {draft.radiusMi != null && geoStatus === "blocked" && (
+                  <p className="text-xs text-red-500 mt-2">
+                    Location access is blocked. Enable it for this site in your
+                    browser settings, then{" "}
+                    <button
+                      onClick={requestLocation}
+                      className="underline"
+                      type="button"
+                    >
+                      try again
+                    </button>
+                    .
+                  </p>
+                )}
+              </Section>
+
+              {/* Category */}
+              <Section title="Category">
+                <div className="flex flex-wrap gap-2">
+                  {CATEGORY_FILTER_OPTIONS.map((c) => (
+                    <Pill
+                      key={c}
+                      active={draft.categories.includes(c)}
+                      onClick={() =>
+                        setDraft((d) => ({
+                          ...d,
+                          categories: toggleInArray(d.categories, c),
+                        }))
+                      }
+                    >
+                      {c}
+                    </Pill>
+                  ))}
+                </div>
+              </Section>
+
+              {/* Business Type */}
+              <Section title="Business Type">
+                <div className="flex flex-wrap gap-2">
+                  {BUSINESS_TYPE_FILTER_OPTIONS.map((t) => (
+                    <Pill
+                      key={t.value}
+                      active={draft.subTypes.includes(t.value)}
+                      onClick={() =>
+                        setDraft((d) => ({
+                          ...d,
+                          subTypes: toggleInArray(d.subTypes, t.value),
+                        }))
+                      }
+                    >
+                      {t.label}
+                    </Pill>
+                  ))}
+                </div>
               </Section>
 
               {/* Open now */}
@@ -241,6 +347,46 @@ export default function FilterPanel({
                       }
                     >
                       {p.label}
+                    </Pill>
+                  ))}
+                </div>
+              </Section>
+
+              {/* Payment Options */}
+              <Section title="Payment Options">
+                <div className="flex flex-wrap gap-2">
+                  {PAYMENT_FILTER_OPTIONS.map((p) => (
+                    <Pill
+                      key={p}
+                      active={draft.payment.includes(p)}
+                      onClick={() =>
+                        setDraft((d) => ({
+                          ...d,
+                          payment: toggleInArray(d.payment, p),
+                        }))
+                      }
+                    >
+                      {p}
+                    </Pill>
+                  ))}
+                </div>
+              </Section>
+
+              {/* Ordering Methods */}
+              <Section title="Ordering Methods">
+                <div className="flex flex-wrap gap-2">
+                  {ORDERING_FILTER_OPTIONS.map((o) => (
+                    <Pill
+                      key={o}
+                      active={draft.ordering.includes(o)}
+                      onClick={() =>
+                        setDraft((d) => ({
+                          ...d,
+                          ordering: toggleInArray(d.ordering, o),
+                        }))
+                      }
+                    >
+                      {o}
                     </Pill>
                   ))}
                 </div>

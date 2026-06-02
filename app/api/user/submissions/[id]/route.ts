@@ -4,6 +4,8 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { buildSocialUrls } from
   "@/lib/utils/buildSocialUrls";
+import { uploadImage } from "@/lib/utils/uploadImage";
+import cloudinary from "@/lib/cloudinary";
 
 export async function GET(
   req: NextRequest,
@@ -53,8 +55,23 @@ export async function GET(
       );
     }
 
+    // Return already-uploaded photos so the edit form can show and manage
+    // them (kept/removed), ordered the same way as the public listing.
+    const images = await sql`
+      SELECT id, cloudinary_url
+      FROM business_images
+      WHERE business_id = ${business.id}
+      ORDER BY is_primary DESC, display_order ASC
+    `;
+
     return NextResponse.json({
-      business
+      business: {
+        ...business,
+        existingImages: images.map(img => ({
+          id:  img.id,
+          url: img.cloudinary_url,
+        })),
+      },
     });
 
   } catch (error) {
@@ -114,7 +131,37 @@ export async function PATCH(
     }
 
     const wasListed = existing[0].status === 'listed';
-    const data = await req.json();
+
+    // The edit form submits multipart (text fields as a JSON "data" blob,
+    // kept image ids as JSON, plus new image files). Older callers may still
+    // send raw JSON, so fall back to that.
+    const contentType = req.headers.get("content-type") || "";
+    let data: any;
+    let keptImageIds: string[] | null = null;
+    const newImageFiles: File[] = [];
+
+    if (contentType.includes("multipart/form-data")) {
+      const form = await req.formData();
+      data = JSON.parse((form.get("data") as string) || "{}");
+
+      const keptRaw = form.get("keptImageIds");
+      if (typeof keptRaw === "string") {
+        try {
+          keptImageIds = JSON.parse(keptRaw);
+        } catch {
+          keptImageIds = [];
+        }
+      }
+
+      let i = 0;
+      while (form.get(`image_${i}`)) {
+        newImageFiles.push(form.get(`image_${i}`) as File);
+        i++;
+      }
+    } else {
+      data = await req.json();
+    }
+
     const socialUrls = buildSocialUrls(data);
 
     await sql`
@@ -140,6 +187,78 @@ export async function PATCH(
         updated_at         = NOW()
       WHERE id = ${id}
     `;
+
+    // Reconcile photos (only when the multipart edit form sent them).
+    if (keptImageIds !== null) {
+      // Delete any existing image the user removed — from Cloudinary too.
+      const current = await sql`
+        SELECT id, cloudinary_public_id
+        FROM business_images
+        WHERE business_id = ${id}
+      `;
+
+      const removed = current.filter(
+        img => !keptImageIds!.includes(img.id)
+      );
+
+      for (const img of removed) {
+        try {
+          await cloudinary.uploader.destroy(
+            img.cloudinary_public_id
+          );
+        } catch (err) {
+          // Don't fail the whole save if Cloudinary cleanup hiccups;
+          // the DB row is still removed below.
+          console.error(
+            "Cloudinary destroy failed:",
+            img.cloudinary_public_id,
+            err
+          );
+        }
+      }
+
+      if (removed.length > 0) {
+        await sql`
+          DELETE FROM business_images
+          WHERE business_id = ${id}
+          AND id = ANY(${removed.map(r => r.id)})
+        `;
+      }
+
+      // Upload newly added files, capturing their new ids in upload order.
+      const newImageIds: string[] = [];
+      for (const file of newImageFiles) {
+        const uploaded = await uploadImage(file, "businesses");
+        const [inserted] = await sql`
+          INSERT INTO business_images (
+            business_id,
+            cloudinary_public_id,
+            cloudinary_url,
+            image_type
+          ) VALUES (
+            ${id},
+            ${uploaded.publicId},
+            ${uploaded.url},
+            'gallery'
+          )
+          RETURNING id
+        `;
+        newImageIds.push(inserted.id);
+      }
+
+      // Final order = kept images (in the order the user left them) followed
+      // by the new uploads. First image is the cover.
+      const finalOrder = [...keptImageIds, ...newImageIds];
+
+      for (let idx = 0; idx < finalOrder.length; idx++) {
+        await sql`
+          UPDATE business_images
+          SET display_order = ${idx},
+              is_primary    = ${idx === 0}
+          WHERE id = ${finalOrder[idx]}
+        `;
+      }
+    }
 
     return NextResponse.json({
       success: true,

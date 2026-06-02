@@ -20,11 +20,10 @@ export default function Step1Type({
   return (
     <div>
       <h2 className="text-2xl font-semibold mb-2 text-black">
-        What are you adding?
+        Where would you like to add the business?
       </h2>
       <p className="text-gray-500 text-sm mb-8">
-        Select the type of listing you want to add
-        to Vendor Maps
+        Select where in the website the business should be added. This can always be changed later.
       </p>
 
       <div className="space-y-4">

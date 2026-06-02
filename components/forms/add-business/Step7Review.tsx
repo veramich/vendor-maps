@@ -49,10 +49,8 @@ export default function Step7Review({
   );
 
   const SUB_TYPE_LABELS: Record<string, string> = {
-    permanent_location: "Permanent Location",
-    no_location:        "No Permanent Location",
-    market:             "Recurring Market",
-    pop_up:             "Pop-Up Event",
+    market: "Recurring Market",
+    pop_up: "Pop-Up Event",
   };
 
   const DETAILED_SUB_TYPE_LABELS: Record<string, string> = {
@@ -61,26 +59,25 @@ export default function Step7Review({
     home_based:         "Home Based",
     market_based:       "Market Based",
     pop_up_based:       "Pop-Up Based",
-    catering_only:      "Catering Only",
-    shipping_only:      "Shipping Only",
-    other_permanent:    "Other",
-    other_no_location:  "Other",
+    other:              "Other",
   };
-
-  const hasLocation =
-    formData.subType === "permanent_location" ||
-    formData.subType === "market" ||
-    formData.subType === "pop_up";
 
   const isEvent =
     formData.subType === "market" ||
     formData.subType === "pop_up";
 
+  // Small business has a location unless they chose directory-only; events
+  // (market/pop_up) always have a venue.
+  const hasLocation = isEvent
+    ? true
+    : formData.type === "small_business" &&
+      !formData.noFixedLocation;
+
   return (
     <div>
       <h2 className="text-2xl font-semibold mb-2
         text-black">
-        Review your listing
+        Review the listing
       </h2>
       <p className="text-gray-500 text-sm mb-8">
         Make sure everything looks correct
@@ -92,7 +89,7 @@ export default function Step7Review({
         {/* Type */}
         <ReviewSection
           title="Type"
-          onEdit={() => onEditStep(1)}
+          onEdit={() => onEditStep(2)}
         >
           <p className="text-sm text-black">
             {formData.type === "small_business"
@@ -100,12 +97,17 @@ export default function Step7Review({
               : "Event"
             }
           </p>
-          <p className="text-sm text-gray-500">
-            {SUB_TYPE_LABELS[
-              formData.subType || ""
-            ] || ""}
-          </p>
-          {formData.detailedSubType && (
+          {/* Events show their subtype; small business shows the
+              chosen detailed type. */}
+          {isEvent && (
+            <p className="text-sm text-gray-500">
+              {SUB_TYPE_LABELS[
+                formData.subType || ""
+              ] || ""}
+            </p>
+          )}
+          {formData.type === "small_business" &&
+            formData.detailedSubType && (
             <p className="text-sm text-gray-500">
               {DETAILED_SUB_TYPE_LABELS[
                 formData.detailedSubType
@@ -121,9 +123,9 @@ export default function Step7Review({
             onEdit={() => onEditStep(3)}
           >
             <p className="text-sm text-black">
-              {formData.subType === "permanent_location"
-                ? `${formData.street1} & ${formData.street2}`
-                : formData.streetAddress
+              {isEvent
+                ? formData.streetAddress
+                : `${formData.street1} & ${formData.street2}`
               }
             </p>
             <p className="text-sm text-gray-500">
@@ -134,12 +136,21 @@ export default function Step7Review({
               {formData.city}, {formData.stateCode}
               {formData.zip ? ` ${formData.zip}` : ""}
             </p>
-            {!formData.lat && !formData.lng && (
-              <p className="text-xs text-amber-600
-                mt-1">
-                ⚠ No map location — directory only
-              </p>
-            )}
+          </ReviewSection>
+        )}
+
+        {/* Directory-only (small business that skipped location) */}
+        {!hasLocation && formData.type === "small_business" && (
+          <ReviewSection
+            title="Location"
+            onEdit={() => onEditStep(3)}
+          >
+            <p className="text-sm text-black">
+              No location
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              The listing will appear in the directory list
+            </p>
           </ReviewSection>
         )}
 
@@ -433,7 +444,7 @@ export default function Step7Review({
         </button>
 
         <p className="text-center text-xs text-gray-400">
-          Your listing will be reviewed before
+          The listing will be reviewed before
           going live on Vendor Maps
         </p>
 

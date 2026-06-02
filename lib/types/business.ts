@@ -12,12 +12,9 @@ export type DetailedSubType =
   | "street_vendor"
   | "food_truck"
   | "home_based"
-  | "other_permanent"
   | "market_based"
   | "pop_up_based"
-  | "catering_only"
-  | "shipping_only"
-  | "other_no_location"
+  | "other"
   | null;
 
 export type BusinessCategory =
@@ -46,6 +43,12 @@ export type BusinessCategory =
   | "Art";
 
 export type PriceTier = 1 | 2 | 3 | 4;
+
+// An already-uploaded photo, as returned by the edit GET endpoint.
+export type ExistingImage = {
+  id:  string;
+  url: string;
+};
 
 export type BusinessHours = {
   dayOfWeek:      string;
@@ -102,11 +105,16 @@ export type BusinessFormData = {
   // Step 1 — top level type
   type:           BusinessType | null;
 
-  // Step 2 — sub type
+  // Step 2 — business type (small business: detailedSubType is the user's
+  // direct choice; subType is derived at submit from noFixedLocation.
+  // events: subType is "market" | "pop_up", detailedSubType stays null)
   subType:        BusinessSubType | null;
   detailedSubType: DetailedSubType;
 
   // Step 3 — location
+  // when true the business is directory-only with no map marker; this is the
+  // source of truth that derives subType (no_location vs permanent_location)
+  noFixedLocation: boolean;
   // cross streets (all except market and pop_up)
   street1:        string;
   street2:        string;
@@ -153,7 +161,10 @@ export type BusinessFormData = {
   vendorFees:         VendorFee[];
 
   // Step 6 — media and contact
+  // newly-added photos to upload
   images:    File[];
+  // already-uploaded photos (edit flow only); empty in the add flow
+  existingImages: ExistingImage[];
   videoUrl:  string;
   website:   string;
   instagram: string;
@@ -171,12 +182,16 @@ export type BusinessFormData = {
 
   // Server-side status (read-only, populated from API)
   status: string;
+  // "unclaimed" | "pending" | "claimed" — gates owner-only features like
+  // the logo upload. Read-only, populated from API.
+  claim_status: string;
 };
 
 export const INITIAL_FORM_DATA: BusinessFormData = {
   type:             null,
   subType:          null,
   detailedSubType: null,
+  noFixedLocation:  false,
   street1:          "",
   street2:          "",
   streetAddress:    "",
@@ -207,6 +222,7 @@ export const INITIAL_FORM_DATA: BusinessFormData = {
   vendorSpace:      null,
   vendorFees:       [],
   images:           [],
+  existingImages:   [],
   videoUrl:         "",
   website:          "",
   instagram:        "",
@@ -220,6 +236,7 @@ export const INITIAL_FORM_DATA: BusinessFormData = {
   brandId:          null,
   locationNickname: "",
   status:           "",
+  claim_status:     "",
 };
 
 // Price tier labels per business sub type
@@ -229,8 +246,7 @@ export const PRICE_CONTEXT: Record<string, string> = {
   home_based:         "per item or order",
   market_based:       "per item",
   pop_up_based:       "per item",
-  catering_only:      "per person",
-  shipping_only:      "per order",
+  other:              "per item",
   market:             "per item or entry",
   pop_up:             "per item or entry",
   permanent_location: "per item",
@@ -340,6 +356,17 @@ export const VENDOR_TYPES = [
   "Produce",
   "Wellness",
   "Other",
+];
+
+// Small-business sub types, with display labels (mirrors Step2bSubType).
+// Event sub types (market / pop_up) are surfaced via the Events filter instead.
+export const BUSINESS_TYPE_OPTIONS: { value: string; label: string }[] = [
+  { value: "street_vendor", label: "Street Vendor" },
+  { value: "food_truck",    label: "Food Truck" },
+  { value: "home_based",    label: "Home Based" },
+  { value: "market_based",  label: "Market Based" },
+  { value: "pop_up_based",  label: "Pop-Up Based" },
+  { value: "other",         label: "Other" },
 ];
 
 // Categories

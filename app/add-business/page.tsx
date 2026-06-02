@@ -36,14 +36,14 @@ export default function AddBusinessPage() {
   const [currentBrandId, setCurrentBrandId] =
     useState<string | null>(null);
 
-  // Total steps depends on path taken
+  // Total steps depends on path taken. Small business now always shows the
+  // location step (directory-only is a checkbox there), so both small
+  // business paths are 7 steps. Events are 6 (pop_up) or 7 (market).
   const getTotalSteps = () => {
     if (formData.type === "event") {
       return formData.subType === "pop_up" ? 6 : 7;
     }
-    // Small business always has step 2b
-    if (formData.subType === "no_location") return 7;
-    return 8; // permanent_location has location step
+    return 7;
   };
 
   const totalSteps = getTotalSteps();
@@ -53,10 +53,12 @@ export default function AddBusinessPage() {
       case 1:  return "What are you adding?";
       case 2:
         return formData.type === "small_business"
-          ? "Tell us about your business"
-          : "Tell us about your event";
-      case 2.5: return "What type of business?";
-      case 3:  return "Where are you located?";
+          ? "What type of business?"
+          : "Tell us about the event";
+      case 3:
+        return formData.type === "small_business"
+          ? "Where is the business located?"
+          : "Where is the event located?";
       case 4:  return "Business details";
       case 5:  return "Hours & amenities";
       case 6:  return "Photos & contact";
@@ -65,70 +67,22 @@ export default function AddBusinessPage() {
     }
   };
 
-  // Use a step index for display purposes
-  const getDisplayStep = () => {
-    if (step <= 2)   return step;
-    if (step === 2.5) return 3;
-    return step + 1;
-  };
+  // Step number is now 1:1 with the display step.
+  const getDisplayStep = () => step;
 
   const updateForm = (data: Partial<BusinessFormData>) => {
     setFormData(prev => ({ ...prev, ...data }));
   };
 
-  const nextStep = (selectedSubType?: string) => {
-    const subType = selectedSubType || formData.subType;
-
-    // After step 2 for small business → go to step 2.5
-    if (step === 2 &&
-        formData.type === "small_business") {
-      setStep(2.5);
-      return;
-    }
-
-    // After step 2.5 → skip location for no_location
-    if (step === 2.5 && subType === "no_location") {
-      setStep(4);
-      return;
-    }
-
-    // After step 2 for events → go to step 3
-    if (step === 2 && formData.type === "event") {
-      setStep(3);
-      return;
-    }
-
-    // Normal progression
-    if (step === 2.5) {
-      setStep(3);
-      return;
-    }
-
+  // Linear progression. Step 2 renders the type screen (Step2bSubType for
+  // small business, Step2SubType for events); both continue to the location
+  // step, which for small business is where directory-only is chosen.
+  // (Children still pass a subType arg; it is no longer needed for routing.)
+  const nextStep = () => {
     setStep(prev => prev + 1);
   };
 
   const prevStep = () => {
-    // From step 3 for no_location → back to step 2.5
-    if (step === 4 &&
-        formData.type === "small_business" &&
-        formData.subType === "no_location") {
-      setStep(2.5);
-      return;
-    }
-
-    // From step 3 → back to step 2.5 for small business
-    if (step === 3 &&
-        formData.type === "small_business") {
-      setStep(2.5);
-      return;
-    }
-
-    // From step 2.5 → back to step 2
-    if (step === 2.5) {
-      setStep(2);
-      return;
-    }
-
     setStep(prev => prev - 1);
   };
 
@@ -204,6 +158,10 @@ export default function AddBusinessPage() {
   const handleAnotherLocation = () => {
     setFormData({
       ...INITIAL_FORM_DATA,
+      // A new location of the same chain keeps its type/category so it
+      // submits with the same DB type and marker; only the location resets.
+      type:            formData.type,
+      detailedSubType: formData.detailedSubType,
       name:            formData.name,
       category:        formData.category,
       description:     formData.description,
@@ -306,15 +264,15 @@ export default function AddBusinessPage() {
             nextStep={nextStep}
           />
         )}
-        {step === 2 && (
-          <Step2SubType
+        {step === 2 && formData.type === "small_business" && (
+          <Step2bSubType
             formData={formData}
             updateForm={updateForm}
             nextStep={nextStep}
           />
         )}
-        {step === 2.5 && (
-          <Step2bSubType
+        {step === 2 && formData.type === "event" && (
+          <Step2SubType
             formData={formData}
             updateForm={updateForm}
             nextStep={nextStep}

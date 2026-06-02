@@ -81,14 +81,28 @@ export default function EditSubmissionPage() {
     setError("");
 
     try {
+      // Send text fields plus image reconciliation as multipart: the JSON
+      // "data" blob, the ids of photos to keep, and any newly added files.
+      const body = new FormData();
+      body.append(
+        "data",
+        JSON.stringify({ ...formData, images: [] })
+      );
+      body.append(
+        "keptImageIds",
+        JSON.stringify(
+          formData.existingImages.map(img => img.id)
+        )
+      );
+      formData.images.forEach((image, index) => {
+        body.append(`image_${index}`, image);
+      });
+
       const res = await fetch(
         `/api/user/submissions/${businessId}`,
         {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(formData),
+          body,
         }
       );
 
@@ -230,6 +244,7 @@ export default function EditSubmissionPage() {
             formData={formData}
             updateForm={updateForm}
             nextStep={() => setStep(5)}
+            allowLogo={formData.claim_status === "claimed"}
           />
         )}
         {step === 5 && (

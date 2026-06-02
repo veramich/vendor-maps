@@ -6,7 +6,11 @@ import {
   DAYS_OF_WEEK,
   LOCATION_AMENITIES,
   DIETARY_OPTIONS,
+  PAYMENT_OPTIONS,
+  ORDERING_METHODS,
   PRICE_TIERS,
+  CATEGORIES,
+  BUSINESS_TYPE_OPTIONS,
 } from "@/lib/types/business";
 
 export type EventDateFilter = "all" | "today" | "weekend" | "week" | "month";
@@ -29,6 +33,10 @@ export type BusinessFilters = {
   priceTiers: number[]; // 1-4
   amenities: string[]; // values from LOCATION_AMENITIES
   dietary: string[]; // values from DIETARY_OPTIONS
+  payment: string[]; // values from PAYMENT_OPTIONS
+  ordering: string[]; // values from ORDERING_METHODS
+  categories: string[]; // values from CATEGORIES (match-any)
+  subTypes: string[]; // business sub types, e.g. "street_vendor" (match-any)
 
   // Event-only filters (surfaced on the map). When active, results are
   // narrowed to event-type businesses matching the date/time window.
@@ -46,6 +54,10 @@ export const EMPTY_FILTERS: BusinessFilters = {
   priceTiers: [],
   amenities: [],
   dietary: [],
+  payment: [],
+  ordering: [],
+  categories: [],
+  subTypes: [],
   eventDate: "all",
   eventTime: "all",
 };
@@ -55,6 +67,10 @@ export const RADIUS_OPTIONS = [1, 2, 5, 10, 25] as const;
 export const DAY_OPTIONS = DAYS_OF_WEEK;
 export const AMENITY_OPTIONS = LOCATION_AMENITIES;
 export const DIETARY_FILTER_OPTIONS = DIETARY_OPTIONS;
+export const PAYMENT_FILTER_OPTIONS = PAYMENT_OPTIONS;
+export const ORDERING_FILTER_OPTIONS = ORDERING_METHODS;
+export const CATEGORY_FILTER_OPTIONS = CATEGORIES;
+export const BUSINESS_TYPE_FILTER_OPTIONS = BUSINESS_TYPE_OPTIONS;
 export const PRICE_OPTIONS = PRICE_TIERS;
 
 // Event date/time options — mirror those in the directory EventList.
@@ -94,6 +110,10 @@ export function activeFilterCount(f: BusinessFilters): number {
   if (f.priceTiers.length) n++;
   if (f.amenities.length) n++;
   if (f.dietary.length) n++;
+  if (f.payment.length) n++;
+  if (f.ordering.length) n++;
+  if (f.categories.length) n++;
+  if (f.subTypes.length) n++;
   if (f.eventDate !== "all") n++;
   if (f.eventTime !== "all") n++;
   return n;
@@ -184,6 +204,10 @@ export function filtersToParams(f: BusinessFilters): URLSearchParams {
   if (f.priceTiers.length) params.set("price", f.priceTiers.join(","));
   if (f.amenities.length) params.set("amenities", f.amenities.join(","));
   if (f.dietary.length) params.set("dietary", f.dietary.join(","));
+  if (f.payment.length) params.set("payment", f.payment.join(","));
+  if (f.ordering.length) params.set("ordering", f.ordering.join(","));
+  if (f.categories.length) params.set("categories", f.categories.join(","));
+  if (f.subTypes.length) params.set("sub_types", f.subTypes.join(","));
 
   const win = eventWindow(f.eventDate);
   if (win) {

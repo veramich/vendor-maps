@@ -9,6 +9,8 @@ CREATE TABLE businesses (
       'permanent_location',
       'event'
     )),
+  -- catering_only / shipping_only are legacy (retained for existing rows);
+  -- see migration 030. New small-business submissions use 'other' instead.
   sub_type            TEXT
     CHECK (sub_type IN (
       'street_vendor',
@@ -16,6 +18,7 @@ CREATE TABLE businesses (
       'home_based',
       'market_based',
       'pop_up_based',
+      'other',
       'catering_only',
       'shipping_only',
       'market',

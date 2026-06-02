@@ -7,7 +7,6 @@ interface Step2SubTypeProps {
 }
 
 export default function Step2SubType({
-  formData,
   updateForm,
   nextStep,
 }: Step2SubTypeProps) {
@@ -17,51 +16,9 @@ export default function Step2SubType({
   nextStep(subType);  // pass subType directly
 };
 
-  const smallBusinessOptions = [
-    {
-      value: "permanent_location",
-      title: "This business has a permanent location",
-      description:
-        "The cross streets will appear on the map and directory. The exact address stays private",
-      icon: (
-        <svg width="28" height="28" viewBox="0 0 24 24"
-          fill="none" stroke="white" strokeWidth="1.8"
-          strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0
-            0 1 18 0z"/>
-          <circle cx="12" cy="10" r="3"/>
-        </svg>
-      ),
-      color: "#111",
-      background: "#F5F5F5",
-      border: "#111",
-      iconBg: "#111",
-      chevron: "black",
-    },
-    {
-      value: "no_location",
-      title: "This business does not have a permanent location",
-      description:
-        "The business will appear in the directory. No map location needed.",
-      icon: (
-        <svg width="28" height="28" viewBox="0 0 24 24"
-          fill="none" stroke="white" strokeWidth="1.8"
-          strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10"/>
-          <line x1="2" y1="12" x2="22" y2="12"/>
-          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3
-            15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10
-            15.3 15.3 0 0 1 4-10z"/>
-        </svg>
-      ),
-      color: "#111",
-      background: "#F5F5F5",
-      border: "#111",
-      iconBg: "#555",
-      chevron: "black",
-    },
-  ];
-
+  // Small business type selection lives in Step2bSubType now; this screen is
+  // only reached for events, which pick their subType ("market" | "pop_up")
+  // directly here.
   const eventOptions = [
     {
       value: "market",
@@ -105,17 +62,10 @@ export default function Step2SubType({
     },
   ];
 
-  const options = formData.type === "small_business"
-    ? smallBusinessOptions
-    : eventOptions;
-
-  const title = formData.type === "small_business"
-    ? "What best describes your business?"
-    : "What type of event is this?";
-
-  const subtitle = formData.type === "small_business"
-    ? "This helps us show your listing correctly"
-    : "This helps us set up the right schedule for you";
+  const options = eventOptions;
+  const title = "What type of event is this?";
+  const subtitle =
+    "This helps us set up the right schedule for the event";
 
   return (
     <div>

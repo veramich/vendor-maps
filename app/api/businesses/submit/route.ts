@@ -69,34 +69,39 @@ export async function POST(req: NextRequest) {
       ),
     ];
 
-    // Map form subType to DB type and sub_type
-    const dbType =
-      data.type === "small_business"
-        ? data.subType === "permanent_location"
-          ? "permanent_location"
-          : "no_location"
-        : "event";
+    // For small business, the permanent_location vs no_location distinction
+    // is derived from the location step: no fixed location (or no coords)
+    // means directory-only. Events carry their subType ("market" | "pop_up")
+    // directly from the form.
+    const isSmallBiz = data.type === "small_business";
+    const isDirectoryOnly =
+      data.noFixedLocation === true ||
+      data.lat == null ||
+      data.lng == null;
 
-    const dbSubType =
-      data.subType === "permanent_location" ||
-      data.subType === "no_location"
-        ? data.detailedSubType &&
-          [
-            "street_vendor",
-            "food_truck",
-            "home_based",
-            "market_based",
-            "pop_up_based",
-            "catering_only",
-            "shipping_only",
-          ].includes(data.detailedSubType)
-          ? data.detailedSubType
-          : null
-        : data.subType === "market"
-        ? "market"
-        : data.subType === "pop_up"
-        ? "pop_up"
-        : null;
+    const dbType = isSmallBiz
+      ? isDirectoryOnly
+        ? "no_location"
+        : "permanent_location"
+      : "event";
+
+    const dbSubType = isSmallBiz
+      ? data.detailedSubType &&
+        [
+          "street_vendor",
+          "food_truck",
+          "home_based",
+          "market_based",
+          "pop_up_based",
+          "other",
+        ].includes(data.detailedSubType)
+        ? data.detailedSubType
+        : null
+      : data.subType === "market"
+      ? "market"
+      : data.subType === "pop_up"
+      ? "pop_up"
+      : null;
 
     // Handle event pricing
     const isEventType = data.type === "event";
@@ -195,9 +200,11 @@ export async function POST(req: NextRequest) {
 
     const businessId = business.id;
 
-    // Insert location if applicable
+    // Insert location if applicable. Small business: anything that resolved
+    // to a permanent_location (has coords, not directory-only). Events:
+    // markets and pop-ups always have a venue.
     const hasLocation =
-      data.subType === "permanent_location" ||
+      dbType === "permanent_location" ||
       data.subType === "market" ||
       data.subType === "pop_up";
 
