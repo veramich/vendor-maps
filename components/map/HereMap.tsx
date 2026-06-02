@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+} from "react";
 
 const PRIMARY = "#FF7300";
 import { getIconBase64 } from "@/lib/getIconBase64";
@@ -67,18 +72,40 @@ interface HereMapProps {
   searchQuery?: string;
   categoryFilter?: string;
   filters?: BusinessFilters;
+  /** The visitor's current position, shown as a "you are here" dot. */
+  userLocation?: { lat: number; lng: number } | null;
 }
 
-export default function HereMap({
-  onMarkerTap,
-  searchQuery = "",
-  categoryFilter = "",
-  filters = EMPTY_FILTERS,
-}: HereMapProps) {
+/** Imperative API exposed to parents via ref. */
+export interface HereMapHandle {
+  /** Pan/zoom back to the visitor's current position. No-op if no fix yet. */
+  recenter: () => void;
+}
+
+const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
+  {
+    onMarkerTap,
+    searchQuery = "",
+    categoryFilter = "",
+    filters = EMPTY_FILTERS,
+    userLocation = null,
+  },
+  ref
+) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const hRef = useRef<any>(null);
   const locationsRef = useRef<any[]>([]);
+  // The "you are here" marker is kept off to the side of the business markers
+  // so it survives the removeObjects() wipe in renderMarkers and can be
+  // re-added after every marker swap.
+  const userMarkerRef = useRef<any>(null);
+  // Latest known position, mirrored into a ref so initMap can place the dot
+  // immediately if a fix arrived before the map finished loading.
+  const userLocationRef = useRef(userLocation);
+  // True until we've recentered the map on the first geolocation fix, so we
+  // only auto-pan once and don't fight the user panning afterwards.
+  const pendingRecenterRef = useRef(true);
   const onMarkerTapRef = useRef(onMarkerTap);
   // Monotonic token: every render request bumps it. A render only touches the
   // map if it is still the latest request, so stale/overlapping renders abort
@@ -92,6 +119,18 @@ export default function HereMap({
     onMarkerTapRef.current = onMarkerTap;
   }, [onMarkerTap]);
 
+  useImperativeHandle(ref, () => ({
+    recenter: () => {
+      const map = mapInstance.current;
+      const fix = userLocationRef.current;
+      if (!map || !fix) return;
+      map.getViewModel().setLookAtData(
+        { position: fix, zoom: Math.max(map.getZoom(), 13) },
+        true
+      );
+    },
+  }), []);
+
   const getMarkerColor = (
     type: string,
     subType: string | null
@@ -103,6 +142,18 @@ export default function HereMap({
     if (subType === "market")        return "#2D6A4F";
     if (type === "permanent_location") return "#E63946";
     return null;
+  };
+
+  // Google-Maps-style blue location dot: a soft accuracy halo behind a solid
+  // blue dot with a white ring. Used for the visitor's own position.
+  const createUserMarker = (H: any, lat: number, lng: number) => {
+    const svgMarkup = `<svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg"><circle cx="18" cy="18" r="16" fill="#4285F4" fill-opacity="0.18"/><circle cx="18" cy="18" r="7" fill="#4285F4" stroke="white" stroke-width="2.5"/></svg>`;
+    const icon = new H.map.Icon(
+      `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`,
+      { size: { w: 36, h: 36 }, anchor: { x: 18, y: 18 } }
+    );
+    // High z-index keeps the dot above business/cluster markers.
+    return new H.map.Marker({ lat, lng }, { icon, zIndex: 1000 });
   };
 
   const createClusterMarker = (
@@ -290,6 +341,8 @@ export default function HereMap({
 
     map.removeObjects(map.getObjects());
     if (objects.length) map.addObjects(objects);
+    // The wipe above removes the user dot too; put it back on top.
+    if (userMarkerRef.current) map.addObject(userMarkerRef.current);
   };
 
   const fetchLocations = async (
@@ -396,6 +449,22 @@ export default function HereMap({
         hRef.current = H;
         mapInstance.current = map;
 
+        // A geolocation fix may have arrived before the map finished loading;
+        // drop the dot now (and recenter once) so it isn't lost until the next
+        // position update.
+        const fix = userLocationRef.current;
+        if (fix) {
+          userMarkerRef.current = createUserMarker(H, fix.lat, fix.lng);
+          map.addObject(userMarkerRef.current);
+          if (pendingRecenterRef.current) {
+            pendingRecenterRef.current = false;
+            map.getViewModel().setLookAtData(
+              { position: fix, zoom: Math.max(map.getZoom(), 13) },
+              true
+            );
+          }
+        }
+
         // Only re-render when crossing the cluster/individual threshold,
         // never on plain pans. Generation token keeps it from racing fetches.
         map.addEventListener("mapviewchangeend", async () => {
@@ -436,9 +505,46 @@ export default function HereMap({
     fetchLocations(searchQuery, categoryFilter, filters);
   }, [searchQuery, categoryFilter, filters]);
 
+  // Add / move / remove the "you are here" dot as the visitor's position
+  // changes. The map may not be ready on the first fix (script still loading),
+  // so we bail and re-run once mapInstance is set on a later change.
+  useEffect(() => {
+    userLocationRef.current = userLocation;
+    const H = hRef.current;
+    const map = mapInstance.current;
+    if (!H || !map) return;
+
+    if (!userLocation) {
+      if (userMarkerRef.current) {
+        map.removeObject(userMarkerRef.current);
+        userMarkerRef.current = null;
+      }
+      return;
+    }
+
+    const { lat, lng } = userLocation;
+    if (userMarkerRef.current) {
+      userMarkerRef.current.setGeometry({ lat, lng });
+    } else {
+      userMarkerRef.current = createUserMarker(H, lat, lng);
+      map.addObject(userMarkerRef.current);
+    }
+
+    // Pan to the visitor once, on the first fix only.
+    if (pendingRecenterRef.current) {
+      pendingRecenterRef.current = false;
+      map.getViewModel().setLookAtData(
+        { position: { lat, lng }, zoom: Math.max(map.getZoom(), 13) },
+        true
+      );
+    }
+  }, [userLocation]);
+
   return (
     <div style={{ width: "100%", height: "100%", position: "relative" }}>
       <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
     </div>
   );
-}
+});
+
+export default HereMap;

@@ -1,9 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import SearchBar from "@/components/ui/SearchBar";
 import FilterPanel from "@/components/ui/FilterPanel";
+import type { HereMapHandle } from "@/components/map/HereMap";
 import { BusinessFilters, EMPTY_FILTERS } from "@/lib/businessFilters";
 
 const HereMap = dynamic(() => import("@/components/map/HereMap"), {
@@ -38,6 +39,28 @@ export default function MapPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [filters, setFilters] = useState<BusinessFilters>(EMPTY_FILTERS);
+  const [userLocation, setUserLocation] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const mapHandleRef = useRef<HereMapHandle>(null);
+
+  // Ask for the visitor's location on load and keep the "you are here" dot in
+  // sync as they move (like Google Maps). Failures (denied / unavailable) are
+  // silent — the map just works without the dot. Cleared on unmount.
+  useEffect(() => {
+    if (!("geolocation" in navigator)) return;
+    const id = navigator.geolocation.watchPosition(
+      (pos) =>
+        setUserLocation({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        }),
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 30000, timeout: 15000 }
+    );
+    return () => navigator.geolocation.clearWatch(id);
+  }, []);
 
   const handleSearch = (q: string) => {
     setSearchQuery(q.trim());
@@ -65,11 +88,56 @@ export default function MapPage() {
       }}
     >
       <HereMap
+        ref={mapHandleRef}
         onMarkerTap={setPopup}
         searchQuery={searchQuery}
         categoryFilter={categoryFilter}
         filters={filters}
+        userLocation={userLocation}
       />
+
+      {/* Recenter-on-me control — only useful once we have a fix. */}
+      {userLocation && (
+        <button
+          type="button"
+          onClick={() => mapHandleRef.current?.recenter()}
+          aria-label="Center map on my location"
+          title="Center on my location"
+          style={{
+            position: "absolute",
+            right: "12px",
+            bottom: "24px",
+            zIndex: 50,
+            width: "44px",
+            height: "44px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: "9999px",
+            border: "none",
+            cursor: "pointer",
+            background: "white",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+          }}
+        >
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#4285F4"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="12" cy="12" r="3" />
+            <line x1="12" y1="2" x2="12" y2="5" />
+            <line x1="12" y1="19" x2="12" y2="22" />
+            <line x1="2" y1="12" x2="5" y2="12" />
+            <line x1="19" y1="12" x2="22" y2="12" />
+          </svg>
+        </button>
+      )}
 
       {/* Search overlay */}
       <div
