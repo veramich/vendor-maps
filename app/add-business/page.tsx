@@ -109,7 +109,17 @@ export default function AddBusinessPage() {
         );
       }
 
-      formData.images.forEach((image, index) => {
+      // Send photos in gallery order so the submit API's first image (index 0)
+      // is the cover the user chose. `imageOrder` holds "new:<i>" tokens here
+      // (no existing photos in the add flow); fall back to array order.
+      const orderedImages =
+        formData.imageOrder.length > 0
+          ? formData.imageOrder
+              .map(t => formData.images[Number(t.replace("new:", ""))])
+              .filter((f): f is File => Boolean(f))
+          : formData.images;
+
+      orderedImages.forEach((image, index) => {
         formDataToSend.append(`image_${index}`, image);
       });
 

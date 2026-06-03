@@ -17,6 +17,12 @@ interface Step6MediaProps {
   nextStep: () => void;
 }
 
+// A single photo in the gallery — either already uploaded (edit flow) or a
+// newly added file pending upload.
+type GalleryItem =
+  | { key: string; url: string; kind: "existing"; id: string }
+  | { key: string; url: string; kind: "new"; index: number };
+
 export default function Step6Media({
   formData,
   updateForm,
@@ -42,26 +48,51 @@ export default function Step6Media({
     };
   }, [previews]);
 
-  // Unified gallery: already-uploaded photos first (edit flow), then newly
-  // added files. The first item is the cover. Each entry knows which list it
-  // belongs to so removal targets the right one.
-  const gallery = useMemo(
+  // A gallery slot is either an already-uploaded photo (edit flow) or a newly
+  // added file. Each is identified by a stable token so the chosen cover and
+  // the submitted order survive add/remove of other photos.
+  const tokenFor = (item: GalleryItem) =>
+    item.kind === "existing" ? item.id : `new:${item.index}`;
+
+  // All slots in their default order: existing photos, then new files.
+  const slots = useMemo<GalleryItem[]>(
     () => [
       ...formData.existingImages.map(img => ({
-        key:      img.id,
-        url:      img.url,
-        kind:     "existing" as const,
-        id:       img.id,
+        key:  img.id,
+        url:  img.url,
+        kind: "existing" as const,
+        id:   img.id,
       })),
       ...previews.map((url, i) => ({
-        key:      `new-${i}`,
+        key:   `new-${i}`,
         url,
-        kind:     "new" as const,
-        index:    i,
+        kind:  "new" as const,
+        index: i,
       })),
     ],
     [formData.existingImages, previews]
   );
+
+  // `imageOrder` (when set) is the authoritative gallery order, holding one
+  // token per slot. The first token is the cover. We intersect it with the
+  // live slots so a removed/added photo can't leave a stale or missing token,
+  // then append any slot the order doesn't mention yet (e.g. a just-added
+  // photo). With no order recorded this falls back to the default slot order.
+  const order = useMemo<string[]>(() => {
+    const tokens = slots.map(tokenFor);
+    const fromState = (formData.imageOrder || []).filter(t =>
+      tokens.includes(t)
+    );
+    const missing = tokens.filter(t => !fromState.includes(t));
+    return [...fromState, ...missing];
+  }, [formData.imageOrder, slots]);
+
+  const gallery = useMemo<GalleryItem[]>(() => {
+    const byToken = new Map(slots.map(s => [tokenFor(s), s]));
+    return order
+      .map(t => byToken.get(t))
+      .filter((s): s is GalleryItem => Boolean(s));
+  }, [order, slots]);
 
   const totalImages =
     formData.existingImages.length + formData.images.length;
@@ -180,9 +211,21 @@ export default function Step6Media({
     }
   };
 
-  const removeNewImage = (index: number) => {
+  // Removing a new file shifts the later files' indices, so the "new:<i>"
+  // tokens are remapped to stay aligned with `images` (the i in a token must
+  // always equal that file's index at submit time).
+  const removeNewImage = (item: GalleryItem) => {
+    if (item.kind !== "new") return;
+    const removed = item.index;
     updateForm({
-      images: formData.images.filter((_, i) => i !== index)
+      images: formData.images.filter((_, i) => i !== removed),
+      imageOrder: formData.imageOrder
+        .filter(t => t !== `new:${removed}`)
+        .map(t => {
+          if (!t.startsWith("new:")) return t;
+          const i = Number(t.slice(4));
+          return i > removed ? `new:${i - 1}` : t;
+        }),
     });
   };
 
@@ -191,6 +234,18 @@ export default function Step6Media({
       existingImages: formData.existingImages.filter(
         img => img.id !== id
       ),
+      imageOrder: formData.imageOrder.filter(t => t !== id),
+    });
+  };
+
+  // The cover is whichever photo leads the gallery. "Set as cover" pins the
+  // chosen photo's token to the front of `imageOrder`; the gallery renders
+  // straight from that order, and the edit API consumes the same token list
+  // (see app/api/user/submissions/[id]/route.ts).
+  const setAsCover = (item: GalleryItem) => {
+    const token = tokenFor(item);
+    updateForm({
+      imageOrder: [token, ...order.filter(t => t !== token)],
     });
   };
 
@@ -333,7 +388,7 @@ export default function Step6Media({
             </span>
           </label>
           <p className="text-xs text-gray-400 mb-3">
-            First photo will be the cover image
+            Tap the star to choose your cover photo
           </p>
 
           {/* Image previews */}
@@ -348,19 +403,45 @@ export default function Step6Media({
                     className="w-full h-full object-cover
                       rounded-xl"
                   />
-                  {i === 0 && (
+                  {i === 0 ? (
                     <span className="absolute top-1
                       left-1 bg-black text-white text-xs
-                      px-1.5 py-0.5 rounded-md">
+                      px-1.5 py-0.5 rounded-md
+                      flex items-center gap-1">
+                      <svg width="11" height="11"
+                        viewBox="0 0 24 24" fill="currentColor"
+                        stroke="none">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                      </svg>
                       Cover
                     </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setAsCover(item)}
+                      aria-label="Set as cover photo"
+                      title="Set as cover photo"
+                      className="absolute top-1 left-1
+                        bg-black bg-opacity-60 text-white
+                        w-6 h-6 rounded-full flex items-center
+                        justify-center hover:bg-opacity-80
+                        transition"
+                    >
+                      <svg width="13" height="13"
+                        viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                      </svg>
+                    </button>
                   )}
                   <button
                     type="button"
                     onClick={() =>
                       item.kind === "existing"
                         ? removeExistingImage(item.id)
-                        : removeNewImage(item.index)
+                        : removeNewImage(item)
                     }
                     className="absolute top-1 right-1
                       bg-black bg-opacity-60 text-white

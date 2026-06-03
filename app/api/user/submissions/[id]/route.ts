@@ -138,6 +138,7 @@ export async function PATCH(
     const contentType = req.headers.get("content-type") || "";
     let data: any;
     let keptImageIds: string[] | null = null;
+    let imageOrder: string[] | null = null;
     const newImageFiles: File[] = [];
 
     if (contentType.includes("multipart/form-data")) {
@@ -150,6 +151,15 @@ export async function PATCH(
           keptImageIds = JSON.parse(keptRaw);
         } catch {
           keptImageIds = [];
+        }
+      }
+
+      const orderRaw = form.get("imageOrder");
+      if (typeof orderRaw === "string") {
+        try {
+          imageOrder = JSON.parse(orderRaw);
+        } catch {
+          imageOrder = null;
         }
       }
 
@@ -225,7 +235,8 @@ export async function PATCH(
         `;
       }
 
-      // Upload newly added files, capturing their new ids in upload order.
+      // Upload newly added files, capturing their new ids keyed by the upload
+      // index so the "new:<i>" tokens in `imageOrder` can resolve to them.
       const newImageIds: string[] = [];
       for (const file of newImageFiles) {
         const uploaded = await uploadImage(file, "businesses");
@@ -246,9 +257,31 @@ export async function PATCH(
         newImageIds.push(inserted.id);
       }
 
-      // Final order = kept images (in the order the user left them) followed
-      // by the new uploads. First image is the cover.
-      const finalOrder = [...keptImageIds, ...newImageIds];
+      // The gallery order the form sent decides the final order and the cover
+      // (first item). Resolve each token to a real image id: an existing id is
+      // kept as-is; "new:<i>" maps to the i-th freshly uploaded image. Fall
+      // back to kept-then-new when the client sent no explicit order.
+      const finalOrder =
+        imageOrder !== null
+          ? imageOrder
+              .map(token =>
+                token.startsWith("new:")
+                  ? newImageIds[Number(token.slice(4))]
+                  : token
+              )
+              .filter(
+                id =>
+                  typeof id === "string" &&
+                  (keptImageIds!.includes(id) ||
+                    newImageIds.includes(id))
+              )
+          : [...keptImageIds, ...newImageIds];
+
+      // Guard against an order that dropped some surviving photo (e.g. a stale
+      // token): append any kept/new id the order didn't mention.
+      for (const id of [...keptImageIds, ...newImageIds]) {
+        if (!finalOrder.includes(id)) finalOrder.push(id);
+      }
 
       for (let idx = 0; idx < finalOrder.length; idx++) {
         await sql`

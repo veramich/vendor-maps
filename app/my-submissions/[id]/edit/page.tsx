@@ -94,6 +94,13 @@ export default function EditSubmissionPage() {
           formData.existingImages.map(img => img.id)
         )
       );
+      // The gallery order (existing ids + "new:<i>" tokens) drives the final
+      // photo order, including which one is the cover. New files keep the
+      // index encoded in their "new:<i>" token so the API can match them.
+      body.append(
+        "imageOrder",
+        JSON.stringify(formData.imageOrder)
+      );
       formData.images.forEach((image, index) => {
         body.append(`image_${index}`, image);
       });

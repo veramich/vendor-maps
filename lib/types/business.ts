@@ -165,6 +165,10 @@ export type BusinessFormData = {
   images:    File[];
   // already-uploaded photos (edit flow only); empty in the add flow
   existingImages: ExistingImage[];
+  // Authoritative gallery order as tokens — an existing image id, or
+  // "new:<i>" for the i-th entry of `images`. The first token is the cover.
+  // Empty until the user reorders; the form then defaults to existing-then-new.
+  imageOrder: string[];
   videoUrl:  string;
   website:   string;
   instagram: string;
@@ -223,6 +227,7 @@ export const INITIAL_FORM_DATA: BusinessFormData = {
   vendorFees:       [],
   images:           [],
   existingImages:   [],
+  imageOrder:       [],
   videoUrl:         "",
   website:          "",
   instagram:        "",
