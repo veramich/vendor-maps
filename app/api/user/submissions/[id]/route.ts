@@ -7,6 +7,15 @@ import { buildSocialUrls } from
 import { uploadImage } from "@/lib/utils/uploadImage";
 import cloudinary from "@/lib/cloudinary";
 
+// Add one day to a YYYY-MM-DD string (UTC noon, so it never drifts across a
+// timezone boundary). Mirrors the helper in the submit route.
+function nextDay(date: string): string {
+  const [y, m, d] = date.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  dt.setUTCDate(dt.getUTCDate() + 1);
+  return dt.toISOString().split("T")[0];
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -64,13 +73,161 @@ export async function GET(
       ORDER BY is_primary DESC, display_order ASC
     `;
 
+    // Location, mapped to the camelCase keys the form (Step3Location) expects
+    // so the address pre-fills and can be edited. no_location businesses have
+    // no row / no coords → directory-only.
+    const locRows = await sql`
+      SELECT
+        street_1, street_2, street_address,
+        city, state, state_code, zip, neighborhood,
+        ST_X(coordinates) AS lng,
+        ST_Y(coordinates) AS lat
+      FROM locations
+      WHERE business_id = ${business.id}
+      LIMIT 1
+    `;
+    const locRow = locRows[0] || null;
+
+    const location = {
+      street1:       locRow?.street_1 || "",
+      street2:       locRow?.street_2 || "",
+      streetAddress: locRow?.street_address || "",
+      city:          locRow?.city || "",
+      state:         locRow?.state || "",
+      stateCode:     locRow?.state_code || "",
+      zip:           locRow?.zip || "",
+      neighborhood:  locRow?.neighborhood || "",
+      lat:           locRow?.lat ?? null,
+      lng:           locRow?.lng ?? null,
+      // Directory-only when the business has no map coordinates.
+      noFixedLocation:
+        business.type === "no_location" ||
+        locRow?.lat == null ||
+        locRow?.lng == null,
+    };
+
+    // Vendor spaces + fees (events). Shape into the camelCase form the
+    // edit form / BusinessFormData expects so it pre-fills directly.
+    const vsRows = await sql`
+      SELECT *
+      FROM vendor_spaces
+      WHERE business_id = ${business.id}
+      LIMIT 1
+    `;
+    const vsRow = vsRows[0] || null;
+
+    const feeRows = vsRow
+      ? await sql`
+          SELECT fee_type, amount, is_free, description
+          FROM vendor_fees
+          WHERE business_id = ${business.id}
+        `
+      : [];
+
+    const vendorSpace =
+      vsRow && vsRow.vendor_space_available
+        ? {
+            vendorSpaceAvailable: true,
+            spaceSizes:  vsRow.space_sizes || [],
+            vendorTypes: vsRow.vendor_types || [],
+            hasWaitlist: vsRow.has_waitlist || false,
+            hasHolds:    vsRow.has_holds || false,
+            signupLink:  vsRow.signup_link || "",
+            note:        vsRow.note || "",
+          }
+        : null;
+
+    const vendorFees = feeRows.map(f => ({
+      feeType:     f.fee_type,
+      amount:      f.amount != null ? Number(f.amount) : null,
+      isFree:      f.is_free || false,
+      description: f.description || "",
+    }));
+
+    // Event dates. The kind is derived from sub_type: market → recurring
+    // (market_schedules); pop_up → specific dates (popup_events). Both are
+    // hydrated into the camelCase shape the form expects.
+    const isEvent =
+      business.sub_type === "market" || business.sub_type === "pop_up";
+    const eventDateMode = isEvent
+      ? business.sub_type === "market"
+        ? "recurring"
+        : "specific"
+      : null;
+
+    const scheduleRows =
+      business.sub_type === "market"
+        ? await sql`
+            SELECT * FROM market_schedules
+            WHERE business_id = ${business.id}
+          `
+        : [];
+
+    const marketSchedules = scheduleRows.map(s => ({
+      dayOfWeek:      s.day_of_week,
+      recurrenceType: s.recurrence_type,
+      anchorDate:     s.anchor_date
+        ? new Date(s.anchor_date).toISOString().split("T")[0]
+        : "",
+      startTime:      s.start_time ? String(s.start_time).slice(0, 5) : "",
+      endTime:        s.end_time ? String(s.end_time).slice(0, 5) : "",
+      closesNextDay:  s.closes_next_day || false,
+      seasonStart:    s.season_start
+        ? new Date(s.season_start).toISOString().split("T")[0]
+        : "",
+      seasonEnd:      s.season_end
+        ? new Date(s.season_end).toISOString().split("T")[0]
+        : "",
+    }));
+
+    const dateRows =
+      business.sub_type === "pop_up"
+        ? await sql`
+            SELECT
+              id,
+              event_name,
+              lower(event_range) AS start_ts,
+              upper(event_range) AS end_ts
+            FROM popup_events
+            WHERE business_id = ${business.id}
+            ORDER BY lower(event_range) ASC
+          `
+        : [];
+
+    // A timestamp string "YYYY-MM-DD HH:MM:SS" → date / HH:MM parts.
+    const splitTs = (ts: any) => {
+      const [datePart, timePart] = String(ts).split(/[ T]/);
+      return { date: datePart, time: (timePart || "").slice(0, 5) };
+    };
+
+    const eventDates = dateRows.map(r => {
+      const start = splitTs(r.start_ts);
+      const end = splitTs(r.end_ts);
+      return {
+        date:          start.date,
+        startTime:     start.time,
+        endTime:       end.time,
+        // The event runs past midnight when the end date is after the start.
+        closesNextDay: end.date !== start.date,
+      };
+    });
+
+    const eventName = dateRows[0]?.event_name || "";
+
     return NextResponse.json({
       business: {
         ...business,
+        ...location,
         existingImages: images.map(img => ({
           id:  img.id,
           url: img.cloudinary_url,
         })),
+        vendorSpace,
+        vendorFees,
+        eventDateMode,
+        marketSchedules,
+        eventDates,
+        eventName,
       },
     });
 
@@ -197,6 +354,238 @@ export async function PATCH(
         updated_at         = NOW()
       WHERE id = ${id}
     `;
+
+    // Location. Only reconcile when the edit form sent address fields (the
+    // Location tab always does; guarding protects older callers). Events keep
+    // type='event'; small business derives no_location vs permanent_location
+    // from the directory-only choice (mirrors the submit route).
+    const sentLocation =
+      data.streetAddress !== undefined ||
+      data.street1 !== undefined ||
+      data.city !== undefined;
+
+    if (sentLocation) {
+      const isEventRow = existing[0].type === "event";
+      const directoryOnly =
+        !isEventRow &&
+        (data.noFixedLocation === true ||
+          data.lat == null ||
+          data.lng == null);
+
+      // Realign the business type for small business when the map/no-map
+      // choice changed (events stay 'event').
+      if (!isEventRow) {
+        await sql`
+          UPDATE businesses
+          SET type = ${directoryOnly ? "no_location" : "permanent_location"}
+          WHERE id = ${id}
+        `;
+      }
+
+      const hasCoords =
+        !directoryOnly && data.lat != null && data.lng != null;
+
+      const existingLoc = await sql`
+        SELECT id FROM locations WHERE business_id = ${id} LIMIT 1
+      `;
+
+      if (existingLoc.length > 0) {
+        // Update the address fields; set or clear coords depending on mode.
+        await sql`
+          UPDATE locations SET
+            street_1       = ${data.street1 || null},
+            street_2       = ${data.street2 || null},
+            street_address = ${data.streetAddress || null},
+            city           = ${data.city || null},
+            state          = ${data.state || null},
+            state_code     = ${data.stateCode || null},
+            zip            = ${data.zip || null},
+            neighborhood   = ${data.neighborhood || null},
+            coordinates    = ${
+              hasCoords
+                ? sql`ST_MakePoint(${data.lng}, ${data.lat})`
+                : sql`NULL`
+            },
+            updated_at     = NOW()
+          WHERE business_id = ${id}
+        `;
+      } else if (hasCoords || data.city) {
+        // No row yet (e.g. a previously directory-only business gaining an
+        // address) — insert one.
+        await sql`
+          INSERT INTO locations (
+            business_id, street_1, street_2, street_address,
+            city, state, state_code, zip, country, neighborhood,
+            coordinates, is_active_area
+          ) VALUES (
+            ${id},
+            ${data.street1 || null},
+            ${data.street2 || null},
+            ${data.streetAddress || null},
+            ${data.city || null},
+            ${data.state || null},
+            ${data.stateCode || null},
+            ${data.zip || null},
+            'USA',
+            ${data.neighborhood || null},
+            ${hasCoords ? sql`ST_MakePoint(${data.lng}, ${data.lat})` : sql`NULL`},
+            true
+          )
+        `;
+      }
+    }
+
+    // Vendor spaces + fees. Only reconcile when the edit form sent the field
+    // (it always does for the add/edit forms; guarding keeps older callers
+    // that omit it from wiping data). When the toggle is on we upsert the
+    // single vendor_spaces row and replace all fee rows; when off we remove
+    // them entirely.
+    if (data.vendorSpace !== undefined) {
+      const vsData = data.vendorSpace;
+      const VALID_FEE_TYPES = [
+        "non_food",
+        "prepackaged_food",
+        "beverage",
+        "hot_food",
+        "other",
+      ];
+
+      if (vsData?.vendorSpaceAvailable) {
+        await sql`
+          INSERT INTO vendor_spaces (
+            business_id,
+            vendor_space_available,
+            space_sizes,
+            vendor_types,
+            has_waitlist,
+            has_holds,
+            signup_link,
+            note
+          ) VALUES (
+            ${id},
+            true,
+            ${vsData.spaceSizes || []},
+            ${vsData.vendorTypes || []},
+            ${vsData.hasWaitlist || false},
+            ${vsData.hasHolds || false},
+            ${vsData.signupLink || null},
+            ${vsData.note || null}
+          )
+          ON CONFLICT (business_id) DO UPDATE SET
+            vendor_space_available = EXCLUDED.vendor_space_available,
+            space_sizes  = EXCLUDED.space_sizes,
+            vendor_types = EXCLUDED.vendor_types,
+            has_waitlist = EXCLUDED.has_waitlist,
+            has_holds    = EXCLUDED.has_holds,
+            signup_link  = EXCLUDED.signup_link,
+            note         = EXCLUDED.note,
+            updated_at   = NOW()
+        `;
+      } else {
+        // Toggled off — drop the vendor space row (fees cascade via the
+        // delete below anyway, but keep them explicit).
+        await sql`
+          DELETE FROM vendor_spaces WHERE business_id = ${id}
+        `;
+      }
+
+      // Replace fees: clear then re-insert whatever the form sent.
+      await sql`DELETE FROM vendor_fees WHERE business_id = ${id}`;
+
+      if (vsData?.vendorSpaceAvailable && Array.isArray(data.vendorFees)) {
+        for (const fee of data.vendorFees) {
+          if (!VALID_FEE_TYPES.includes(fee.feeType)) continue;
+          const hasAmount =
+            fee.amount != null && !Number.isNaN(Number(fee.amount));
+          const hasDescription = !!fee.description?.trim();
+          if (!hasAmount && !hasDescription && !fee.isFree) continue;
+
+          await sql`
+            INSERT INTO vendor_fees (
+              business_id,
+              fee_type,
+              amount,
+              is_free,
+              description
+            ) VALUES (
+              ${id},
+              ${fee.feeType},
+              ${hasAmount ? Number(fee.amount) : null},
+              ${fee.isFree || false},
+              ${fee.description?.trim() || null}
+            )
+          `;
+        }
+      }
+    }
+
+    // Event dates. Persist the chosen mode: recurring → market_schedules,
+    // specific → popup_events. Replace-all (delete then reinsert) and clear
+    // the other table so switching modes can't leave stale rows. sub_type is
+    // realigned to the mode since the businesses UPDATE above doesn't touch it.
+    if (data.eventDateMode === "recurring" || data.eventDateMode === "specific") {
+      const newSubType =
+        data.eventDateMode === "recurring" ? "market" : "pop_up";
+      await sql`
+        UPDATE businesses SET sub_type = ${newSubType} WHERE id = ${id}
+      `;
+
+      await sql`DELETE FROM market_schedules WHERE business_id = ${id}`;
+      await sql`DELETE FROM popup_events WHERE business_id = ${id}`;
+
+      if (
+        data.eventDateMode === "recurring" &&
+        Array.isArray(data.marketSchedules)
+      ) {
+        for (const s of data.marketSchedules) {
+          if (!s.dayOfWeek || !s.recurrenceType) continue;
+          await sql`
+            INSERT INTO market_schedules (
+              business_id, day_of_week, recurrence_type, anchor_date,
+              start_time, end_time, closes_next_day, season_start, season_end
+            ) VALUES (
+              ${id},
+              ${s.dayOfWeek},
+              ${s.recurrenceType},
+              ${s.anchorDate || null},
+              ${s.startTime || null},
+              ${s.endTime || null},
+              ${s.closesNextDay || false},
+              ${s.seasonStart || null},
+              ${s.seasonEnd || null}
+            )
+          `;
+        }
+      }
+
+      if (
+        data.eventDateMode === "specific" &&
+        Array.isArray(data.eventDates)
+      ) {
+        for (const d of data.eventDates) {
+          if (!d.date || !d.startTime || !d.endTime) continue;
+          const startDateTime = `${d.date} ${d.startTime}`;
+          const endDate = d.closesNextDay ? nextDay(d.date) : d.date;
+          const endDateTime = `${endDate} ${d.endTime}`;
+          if (new Date(startDateTime) >= new Date(endDateTime)) continue;
+          // ::text::timestamp keeps these as naive wall-clock timestamps;
+          // see the submit route for why the cast is required.
+          await sql`
+            INSERT INTO popup_events (
+              business_id, event_name, event_range, notes
+            ) VALUES (
+              ${id},
+              ${data.eventName || null},
+              tsrange(
+                ${startDateTime}::text::timestamp,
+                ${endDateTime}::text::timestamp
+              ),
+              null
+            )
+          `;
+        }
+      }
+    }
 
     // Reconcile photos (only when the multipart edit form sent them).
     if (keptImageIds !== null) {

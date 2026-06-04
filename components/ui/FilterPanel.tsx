@@ -309,6 +309,17 @@ export default function FilterPanel({
                   >
                     ★ Top rated
                   </Pill>
+                  <Pill
+                    active={draft.vendorSpaces}
+                    onClick={() =>
+                      setDraft((d) => ({
+                        ...d,
+                        vendorSpaces: !d.vendorSpaces,
+                      }))
+                    }
+                  >
+                    Vendor spaces
+                  </Pill>
                 </div>
               </Section>
 

@@ -3,7 +3,9 @@ import { BusinessFormData } from "@/lib/types/business";
 interface Step1TypeProps {
   formData: BusinessFormData;
   updateForm: (data: Partial<BusinessFormData>) => void;
-  nextStep: () => void;
+  // The chosen type is passed back so the parent can route off the fresh
+  // value (events skip the Step-2 type screen) rather than stale state.
+  nextStep: (type?: "small_business" | "event") => void;
 }
 
 export default function Step1Type({
@@ -14,7 +16,7 @@ export default function Step1Type({
 
   const handleSelect = (type: "small_business" | "event") => {
     updateForm({ type, subType: null });
-    nextStep();
+    nextStep(type);
   };
 
   return (

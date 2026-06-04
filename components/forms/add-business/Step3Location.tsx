@@ -86,17 +86,72 @@ export default function Step3Location({
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [results, setResults] = useState<LocationResult[]>([]);
+
+  // Edit mode arrives with a saved address: coords already set, or a
+  // directory-only (no_location) business. Seed the component so the saved
+  // location is treated as the current selection — the user can Save without
+  // re-geocoding, and only needs "Find Location" if they change the address.
+  const hasSavedLocation =
+    (formData.lat != null && formData.lng != null) ||
+    formData.noFixedLocation;
+
   const [selectedResult, setSelectedResult] =
-    useState<LocationResult | null>(null);
+    useState<LocationResult | null>(
+      formData.lat != null && formData.lng != null
+        ? {
+            id:           "existing",
+            title:        formData.streetAddress ||
+              `${formData.street1} & ${formData.street2}`,
+            address:      "",
+            lat:          formData.lat,
+            lng:          formData.lng,
+            city:         formData.city,
+            state:        formData.state,
+            stateCode:    formData.stateCode,
+            zip:          formData.zip,
+            neighborhood: formData.neighborhood,
+          }
+        : null
+    );
   const [notOnMap, setNotOnMap] =
     useState(formData.noFixedLocation);
-  const [showResults, setShowResults] = useState(false);
+  // Open straight to the summary/results view when a saved location exists.
+  const [showResults, setShowResults] = useState(hasSavedLocation);
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
 
-  const isEvent =
-    formData.subType === "market" ||
-    formData.subType === "pop_up";
+  // Events no longer set subType in the merged flow — key off the top-level
+  // type instead.
+  const isEvent = formData.type === "event";
+
+  // Events can give either a full street address or cross streets. Default to
+  // full address; switch to cross streets if the form already has them (e.g.
+  // returning to this step / editing). Small business always uses cross
+  // streets, so this toggle is event-only.
+  const [eventAddressMode, setEventAddressMode] = useState<
+    "full" | "cross"
+  >(
+    isEvent && !formData.streetAddress && (formData.street1 || formData.street2)
+      ? "cross"
+      : "full"
+  );
+
+  // Whether the cross-streets fields are the active address inputs.
+  const useCrossStreets = isEvent
+    ? eventAddressMode === "cross"
+    : true;
+
+  // Switch event address style, clearing the other style's fields so a stale
+  // value from the hidden inputs can't be submitted alongside.
+  const switchEventAddressMode = (mode: "full" | "cross") => {
+    setEventAddressMode(mode);
+    setErrors({});
+    if (mode === "full") {
+      updateForm({ street1: "", street2: "" });
+    } else {
+      updateForm({ streetAddress: "" });
+    }
+  };
 
   // Load HERE script
   const loadScript = (src: string): Promise<void> => {
@@ -213,17 +268,17 @@ export default function Step3Location({
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
-    if (isEvent) {
-      if (!formData.streetAddress.trim()) {
-        newErrors.streetAddress =
-          "Street address is required";
-      }
-    } else {
+    if (useCrossStreets) {
       if (!formData.street1.trim()) {
         newErrors.street1 = "Street 1 is required";
       }
       if (!formData.street2.trim()) {
         newErrors.street2 = "Street 2 is required";
+      }
+    } else {
+      if (!formData.streetAddress.trim()) {
+        newErrors.streetAddress =
+          "Street address is required";
       }
     }
 
@@ -254,9 +309,9 @@ export default function Step3Location({
       mapInstance.current = null;
     }
 
-    const query = isEvent
-      ? `${formData.streetAddress}, ${formData.city}, ${formData.stateCode}${formData.zip ? ` ${formData.zip}` : ""}`
-      : `${formData.street1} & ${formData.street2}, ${formData.city}, ${formData.stateCode}${formData.zip ? ` ${formData.zip}` : ""}`;
+    const query = useCrossStreets
+      ? `${formData.street1} & ${formData.street2}, ${formData.city}, ${formData.stateCode}${formData.zip ? ` ${formData.zip}` : ""}`
+      : `${formData.streetAddress}, ${formData.city}, ${formData.stateCode}${formData.zip ? ` ${formData.zip}` : ""}`;
 
     try {
       const res = await fetch(
@@ -391,7 +446,7 @@ export default function Step3Location({
       </h2>
       <p className="text-gray-500 text-sm mb-8">
         {isEvent
-          ? "Enter the venue address"
+          ? "Enter the venue's full address or its cross streets."
           : <>
               We will not ask for the address, just the cross streets.
               <br />
@@ -459,8 +514,38 @@ export default function Step3Location({
               </div>
             )}
 
+            {/* Event address style toggle — full address or cross streets */}
+            {isEvent && (
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                <button
+                  type="button"
+                  onClick={() => switchEventAddressMode("full")}
+                  className={`border-2 rounded-xl py-2.5 text-sm
+                    font-medium transition
+                    ${eventAddressMode === "full"
+                      ? "border-black bg-black text-white"
+                      : "border-gray-200 text-black"
+                    }`}
+                >
+                  Full address
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchEventAddressMode("cross")}
+                  className={`border-2 rounded-xl py-2.5 text-sm
+                    font-medium transition
+                    ${eventAddressMode === "cross"
+                      ? "border-black bg-black text-white"
+                      : "border-gray-200 text-black"
+                    }`}
+                >
+                  Cross streets
+                </button>
+              </div>
+            )}
+
             {/* Cross streets */}
-            {!notOnMap && !isEvent && (
+            {!notOnMap && useCrossStreets && (
               <>
                 <div>
                   <label className="block text-sm
@@ -528,8 +613,8 @@ export default function Step3Location({
               </>
             )}
 
-            {/* Full address for events */}
-            {isEvent && (
+            {/* Full address (events, full-address mode) */}
+            {!useCrossStreets && (
               <div>
                 <label className="block text-sm
                   font-medium text-black mb-1">
@@ -688,9 +773,9 @@ export default function Step3Location({
               justify-between">
               <p className="text-sm font-medium
                 text-black">
-                {isEvent
-                  ? formData.streetAddress
-                  : `${formData.street1} & ${formData.street2}`
+                {useCrossStreets
+                  ? `${formData.street1} & ${formData.street2}`
+                  : formData.streetAddress
                 }
                 {formData.city
                   ? `, ${formData.city}`
@@ -772,7 +857,9 @@ export default function Step3Location({
               </div>
             )}
 
-            {/* Directory-only checkbox */}
+            {/* Directory-only checkbox — small business only; events must
+                have a location. */}
+            {!isEvent && (
             <label className={`flex items-start gap-3
               cursor-pointer p-4 border-2 rounded-xl
               transition
@@ -801,6 +888,7 @@ export default function Step3Location({
                 </p>
               </div>
             </label>
+            )}
 
             {/* Map preview */}
             {selectedResult && !notOnMap && (

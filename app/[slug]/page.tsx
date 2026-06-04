@@ -69,16 +69,42 @@ async function getBusinessBySlug(slug: string) {
       WHERE business_id = ${business.id}
     `;
 
-    const popupResult = await sql`
+    // All upcoming dates for a specific-date event (a market/event can have
+    // several scattered dates), soonest first.
+    const popupEvents = await sql`
       SELECT *,
         lower(event_range) as start_time,
         upper(event_range) as end_time
       FROM popup_events
       WHERE business_id = ${business.id}
       AND upper(event_range) > NOW()
+      ORDER BY lower(event_range) ASC
+    `;
+
+    const vendorSpaceResult = await sql`
+      SELECT *
+      FROM vendor_spaces
+      WHERE business_id = ${business.id}
+      AND vendor_space_available = true
       LIMIT 1
     `;
-    const popupEvent = popupResult[0] || null;
+    const vendorSpace = vendorSpaceResult[0] || null;
+
+    const vendorFees = vendorSpace
+      ? await sql`
+          SELECT *
+          FROM vendor_fees
+          WHERE business_id = ${business.id}
+          ORDER BY
+            CASE fee_type
+              WHEN 'non_food'         THEN 1
+              WHEN 'prepackaged_food' THEN 2
+              WHEN 'beverage'         THEN 3
+              WHEN 'hot_food'         THEN 4
+              WHEN 'other'            THEN 5
+            END
+        `
+      : [];
 
     const reviews = await sql`
       SELECT
@@ -121,7 +147,9 @@ async function getBusinessBySlug(slug: string) {
       images,
       hours,
       schedules,
-      popupEvent,
+      popupEvents,
+      vendorSpace,
+      vendorFees,
       reviews,
       otherLocations,
     };
@@ -180,6 +208,14 @@ const SUB_TYPE_LABELS: Record<string, string> = {
   pop_up:             "Pop-Up Event",
 };
 
+const FEE_LABELS: Record<string, string> = {
+  non_food:         "Non-food",
+  prepackaged_food: "Prepackaged food",
+  beverage:         "Beverage",
+  hot_food:         "Hot food",
+  other:            "Other",
+};
+
 const DAY_LABELS: Record<string, string> = {
   monday:    "Monday",
   tuesday:   "Tuesday",
@@ -212,7 +248,9 @@ export default async function BusinessProfilePage({
     images,
     hours,
     schedules,
-    popupEvent,
+    popupEvents,
+    vendorSpace,
+    vendorFees,
     reviews,
     otherLocations,
   } = data;
@@ -541,7 +579,6 @@ export default async function BusinessProfilePage({
                           .replace("_", " ") +
                         " of month"
                     }
-                    {s.is_night_market && " 🌙"}
                   </p>
                   <p className="text-xs text-gray-500">
                     {formatTime12h(s.start_time)} – {formatTime12h(s.end_time)}
@@ -567,44 +604,165 @@ export default async function BusinessProfilePage({
           </div>
         )}
 
-        {/* Pop-up event */}
-        {popupEvent && (
+        {/* Upcoming dates — a specific-date event can have several */}
+        {popupEvents.length > 0 && (
           <div className="py-5 border-b
             border-gray-100">
             <h2 className="text-sm font-semibold
               text-black mb-3">
-              Upcoming Event
+              {popupEvents.length > 1
+                ? "Upcoming Dates"
+                : "Upcoming Event"}
             </h2>
-            <div className="bg-orange-50 border
-              border-orange-200 rounded-xl p-4">
-              {popupEvent.event_name && (
-                <p className="text-sm font-medium
-                  text-black mb-1">
-                  {popupEvent.event_name}
+            {popupEvents[0].event_name && (
+              <p className="text-sm font-medium
+                text-black mb-2">
+                {popupEvents[0].event_name}
+              </p>
+            )}
+            <div className="space-y-2">
+              {popupEvents.map((pe: any) => (
+                <div
+                  key={pe.id}
+                  className="bg-orange-50 border
+                    border-orange-200 rounded-xl p-4"
+                >
+                  <p className="text-sm text-gray-600">
+                    {new Date(pe.start_time)
+                      .toLocaleDateString("en-US", {
+                        weekday: "long",
+                        month: "long",
+                        day: "numeric",
+                      })}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    {new Date(pe.start_time)
+                      .toLocaleTimeString("en-US", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    {" — "}
+                    {new Date(pe.end_time)
+                      .toLocaleTimeString("en-US", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Vendor spaces */}
+        {vendorSpace && (
+          <div className="py-5 border-b border-gray-100">
+            <div className="flex items-center gap-2 mb-3">
+              <svg width="18" height="18" viewBox="0 0 24 24"
+                fill="none" stroke="#16a34a" strokeWidth="2"
+                strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9l1-5h16l1 5"/>
+                <path d="M4 9v11a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9"/>
+                <path d="M3 9h18"/>
+              </svg>
+              <h2 className="text-sm font-semibold text-black">
+                Vendor Spaces Available
+              </h2>
+            </div>
+
+            <div className="bg-green-50 border border-green-200
+              rounded-xl p-4 space-y-4">
+
+              {/* Space sizes */}
+              {vendorSpace.space_sizes?.length > 0 && (
+                <div>
+                  <p className="text-xs text-gray-500 mb-1.5">
+                    Space sizes
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {vendorSpace.space_sizes.map((size: string) => (
+                      <span
+                        key={size}
+                        className="text-xs bg-white border
+                          border-green-200 text-green-800 px-3 py-1
+                          rounded-full"
+                      >
+                        {size}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Fees */}
+              {vendorFees.length > 0 && (
+                <div>
+                  <p className="text-xs text-gray-500 mb-1.5">
+                    Vendor fees
+                  </p>
+                  <div className="space-y-1">
+                    {vendorFees.map((fee: any) => (
+                      <div
+                        key={fee.id}
+                        className="flex justify-between text-sm"
+                      >
+                        <span className="text-black">
+                          {FEE_LABELS[fee.fee_type] || fee.fee_type}
+                        </span>
+                        <span className="text-gray-600">
+                          {fee.is_free
+                            ? "Free"
+                            : fee.amount != null
+                            ? `$${Number(fee.amount).toFixed(2)}`
+                            : "—"}
+                          {fee.description ? ` · ${fee.description}` : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Waitlist / Holds */}
+              {(vendorSpace.has_waitlist || vendorSpace.has_holds) && (
+                <div className="flex flex-wrap gap-2">
+                  {vendorSpace.has_waitlist && (
+                    <span className="text-xs bg-white border
+                      border-green-200 text-green-800 px-3 py-1
+                      rounded-full">
+                      Waitlist available
+                    </span>
+                  )}
+                  {vendorSpace.has_holds && (
+                    <span className="text-xs bg-white border
+                      border-green-200 text-green-800 px-3 py-1
+                      rounded-full">
+                      Holds available
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Note */}
+              {vendorSpace.note && (
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  {vendorSpace.note}
                 </p>
               )}
-              <p className="text-sm text-gray-600">
-                {new Date(popupEvent.start_time)
-                  .toLocaleDateString("en-US", {
-                    weekday: "long",
-                    month: "long",
-                    day: "numeric",
-                  })}
-              </p>
-              <p className="text-sm text-gray-600">
-                {new Date(popupEvent.start_time)
-                  .toLocaleTimeString("en-US", {
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
-                {" — "}
-                {new Date(popupEvent.end_time)
-                  .toLocaleTimeString("en-US", {
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
-                {popupEvent.is_night_market && " 🌙"}
-              </p>
+
+              {/* Sign up link */}
+              {vendorSpace.signup_link && (
+                <a
+                  href={vendorSpace.signup_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full text-center bg-green-600
+                    text-white rounded-xl py-3 text-sm font-medium
+                    hover:bg-green-700 transition"
+                >
+                  Sign up to vend
+                </a>
+              )}
             </div>
           </div>
         )}

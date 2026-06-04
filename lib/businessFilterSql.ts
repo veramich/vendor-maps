@@ -18,7 +18,6 @@ const EVENT_TIMES = new Set([
   "morning",
   "afternoon",
   "evening",
-  "night_market",
 ]);
 
 // Small-business sub types selectable in the filter panel. Event sub types
@@ -49,6 +48,7 @@ export type ParsedFilters = {
   ordering: string[];
   categories: string[];
   subTypes: string[];
+  vendorSpaces: boolean;
   eventFrom: string | null;
   eventTo: string | null;
   eventDays: string[];
@@ -97,6 +97,7 @@ export function parseFilters(params: URLSearchParams): ParsedFilters {
     ordering: list("ordering"),
     categories: list("categories"),
     subTypes: list("sub_types").filter((s) => VALID_SUB_TYPES.has(s)),
+    vendorSpaces: params.get("vendor_spaces") === "1",
     eventFrom: params.get("event_from"),
     eventTo: params.get("event_to"),
     eventDays: list("event_days").filter((d) => VALID_DAYS.has(d)),
@@ -247,6 +248,17 @@ export function buildFilterClause(f: ParsedFilters) {
     frags.push(sql`AND b.sub_type = ANY(${f.subTypes})`);
   }
 
+  // Vendor spaces — only listings with an available vendor_spaces row.
+  if (f.vendorSpaces) {
+    frags.push(sql`
+      AND EXISTS (
+        SELECT 1 FROM vendor_spaces vs
+        WHERE vs.business_id = b.id
+        AND vs.vendor_space_available = true
+      )
+    `);
+  }
+
   // Event date/time — narrows to event-type businesses with a matching market
   // schedule or pop-up occurrence. Markets (recurring) match on day-of-week;
   // pop-ups match on date-range overlap when a window is given, otherwise on
@@ -262,9 +274,7 @@ export function buildFilterClause(f: ParsedFilters) {
     if (hasDays) {
       markets = sql`${markets} AND ms.day_of_week = ANY(${f.eventDays})`;
     }
-    if (f.eventTime === "night_market") {
-      markets = sql`${markets} AND ms.is_night_market = true`;
-    } else if (band) {
+    if (band) {
       // Interval overlap of [start, end) with the band; closes_next_day means
       // the event also covers the late-night/early-morning span.
       markets = sql`${markets} AND (
@@ -280,9 +290,7 @@ export function buildFilterClause(f: ParsedFilters) {
     } else if (hasDays) {
       popups = sql`${popups} AND lower(to_char(lower(pe.event_range), 'FMDay')) = ANY(${f.eventDays})`;
     }
-    if (f.eventTime === "night_market") {
-      popups = sql`${popups} AND pe.is_night_market = true`;
-    } else if (band) {
+    if (band) {
       // Interval overlap of [start, end) with the band; a range that crosses
       // into the next day also covers the late-night/early-morning span.
       popups = sql`${popups} AND (

@@ -7,10 +7,14 @@ import {
   BusinessFormData,
   INITIAL_FORM_DATA,
 } from "@/lib/types/business";
+import Step3Location from
+  "@/components/forms/add-business/Step3Location";
 import Step4Info from
   "@/components/forms/add-business/Step4Info";
 import Step5Details from
   "@/components/forms/add-business/Step5Details";
+import Step5bVendorSpace from
+  "@/components/forms/add-business/Step5bVendorSpace";
 import Step6Media from
   "@/components/forms/add-business/Step6Media";
 
@@ -24,7 +28,7 @@ export default function EditSubmissionPage() {
   // Allow deep-linking to a step (e.g. the directory "Add a photo" CTA → step 6).
   const initialStep = (() => {
     const s = Number(searchParams.get("step"));
-    return s >= 4 && s <= 6 ? s : 4;
+    return s >= 3 && s <= 6 ? s : 4;
   })();
 
   const [formData, setFormData] =
@@ -137,9 +141,17 @@ export default function EditSubmissionPage() {
     }
   };
 
+  // Events (market / pop_up) expose the vendor-spaces editor between Details
+  // and Photos.
+  const isEvent =
+    (formData as any).sub_type === "market" ||
+    (formData as any).sub_type === "pop_up";
+
   const STEPS = [
+    { num: 3, label: "Location" },
     { num: 4, label: "Info" },
     { num: 5, label: "Details" },
+    ...(isEvent ? [{ num: 5.5, label: "Vendor Spaces" }] : []),
     { num: 6, label: "Photos & Contact" },
   ];
 
@@ -246,6 +258,13 @@ export default function EditSubmissionPage() {
 
       {/* Step content */}
       <div className="max-w-lg mx-auto px-4 py-6">
+        {step === 3 && (
+          <Step3Location
+            formData={formData}
+            updateForm={updateForm}
+            nextStep={() => setStep(4)}
+          />
+        )}
         {step === 4 && (
           <Step4Info
             formData={formData}
@@ -256,6 +275,13 @@ export default function EditSubmissionPage() {
         )}
         {step === 5 && (
           <Step5Details
+            formData={formData}
+            updateForm={updateForm}
+            nextStep={() => setStep(isEvent ? 5.5 : 6)}
+          />
+        )}
+        {step === 5.5 && (
+          <Step5bVendorSpace
             formData={formData}
             updateForm={updateForm}
             nextStep={() => setStep(6)}

@@ -18,8 +18,7 @@ export type EventTimeFilter =
   | "all"
   | "morning"
   | "afternoon"
-  | "evening"
-  | "night_market";
+  | "evening";
 
 export type BusinessFilters = {
   // Radius is active only when radiusMi is set AND we have a center point.
@@ -37,6 +36,9 @@ export type BusinessFilters = {
   ordering: string[]; // values from ORDERING_METHODS
   categories: string[]; // values from CATEGORIES (match-any)
   subTypes: string[]; // business sub types, e.g. "street_vendor" (match-any)
+
+  // Only show listings that have vendor spaces available.
+  vendorSpaces: boolean;
 
   // Event-only filters (surfaced on the map). When active, results are
   // narrowed to event-type businesses matching the date/time window.
@@ -58,6 +60,7 @@ export const EMPTY_FILTERS: BusinessFilters = {
   ordering: [],
   categories: [],
   subTypes: [],
+  vendorSpaces: false,
   eventDate: "all",
   eventTime: "all",
 };
@@ -87,7 +90,6 @@ export const EVENT_TIME_OPTIONS: { value: EventTimeFilter; label: string }[] = [
   { value: "morning", label: "Morning" },
   { value: "afternoon", label: "Afternoon" },
   { value: "evening", label: "Evening" },
-  { value: "night_market", label: "🌙 Night Market" },
 ];
 
 const DAY_NAMES = [
@@ -114,6 +116,7 @@ export function activeFilterCount(f: BusinessFilters): number {
   if (f.ordering.length) n++;
   if (f.categories.length) n++;
   if (f.subTypes.length) n++;
+  if (f.vendorSpaces) n++;
   if (f.eventDate !== "all") n++;
   if (f.eventTime !== "all") n++;
   return n;
@@ -208,6 +211,7 @@ export function filtersToParams(f: BusinessFilters): URLSearchParams {
   if (f.ordering.length) params.set("ordering", f.ordering.join(","));
   if (f.categories.length) params.set("categories", f.categories.join(","));
   if (f.subTypes.length) params.set("sub_types", f.subTypes.join(","));
+  if (f.vendorSpaces) params.set("vendor_spaces", "1");
 
   const win = eventWindow(f.eventDate);
   if (win) {

@@ -6,6 +6,15 @@ import { generateSlug } from "@/lib/utils/generateSlug";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 
+// Add one day to a YYYY-MM-DD string, returning YYYY-MM-DD. Built from the
+// date parts (UTC noon) so it never drifts across a timezone boundary.
+function nextDay(date: string): string {
+  const [y, m, d] = date.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  dt.setUTCDate(dt.getUTCDate() + 1);
+  return dt.toISOString().split("T")[0];
+}
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
@@ -85,6 +94,9 @@ export async function POST(req: NextRequest) {
         : "permanent_location"
       : "event";
 
+    // Events no longer pick a sub_type up front — it's derived from the date
+    // mode: recurring → market (market_schedules); specific dates → pop_up
+    // (popup_events).
     const dbSubType = isSmallBiz
       ? data.detailedSubType &&
         [
@@ -97,11 +109,9 @@ export async function POST(req: NextRequest) {
         ].includes(data.detailedSubType)
         ? data.detailedSubType
         : null
-      : data.subType === "market"
+      : data.eventDateMode === "recurring"
       ? "market"
-      : data.subType === "pop_up"
-      ? "pop_up"
-      : null;
+      : "pop_up";
 
     // Handle event pricing
     const isEventType = data.type === "event";
@@ -201,12 +211,11 @@ export async function POST(req: NextRequest) {
     const businessId = business.id;
 
     // Insert location if applicable. Small business: anything that resolved
-    // to a permanent_location (has coords, not directory-only). Events:
-    // markets and pop-ups always have a venue.
+    // to a permanent_location (has coords, not directory-only). Events always
+    // have a venue.
     const hasLocation =
       dbType === "permanent_location" ||
-      data.subType === "market" ||
-      data.subType === "pop_up";
+      isEventType;
 
     if (hasLocation) {
       if (data.lat && data.lng) {
@@ -303,9 +312,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Insert market schedules
+    // Insert market schedules (recurring-mode events)
     if (
-      data.subType === "market" &&
+      isEventType &&
+      data.eventDateMode === "recurring" &&
       data.marketSchedules?.length > 0
     ) {
       for (const schedule of data.marketSchedules) {
@@ -318,7 +328,6 @@ export async function POST(req: NextRequest) {
             start_time,
             end_time,
             closes_next_day,
-            is_night_market,
             season_start,
             season_end
           ) VALUES (
@@ -329,7 +338,6 @@ export async function POST(req: NextRequest) {
             ${schedule.startTime},
             ${schedule.endTime},
             ${schedule.closesNextDay || false},
-            false,
             ${schedule.seasonStart || null},
             ${schedule.seasonEnd || null}
           )
@@ -337,54 +345,115 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Insert pop-up event
+    // Insert discrete event dates (specific-mode events) — one popup_events
+    // row per date. Each date carries its own times; closesNextDay rolls the
+    // end to the following day.
     if (
-      data.subType === "pop_up" &&
-      data.popUpEvent?.startDate &&
-      data.popUpEvent?.startTime &&
-      data.popUpEvent?.endTime
+      isEventType &&
+      data.eventDateMode === "specific" &&
+      Array.isArray(data.eventDates)
     ) {
-      const { popUpEvent } = data;
+      for (const d of data.eventDates) {
+        if (!d.date || !d.startTime || !d.endTime) continue;
 
-      const startDateTime =
-        `${popUpEvent.startDate} ${popUpEvent.startTime}`;
+        const startDateTime = `${d.date} ${d.startTime}`;
+        const endDate = d.closesNextDay ? nextDay(d.date) : d.date;
+        const endDateTime = `${endDate} ${d.endTime}`;
 
-      let endDate =
-        popUpEvent.endDate || popUpEvent.startDate;
+        if (new Date(startDateTime) >= new Date(endDateTime)) {
+          return NextResponse.json(
+            { error: "Event end time must be after start time." },
+            { status: 400 }
+          );
+        }
 
-      if (popUpEvent.closesNextDay) {
-        const start = new Date(popUpEvent.startDate);
-        start.setDate(start.getDate() + 1);
-        endDate = start.toISOString().split("T")[0];
+        // ::text::timestamp forces the driver-bound value to be parsed as a
+        // naive (wall-clock) timestamp. Without it postgres.js infers the
+        // bare string as timestamptz and shifts it by the server TZ offset.
+        await sql`
+          INSERT INTO popup_events (
+            business_id,
+            event_name,
+            event_range,
+            notes
+          ) VALUES (
+            ${businessId},
+            ${data.eventName || null},
+            tsrange(
+              ${startDateTime}::text::timestamp,
+              ${endDateTime}::text::timestamp
+            ),
+            null
+          )
+        `;
       }
+    }
 
-      const endDateTime =
-        `${endDate} ${popUpEvent.endTime}`;
-
-      if (
-        new Date(startDateTime) >= new Date(endDateTime)
-      ) {
-        return NextResponse.json(
-          { error: "Event end time must be after start time." },
-          { status: 400 }
-        );
-      }
+    // Insert vendor spaces (events only). One row per business; fees are
+    // separate rows in vendor_fees.
+    if (
+      isEventType &&
+      data.vendorSpace?.vendorSpaceAvailable
+    ) {
+      const vsData = data.vendorSpace;
 
       await sql`
-        INSERT INTO popup_events (
+        INSERT INTO vendor_spaces (
           business_id,
-          event_name,
-          event_range,
-          is_night_market,
-          notes
+          vendor_space_available,
+          space_sizes,
+          vendor_types,
+          has_waitlist,
+          has_holds,
+          signup_link,
+          note
         ) VALUES (
           ${businessId},
-          ${popUpEvent.eventName || null},
-          tsrange(${startDateTime}, ${endDateTime}),
-          ${popUpEvent.isNightMarket || false},
-          ${popUpEvent.notes || null}
+          true,
+          ${sql.array(vsData.spaceSizes || [], 25)},
+          ${sql.array(vsData.vendorTypes || [], 25)},
+          ${vsData.hasWaitlist || false},
+          ${vsData.hasHolds || false},
+          ${vsData.signupLink || null},
+          ${vsData.note || null}
         )
       `;
+
+      // Insert each fee the user filled in. Skip empty rows (no amount and
+      // no description).
+      const VALID_FEE_TYPES = [
+        "non_food",
+        "prepackaged_food",
+        "beverage",
+        "hot_food",
+        "other",
+      ];
+
+      if (Array.isArray(data.vendorFees)) {
+        for (const fee of data.vendorFees) {
+          if (!VALID_FEE_TYPES.includes(fee.feeType)) continue;
+          const hasAmount =
+            fee.amount != null && !Number.isNaN(Number(fee.amount));
+          const hasDescription = !!fee.description?.trim();
+          if (!hasAmount && !hasDescription && !fee.isFree) continue;
+
+          await sql`
+            INSERT INTO vendor_fees (
+              business_id,
+              fee_type,
+              amount,
+              is_free,
+              description
+            ) VALUES (
+              ${businessId},
+              ${fee.feeType},
+              ${hasAmount ? Number(fee.amount) : null},
+              ${fee.isFree || false},
+              ${fee.description?.trim() || null}
+            )
+          `;
+        }
+      }
     }
 
     // Upload and insert business images

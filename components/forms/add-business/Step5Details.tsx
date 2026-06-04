@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BusinessFormData,
   PRICE_TIERS,
@@ -124,19 +124,36 @@ export default function Step5Details({
 }: Step5DetailsProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const isMarket  = formData.subType === "market";
-  const isPopUp   = formData.subType === "pop_up";
-  const isEvent   = isMarket || isPopUp;
+  // Events no longer pick a sub_type in Step 2 — it's derived at submit from
+  // the date mode. Within the form, the event date mode drives which UI shows:
+  // "recurring" → market schedules, "specific" → discrete dates. Default a
+  // freshly-reached event to "specific".
+  const isEvent = formData.type === "event";
+  const mode: "specific" | "recurring" =
+    formData.eventDateMode ?? "specific";
+  const isRecurring = isEvent && mode === "recurring";
+  const isSpecific  = isEvent && mode === "specific";
+  // Small business is permanent unless directory-only is chosen at the
+  // location step (subType is only derived at submit time).
   const isPermanent =
-    formData.subType === "permanent_location";
+    formData.type === "small_business" && !formData.noFixedLocation;
 
-  // Small business price context keys off the chosen detailedSubType
-  // (subType is only derived from the location step at submit time);
-  // events still key off subType ("market" | "pop_up").
+  // Price context keys off the chosen detailedSubType (small business);
+  // events use a generic event context.
   const priceContext =
     PRICE_CONTEXT[
-      formData.detailedSubType || formData.subType || ""
+      formData.detailedSubType || (isEvent ? "pop_up" : "") || ""
     ] || "per item";
+
+  const MAX_EVENT_DATES = 6;
+
+  // Persist the default mode so submit/review see it even if the user never
+  // taps the toggle.
+  useEffect(() => {
+    if (isEvent && formData.eventDateMode == null) {
+      updateForm({ eventDateMode: "specific" });
+    }
+  }, [isEvent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -154,51 +171,45 @@ export default function Step5Details({
         "Please enter an admission price";
     }
 
-    if (isPopUp) {
-      if (!formData.popUpEvent?.eventName) {
-        newErrors.eventName = "Event name is required";
+    // Specific-dates mode — at least one date, each with date + times, and a
+    // per-row end-after-start check (unless it runs past midnight).
+    if (isSpecific) {
+      if (formData.eventDates.length === 0) {
+        newErrors.eventDates = "Please add at least one date";
       }
-      if (!formData.popUpEvent?.startDate) {
-        newErrors.startDate = "Start date is required";
-      }
-      if (!formData.popUpEvent?.startTime) {
-        newErrors.startTime = "Start time is required";
-      }
-      if (!formData.popUpEvent?.endTime) {
-        newErrors.endTime = "End time is required";
-      }
+      formData.eventDates.forEach((d, i) => {
+        if (!d.date) {
+          newErrors[`date_${i}`] = "Date is required";
+        }
+        if (!d.startTime) {
+          newErrors[`startTime_${i}`] = "Start time is required";
+        }
+        if (!d.endTime) {
+          newErrors[`endTime_${i}`] = "End time is required";
+        }
+        if (
+          d.date &&
+          d.startTime &&
+          d.endTime &&
+          !d.closesNextDay
+        ) {
+          const start = new Date(`${d.date} ${d.startTime}`);
+          const end = new Date(`${d.date} ${d.endTime}`);
+          if (start >= end) {
+            newErrors[`endTime_${i}`] =
+              "End time must be after start time";
+          }
+        }
+      });
     }
 
-    if (isPopUp &&
-    formData.popUpEvent?.startDate &&
-    formData.popUpEvent?.startTime &&
-    formData.popUpEvent?.endTime &&
-    !formData.popUpEvent?.closesNextDay
-    ) {
-      const start = new Date(
-        `${formData.popUpEvent.startDate} ${formData.popUpEvent.startTime}`
-      );
-      const end = new Date(
-        `${formData.popUpEvent.endDate || formData.popUpEvent.startDate} ${formData.popUpEvent.endTime}`
-      );
-
-      if (start >= end) {
-        newErrors.endTime =
-          "End time must be after start time";
+    // Recurring mode — at least one schedule, each with an anchor date so we
+    // can compute exact upcoming dates (and resolve biweekly cadence).
+    if (isRecurring) {
+      if (formData.marketSchedules.length === 0) {
+        newErrors.schedule =
+          "Please add at least one schedule";
       }
-    }
-
-    if (
-      isMarket &&
-      formData.marketSchedules.length === 0
-    ) {
-      newErrors.schedule =
-        "Please add at least one schedule";
-    }
-
-    // Each recurring schedule needs an anchor date so we can compute exact
-    // upcoming dates (and resolve biweekly cadence).
-    if (isMarket) {
       formData.marketSchedules.forEach((s, i) => {
         if (!s.anchorDate) {
           newErrors[`anchorDate_${i}`] =
@@ -239,7 +250,6 @@ export default function Step5Details({
           startTime:      "08:00",
           endTime:        "14:00",
           closesNextDay:  false,
-          isNightMarket:  false,
           seasonStart:    "",
           seasonEnd:      "",
         },
@@ -259,6 +269,37 @@ export default function Step5Details({
   const removeSchedule = (index: number) => {
     updateForm({
       marketSchedules: formData.marketSchedules
+        .filter((_, i) => i !== index),
+    });
+  };
+
+  const addEventDate = () => {
+    if (formData.eventDates.length >= MAX_EVENT_DATES) return;
+    updateForm({
+      eventDates: [
+        ...formData.eventDates,
+        {
+          date:          "",
+          startTime:     "10:00",
+          endTime:       "16:00",
+          closesNextDay: false,
+        },
+      ],
+    });
+  };
+
+  const updateEventDate = (
+    index: number,
+    data: Partial<typeof formData.eventDates[0]>
+  ) => {
+    const updated = [...formData.eventDates];
+    updated[index] = { ...updated[index], ...data };
+    updateForm({ eventDates: updated });
+  };
+
+  const removeEventDate = (index: number) => {
+    updateForm({
+      eventDates: formData.eventDates
         .filter((_, i) => i !== index),
     });
   };
@@ -460,490 +501,520 @@ export default function Step5Details({
           </div>
         )}
 
-        {/* Pop-Up Event Details */}
-        {isPopUp && (
-          <div className="space-y-4">
-            <label className="block text-sm font-medium
-              text-black">
-              Event Details
-              <span className="text-red-500 ml-1">*</span>
-            </label>
+        {/* Event dates — all events. Mode toggle picks between scattered
+            specific dates and a recurring schedule. */}
+        {isEvent && (
+          <div className="space-y-5">
 
-            {/* Event Name */}
+            {/* Optional event name */}
             <div>
-              <label className="block text-xs
-                text-gray-500 mb-1">
+              <label className="block text-sm font-medium
+                text-black mb-1">
                 Event Name
+                <span className="text-gray-400 text-xs
+                  font-normal ml-2">
+                  Optional
+                </span>
               </label>
               <input
                 type="text"
                 maxLength={100}
-                value={formData.popUpEvent?.eventName || ""}
-                onChange={(e) => {
-                  updateForm({
-                    popUpEvent: {
-                      ...formData.popUpEvent!,
-                      eventName: e.target.value,
-                    }
-                  });
-                  if (errors.eventName) {
-                    setErrors(prev => ({
-                      ...prev, eventName: ""
-                    }));
-                  }
-                }}
-                placeholder="e.g. Holiday Pop-Up Market"
-                className={`w-full border-2 rounded-xl
-                  px-4 py-3 text-sm text-black
-                  focus:outline-none transition
-                  ${errors.eventName
-                    ? "border-red-400"
-                    : "border-gray-200 focus:border-black"
-                  }`}
-              />
-              {errors.eventName && (
-                <p className="text-red-500 text-xs mt-1">
-                  {errors.eventName}
-                </p>
-              )}
-            </div>
-
-            {/* Date */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs
-                  text-gray-500 mb-1">
-                  Start Date
-                </label>
-                <input
-                  type="date"
-                  value={
-                    formData.popUpEvent?.startDate || ""
-                  }
-                  min={
-                    new Date().toISOString().split("T")[0]
-                  }
-                  onChange={(e) => {
-                    updateForm({
-                      popUpEvent: {
-                        ...formData.popUpEvent!,
-                        startDate: e.target.value,
-                        endDate:   e.target.value,
-                      }
-                    });
-                    if (errors.startDate) {
-                      setErrors(prev => ({
-                        ...prev, startDate: ""
-                      }));
-                    }
-                  }}
-                  className={`w-full border-2 rounded-xl
-                    px-4 py-3 text-sm text-black
-                    focus:outline-none transition
-                    ${errors.startDate
-                      ? "border-red-400"
-                      : "border-gray-200 focus:border-black"
-                    }`}
-                />
-                {errors.startDate && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {errors.startDate}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="block text-xs
-                  text-gray-500 mb-1">
-                  End Date
-                </label>
-                <input
-                  type="date"
-                  value={
-                    formData.popUpEvent?.endDate || ""
-                  }
-                  min={
-                    formData.popUpEvent?.startDate ||
-                    new Date().toISOString().split("T")[0]
-                  }
-                  onChange={(e) =>
-                    updateForm({
-                      popUpEvent: {
-                        ...formData.popUpEvent!,
-                        endDate: e.target.value,
-                      }
-                    })
-                  }
-                  className="w-full border-2
-                    border-gray-200 rounded-xl px-4 py-3
-                    text-sm text-black focus:outline-none
-                    focus:border-black transition"
-                />
-              </div>
-            </div>
-
-            {/* Time */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs
-                  text-gray-500 mb-1">
-                  Start Time
-                </label>
-                <TimeSelect
-                  value={
-                    formData.popUpEvent?.startTime || ""
-                  }
-                  onChange={(val) => {
-                    updateForm({
-                      popUpEvent: {
-                        ...formData.popUpEvent!,
-                        startTime: val,
-                      }
-                    });
-                    if (errors.startTime) {
-                      setErrors(prev => ({
-                        ...prev, startTime: ""
-                      }));
-                    }
-                  }}
-                  hasError={!!errors.startTime}
-                />
-                {errors.startTime && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {errors.startTime}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="block text-xs
-                  text-gray-500 mb-1">
-                  End Time
-                </label>
-                <TimeSelect
-                  value={
-                    formData.popUpEvent?.endTime || ""
-                  }
-                  onChange={(val) => {
-                    updateForm({
-                      popUpEvent: {
-                        ...formData.popUpEvent!,
-                        endTime: val,
-                      }
-                    });
-                    if (errors.endTime) {
-                      setErrors(prev => ({
-                        ...prev, endTime: ""
-                      }));
-                    }
-                  }}
-                  hasError={!!errors.endTime}
-                />
-                {errors.endTime && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {errors.endTime}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Closes Next Day */}
-            <label className="flex items-center gap-3
-              cursor-pointer">
-              <input
-                type="checkbox"
-                checked={
-                  formData.popUpEvent?.closesNextDay ||
-                  false
-                }
+                value={formData.eventName}
                 onChange={(e) =>
-                  updateForm({
-                    popUpEvent: {
-                      ...formData.popUpEvent!,
-                      closesNextDay: e.target.checked,
-                    }
-                  })
+                  updateForm({ eventName: e.target.value })
                 }
-                className="w-4 h-4 rounded"
+                placeholder="e.g. Holiday Night Market"
+                className="w-full border-2 border-gray-200
+                  rounded-xl px-4 py-3 text-sm text-black
+                  focus:outline-none focus:border-black
+                  transition"
               />
-              <span className="text-sm text-black">
-                Event ends after midnight
-              </span>
-            </label>
+            </div>
 
-            {/* Is Market toggle */}
-            <label className="flex items-center gap-3
-              cursor-pointer">
-              <input
-                type="checkbox"
-                checked={
-                  formData.popUpEvent?.isNightMarket ||
-                  false
-                }
-                onChange={(e) =>
-                  updateForm({
-                    popUpEvent: {
-                      ...formData.popUpEvent!,
-                      isNightMarket: e.target.checked,
-                    }
-                  })
-                }
-                className="w-4 h-4 rounded"
-              />
-              <span className="text-sm text-black">
-                This is part of a market
-              </span>
-            </label>
-          </div>
-        )}
-
-        {/* Market Schedule */}
-        {isMarket && (
-          <div>
-            <div className="flex items-center
-              justify-between mb-3">
-              <label className="text-sm font-medium
-                text-black">
-                Schedule
+            {/* Mode toggle */}
+            <div>
+              <label className="block text-sm font-medium
+                text-black mb-3">
+                When does it happen?
                 <span className="text-red-500 ml-1">*</span>
               </label>
-              <button
-                type="button"
-                onClick={addSchedule}
-                className="text-xs text-black underline"
-              >
-                + Add schedule
-              </button>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateForm({ eventDateMode: "specific" })
+                  }
+                  className={`border-2 rounded-xl py-4
+                    text-center transition
+                    ${isSpecific
+                      ? "border-black bg-black text-white"
+                      : "border-gray-200 text-black"
+                    }`}
+                >
+                  <p className="font-semibold text-sm">
+                    Specific dates
+                  </p>
+                  <p className="text-xs mt-0.5 opacity-70">
+                    Up to 6 dates
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateForm({ eventDateMode: "recurring" })
+                  }
+                  className={`border-2 rounded-xl py-4
+                    text-center transition
+                    ${isRecurring
+                      ? "border-black bg-black text-white"
+                      : "border-gray-200 text-black"
+                    }`}
+                >
+                  <p className="font-semibold text-sm">
+                    Recurring event
+                  </p>
+                  <p className="text-xs mt-0.5 opacity-70">
+                    Repeats on a schedule
+                  </p>
+                </button>
+              </div>
             </div>
 
-            {errors.schedule && (
-              <p className="text-red-500 text-xs mb-2">
-                {errors.schedule}
-              </p>
-            )}
-
-            {formData.marketSchedules.length === 0 && (
-              <button
-                type="button"
-                onClick={addSchedule}
-                className="w-full border-2 border-dashed
-                  border-gray-200 rounded-xl py-6 text-sm
-                  text-gray-400 hover:border-gray-300
-                  transition"
-              >
-                + Add your first schedule
-              </button>
-            )}
-
-            {formData.marketSchedules.map(
-              (schedule, i) => (
-              <div key={i} className="border-2
-                border-gray-200 rounded-xl p-4 mb-3">
-
-                <div className="flex justify-between mb-3">
-                  <p className="text-sm font-medium
+            {/* Specific dates */}
+            {isSpecific && (
+              <div>
+                <div className="flex items-center
+                  justify-between mb-3">
+                  <label className="text-sm font-medium
                     text-black">
-                    Schedule {i + 1}
+                    Dates
+                    <span className="text-red-500 ml-1">*</span>
+                  </label>
+                  {formData.eventDates.length <
+                    MAX_EVENT_DATES && (
+                    <button
+                      type="button"
+                      onClick={addEventDate}
+                      className="text-xs text-black underline"
+                    >
+                      + Add date
+                    </button>
+                  )}
+                </div>
+
+                {errors.eventDates && (
+                  <p className="text-red-500 text-xs mb-2">
+                    {errors.eventDates}
                   </p>
+                )}
+
+                {formData.eventDates.length === 0 && (
                   <button
                     type="button"
-                    onClick={() => removeSchedule(i)}
-                    className="text-xs text-red-400"
+                    onClick={addEventDate}
+                    className="w-full border-2 border-dashed
+                      border-gray-200 rounded-xl py-6 text-sm
+                      text-gray-400 hover:border-gray-300
+                      transition"
                   >
-                    Remove
+                    + Add your first date
+                  </button>
+                )}
+
+                {formData.eventDates.map((d, i) => (
+                  <div key={i} className="border-2
+                    border-gray-200 rounded-xl p-4 mb-3">
+
+                    <div className="flex justify-between mb-3">
+                      <p className="text-sm font-medium
+                        text-black">
+                        Date {i + 1}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => removeEventDate(i)}
+                        className="text-xs text-red-400"
+                      >
+                        Remove
+                      </button>
+                    </div>
+
+                    {/* Date */}
+                    <div className="mb-3">
+                      <label className="block text-xs
+                        text-gray-500 mb-1">
+                        Date
+                      </label>
+                      <input
+                        type="date"
+                        value={d.date}
+                        min={
+                          new Date().toISOString().split("T")[0]
+                        }
+                        onChange={(e) => {
+                          updateEventDate(i, {
+                            date: e.target.value
+                          });
+                          if (errors[`date_${i}`]) {
+                            setErrors(prev => ({
+                              ...prev, [`date_${i}`]: ""
+                            }));
+                          }
+                        }}
+                        className={`w-full border-2 rounded-xl
+                          px-4 py-3 text-sm text-black
+                          focus:outline-none transition
+                          ${errors[`date_${i}`]
+                            ? "border-red-400"
+                            : "border-gray-200 focus:border-black"
+                          }`}
+                      />
+                      {errors[`date_${i}`] && (
+                        <p className="text-red-500 text-xs mt-1">
+                          {errors[`date_${i}`]}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Time */}
+                    <div className="grid grid-cols-2
+                      gap-3 mb-3">
+                      <div>
+                        <label className="block text-xs
+                          text-gray-500 mb-1">
+                          Start Time
+                        </label>
+                        <TimeSelect
+                          value={d.startTime}
+                          onChange={(val) => {
+                            updateEventDate(i, {
+                              startTime: val
+                            });
+                            if (errors[`startTime_${i}`]) {
+                              setErrors(prev => ({
+                                ...prev,
+                                [`startTime_${i}`]: ""
+                              }));
+                            }
+                          }}
+                          hasError={!!errors[`startTime_${i}`]}
+                        />
+                        {errors[`startTime_${i}`] && (
+                          <p className="text-red-500 text-xs
+                            mt-1">
+                            {errors[`startTime_${i}`]}
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-xs
+                          text-gray-500 mb-1">
+                          End Time
+                        </label>
+                        <TimeSelect
+                          value={d.endTime}
+                          onChange={(val) => {
+                            updateEventDate(i, {
+                              endTime: val
+                            });
+                            if (errors[`endTime_${i}`]) {
+                              setErrors(prev => ({
+                                ...prev,
+                                [`endTime_${i}`]: ""
+                              }));
+                            }
+                          }}
+                          hasError={!!errors[`endTime_${i}`]}
+                        />
+                        {errors[`endTime_${i}`] && (
+                          <p className="text-red-500 text-xs
+                            mt-1">
+                            {errors[`endTime_${i}`]}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Closes next day */}
+                    <label className="flex items-center gap-3
+                      cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={d.closesNextDay}
+                        onChange={(e) =>
+                          updateEventDate(i, {
+                            closesNextDay: e.target.checked
+                          })
+                        }
+                        className="w-4 h-4 rounded"
+                      />
+                      <span className="text-sm text-black">
+                        Ends after midnight
+                      </span>
+                    </label>
+                  </div>
+                ))}
+
+                {formData.eventDates.length >=
+                  MAX_EVENT_DATES && (
+                  <p className="text-gray-400 text-xs">
+                    You can add up to {MAX_EVENT_DATES} dates.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Recurring schedule */}
+            {isRecurring && (
+              <div>
+                <div className="flex items-center
+                  justify-between mb-3">
+                  <label className="text-sm font-medium
+                    text-black">
+                    Schedule
+                    <span className="text-red-500 ml-1">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={addSchedule}
+                    className="text-xs text-black underline"
+                  >
+                    + Add schedule
                   </button>
                 </div>
 
-                {/* Day */}
-                <div className="mb-3">
-                  <label className="block text-xs
-                    text-gray-500 mb-1">
-                    Day
-                  </label>
-                  <select
-                    value={schedule.dayOfWeek}
-                    onChange={(e) =>
-                      updateSchedule(i, {
-                        dayOfWeek: e.target.value
-                      })
-                    }
-                    className="w-full border-2
-                      border-gray-200 rounded-xl px-4
-                      py-3 text-sm text-black
-                      focus:outline-none
-                      focus:border-black bg-white"
-                  >
-                    {DAYS_OF_WEEK.map(day => (
-                      <option key={day} value={day}>
-                        {day.charAt(0).toUpperCase() +
-                          day.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Frequency */}
-                <div className="mb-3">
-                  <label className="block text-xs
-                    text-gray-500 mb-1">
-                    Frequency
-                  </label>
-                  <select
-                    value={schedule.recurrenceType}
-                    onChange={(e) =>
-                      updateSchedule(i, {
-                        recurrenceType: e.target.value
-                      })
-                    }
-                    className="w-full border-2
-                      border-gray-200 rounded-xl px-4
-                      py-3 text-sm text-black
-                      focus:outline-none
-                      focus:border-black bg-white"
-                  >
-                    <option value="weekly">
-                      Every week
-                    </option>
-                    <option value="biweekly">
-                      Every other week
-                    </option>
-                    <option value="monthly_first">
-                      First of month
-                    </option>
-                    <option value="monthly_second">
-                      Second of month
-                    </option>
-                    <option value="monthly_third">
-                      Third of month
-                    </option>
-                    <option value="monthly_last">
-                      Last of month
-                    </option>
-                  </select>
-                </div>
-
-                {/* Anchor date — the next/first occurrence. Lets us show exact
-                    upcoming dates and resolve biweekly cadence. */}
-                <div className="mb-3">
-                  <label className="block text-xs
-                    text-gray-500 mb-1">
-                    {schedule.recurrenceType.startsWith("monthly")
-                      ? "First date this happens"
-                      : "Next date this happens"}
-                  </label>
-                  <input
-                    type="date"
-                    value={schedule.anchorDate || ""}
-                    min={
-                      new Date().toISOString().split("T")[0]
-                    }
-                    onChange={(e) => {
-                      updateSchedule(i, {
-                        anchorDate: e.target.value
-                      });
-                      if (errors[`anchorDate_${i}`]) {
-                        setErrors(prev => ({
-                          ...prev,
-                          [`anchorDate_${i}`]: ""
-                        }));
-                      }
-                    }}
-                    className={`w-full border-2 rounded-xl
-                      px-4 py-3 text-sm text-black
-                      focus:outline-none transition
-                      ${errors[`anchorDate_${i}`]
-                        ? "border-red-400"
-                        : "border-gray-200 focus:border-black"
-                      }`}
-                  />
-                  {errors[`anchorDate_${i}`] && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {errors[`anchorDate_${i}`]}
-                    </p>
-                  )}
-                  <p className="text-gray-400 text-xs mt-1">
-                    {schedule.recurrenceType === "biweekly"
-                      ? "We'll repeat every 2 weeks from this date."
-                      : "Used to show the next upcoming date."}
+                {errors.schedule && (
+                  <p className="text-red-500 text-xs mb-2">
+                    {errors.schedule}
                   </p>
-                </div>
+                )}
 
-                {/* Time */}
-                <div className="grid grid-cols-2
-                  gap-3 mb-3">
-                  <div>
-                    <label className="block text-xs
-                      text-gray-500 mb-1">
-                      Start Time
-                    </label>
-                    <TimeSelect
-                      value={schedule.startTime}
-                      onChange={(val) =>
-                        updateSchedule(i, {
-                          startTime: val
-                        })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs
-                      text-gray-500 mb-1">
-                      End Time
-                    </label>
-                    <TimeSelect
-                      value={schedule.endTime}
-                      onChange={(val) =>
-                        updateSchedule(i, {
-                          endTime: val
-                        })
-                      }
-                    />
-                  </div>
-                </div>
+                {formData.marketSchedules.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={addSchedule}
+                    className="w-full border-2 border-dashed
+                      border-gray-200 rounded-xl py-6 text-sm
+                      text-gray-400 hover:border-gray-300
+                      transition"
+                  >
+                    + Add your first schedule
+                  </button>
+                )}
 
-                {/* Season */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs
-                      text-gray-500 mb-1">
-                      Season Start (optional)
-                    </label>
-                    <input
-                      type="date"
-                      value={schedule.seasonStart}
-                      onChange={(e) =>
-                        updateSchedule(i, {
-                          seasonStart: e.target.value
-                        })
-                      }
-                      className="w-full border-2
-                        border-gray-200 rounded-xl px-4
-                        py-3 text-sm text-black
-                        focus:outline-none
-                        focus:border-black"
-                    />
+                {formData.marketSchedules.map(
+                  (schedule, i) => (
+                  <div key={i} className="border-2
+                    border-gray-200 rounded-xl p-4 mb-3">
+
+                    <div className="flex justify-between mb-3">
+                      <p className="text-sm font-medium
+                        text-black">
+                        Schedule {i + 1}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => removeSchedule(i)}
+                        className="text-xs text-red-400"
+                      >
+                        Remove
+                      </button>
+                    </div>
+
+                    {/* Day */}
+                    <div className="mb-3">
+                      <label className="block text-xs
+                        text-gray-500 mb-1">
+                        Day
+                      </label>
+                      <select
+                        value={schedule.dayOfWeek}
+                        onChange={(e) =>
+                          updateSchedule(i, {
+                            dayOfWeek: e.target.value
+                          })
+                        }
+                        className="w-full border-2
+                          border-gray-200 rounded-xl px-4
+                          py-3 text-sm text-black
+                          focus:outline-none
+                          focus:border-black bg-white"
+                      >
+                        {DAYS_OF_WEEK.map(day => (
+                          <option key={day} value={day}>
+                            {day.charAt(0).toUpperCase() +
+                              day.slice(1)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Frequency */}
+                    <div className="mb-3">
+                      <label className="block text-xs
+                        text-gray-500 mb-1">
+                        Frequency
+                      </label>
+                      <select
+                        value={schedule.recurrenceType}
+                        onChange={(e) =>
+                          updateSchedule(i, {
+                            recurrenceType: e.target.value
+                          })
+                        }
+                        className="w-full border-2
+                          border-gray-200 rounded-xl px-4
+                          py-3 text-sm text-black
+                          focus:outline-none
+                          focus:border-black bg-white"
+                      >
+                        <option value="weekly">
+                          Every week
+                        </option>
+                        <option value="biweekly">
+                          Every other week
+                        </option>
+                        <option value="monthly_first">
+                          First of month
+                        </option>
+                        <option value="monthly_second">
+                          Second of month
+                        </option>
+                        <option value="monthly_third">
+                          Third of month
+                        </option>
+                        <option value="monthly_last">
+                          Last of month
+                        </option>
+                      </select>
+                    </div>
+
+                    {/* Anchor date — the next/first occurrence. Lets us show
+                        exact upcoming dates and resolve biweekly cadence. */}
+                    <div className="mb-3">
+                      <label className="block text-xs
+                        text-gray-500 mb-1">
+                        {schedule.recurrenceType.startsWith("monthly")
+                          ? "First date this happens"
+                          : "Next date this happens"}
+                      </label>
+                      <input
+                        type="date"
+                        value={schedule.anchorDate || ""}
+                        min={
+                          new Date().toISOString().split("T")[0]
+                        }
+                        onChange={(e) => {
+                          updateSchedule(i, {
+                            anchorDate: e.target.value
+                          });
+                          if (errors[`anchorDate_${i}`]) {
+                            setErrors(prev => ({
+                              ...prev,
+                              [`anchorDate_${i}`]: ""
+                            }));
+                          }
+                        }}
+                        className={`w-full border-2 rounded-xl
+                          px-4 py-3 text-sm text-black
+                          focus:outline-none transition
+                          ${errors[`anchorDate_${i}`]
+                            ? "border-red-400"
+                            : "border-gray-200 focus:border-black"
+                          }`}
+                      />
+                      {errors[`anchorDate_${i}`] && (
+                        <p className="text-red-500 text-xs mt-1">
+                          {errors[`anchorDate_${i}`]}
+                        </p>
+                      )}
+                      <p className="text-gray-400 text-xs mt-1">
+                        {schedule.recurrenceType === "biweekly"
+                          ? "We'll repeat every 2 weeks from this date."
+                          : "Used to show the next upcoming date."}
+                      </p>
+                    </div>
+
+                    {/* Time */}
+                    <div className="grid grid-cols-2
+                      gap-3 mb-3">
+                      <div>
+                        <label className="block text-xs
+                          text-gray-500 mb-1">
+                          Start Time
+                        </label>
+                        <TimeSelect
+                          value={schedule.startTime}
+                          onChange={(val) =>
+                            updateSchedule(i, {
+                              startTime: val
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs
+                          text-gray-500 mb-1">
+                          End Time
+                        </label>
+                        <TimeSelect
+                          value={schedule.endTime}
+                          onChange={(val) =>
+                            updateSchedule(i, {
+                              endTime: val
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    {/* Season */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs
+                          text-gray-500 mb-1">
+                          Season Start (optional)
+                        </label>
+                        <input
+                          type="date"
+                          value={schedule.seasonStart}
+                          onChange={(e) =>
+                            updateSchedule(i, {
+                              seasonStart: e.target.value
+                            })
+                          }
+                          className="w-full border-2
+                            border-gray-200 rounded-xl px-4
+                            py-3 text-sm text-black
+                            focus:outline-none
+                            focus:border-black"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs
+                          text-gray-500 mb-1">
+                          Season End (optional)
+                        </label>
+                        <input
+                          type="date"
+                          value={schedule.seasonEnd}
+                          onChange={(e) =>
+                            updateSchedule(i, {
+                              seasonEnd: e.target.value
+                            })
+                          }
+                          className="w-full border-2
+                            border-gray-200 rounded-xl px-4
+                            py-3 text-sm text-black
+                            focus:outline-none
+                            focus:border-black"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs
-                      text-gray-500 mb-1">
-                      Season End (optional)
-                    </label>
-                    <input
-                      type="date"
-                      value={schedule.seasonEnd}
-                      onChange={(e) =>
-                        updateSchedule(i, {
-                          seasonEnd: e.target.value
-                        })
-                      }
-                      className="w-full border-2
-                        border-gray-200 rounded-xl px-4
-                        py-3 text-sm text-black
-                        focus:outline-none
-                        focus:border-black"
-                    />
-                  </div>
-                </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         )}
 

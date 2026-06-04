@@ -48,11 +48,6 @@ export default function Step7Review({
     t => t.tier === formData.priceTier
   );
 
-  const SUB_TYPE_LABELS: Record<string, string> = {
-    market: "Recurring Market",
-    pop_up: "Pop-Up Event",
-  };
-
   const DETAILED_SUB_TYPE_LABELS: Record<string, string> = {
     street_vendor:      "Street Vendor",
     food_truck:         "Food Truck",
@@ -62,12 +57,18 @@ export default function Step7Review({
     other:              "Other",
   };
 
-  const isEvent =
-    formData.subType === "market" ||
-    formData.subType === "pop_up";
+  const isEvent = formData.type === "event";
+
+  // Events derive their kind from the chosen date mode.
+  const eventKindLabel =
+    formData.eventDateMode === "recurring"
+      ? "Recurring event"
+      : formData.eventDateMode === "specific"
+      ? "Specific dates"
+      : "";
 
   // Small business has a location unless they chose directory-only; events
-  // (market/pop_up) always have a venue.
+  // always have a venue.
   const hasLocation = isEvent
     ? true
     : formData.type === "small_business" &&
@@ -86,10 +87,11 @@ export default function Step7Review({
 
       <div className="space-y-4">
 
-        {/* Type */}
+        {/* Type — events edit jumps to the date step (5); the type screen no
+            longer exists for events. */}
         <ReviewSection
           title="Type"
-          onEdit={() => onEditStep(2)}
+          onEdit={() => onEditStep(isEvent ? 5 : 2)}
         >
           <p className="text-sm text-black">
             {formData.type === "small_business"
@@ -97,13 +99,11 @@ export default function Step7Review({
               : "Event"
             }
           </p>
-          {/* Events show their subtype; small business shows the
+          {/* Events show their date mode; small business shows the
               chosen detailed type. */}
-          {isEvent && (
+          {isEvent && eventKindLabel && (
             <p className="text-sm text-gray-500">
-              {SUB_TYPE_LABELS[
-                formData.subType || ""
-              ] || ""}
+              {eventKindLabel}
             </p>
           )}
           {formData.type === "small_business" &&
@@ -123,9 +123,9 @@ export default function Step7Review({
             onEdit={() => onEditStep(3)}
           >
             <p className="text-sm text-black">
-              {isEvent
-                ? formData.streetAddress
-                : `${formData.street1} & ${formData.street2}`
+              {formData.street1 && formData.street2
+                ? `${formData.street1} & ${formData.street2}`
+                : formData.streetAddress
               }
             </p>
             <p className="text-sm text-gray-500">
@@ -249,8 +249,16 @@ export default function Step7Review({
             </div>
           )}
 
-          {/* Market schedule */}
+          {/* Event name */}
+          {isEvent && formData.eventName && (
+            <p className="text-xs font-medium text-black mt-2">
+              {formData.eventName}
+            </p>
+          )}
+
+          {/* Recurring schedule */}
           {isEvent &&
+            formData.eventDateMode === "recurring" &&
             formData.marketSchedules.length > 0 && (
             <div className="mt-2 space-y-1">
               {formData.marketSchedules.map((s, i) => (
@@ -267,20 +275,18 @@ export default function Step7Review({
             </div>
           )}
 
-          {/* Pop-up event */}
-          {formData.subType === "pop_up" &&
-            formData.popUpEvent && (
-            <div className="mt-2">
-              <p className="text-xs font-medium
-                text-black">
-                {formData.popUpEvent.eventName}
-              </p>
-              <p className="text-xs text-gray-500">
-                {formData.popUpEvent.startDate}
-                {" · "}
-                {formData.popUpEvent.startTime} —{" "}
-                {formData.popUpEvent.endTime}
-              </p>
+          {/* Specific dates */}
+          {isEvent &&
+            formData.eventDateMode === "specific" &&
+            formData.eventDates.length > 0 && (
+            <div className="mt-2 space-y-1">
+              {formData.eventDates.map((d, i) => (
+                <p key={i} className="text-xs text-black">
+                  {d.date}
+                  {" · "}{d.startTime} — {d.endTime}
+                  {d.closesNextDay ? " (next day)" : ""}
+                </p>
+              ))}
             </div>
           )}
 
@@ -318,6 +324,42 @@ export default function Step7Review({
             </div>
           )}
         </ReviewSection>
+
+        {/* Vendor spaces — events only */}
+        {isEvent && (
+          <ReviewSection
+            title="Vendor Spaces"
+            onEdit={() => onEditStep(5.5)}
+          >
+            {formData.vendorSpace?.vendorSpaceAvailable ? (
+              <div className="space-y-1">
+                <p className="text-sm text-black">
+                  Vendor spaces available
+                </p>
+                {formData.vendorSpace.spaceSizes.length > 0 && (
+                  <p className="text-xs text-gray-500">
+                    Sizes: {formData.vendorSpace.spaceSizes.join(", ")}
+                  </p>
+                )}
+                {formData.vendorFees.length > 0 && (
+                  <p className="text-xs text-gray-500">
+                    {formData.vendorFees.length} fee
+                    {formData.vendorFees.length === 1 ? "" : "s"} set
+                  </p>
+                )}
+                {formData.vendorSpace.signupLink && (
+                  <p className="text-xs text-gray-500 truncate">
+                    Sign up: {formData.vendorSpace.signupLink}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">
+                No vendor spaces
+              </p>
+            )}
+          </ReviewSection>
+        )}
 
         {/* Photos and contact */}
         <ReviewSection

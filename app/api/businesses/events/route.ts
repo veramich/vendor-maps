@@ -41,7 +41,6 @@ export async function GET(req: NextRequest) {
         occ.anchor_date::text AS anchor_date,
         occ.start_time,
         occ.end_time,
-        occ.is_night_market,
         occ.event_start,
         (
           SELECT bi.cloudinary_url
@@ -67,7 +66,6 @@ export async function GET(req: NextRequest) {
             ms.anchor_date,
             ms.start_time,
             ms.end_time,
-            ms.is_night_market,
             NULL::text AS event_start,
             CASE
               -- With an anchor, step by the real cadence (14d biweekly, else 7d)
@@ -100,7 +98,6 @@ export async function GET(req: NextRequest) {
             NULL::date AS anchor_date,
             lower(pe.event_range)::time AS start_time,
             upper(pe.event_range)::time AS end_time,
-            pe.is_night_market,
             lower(pe.event_range)::text AS event_start,
             CASE
               WHEN lower(pe.event_range)::date >= CURRENT_DATE

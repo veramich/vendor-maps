@@ -18,10 +18,9 @@ type Event = {
   neighborhood: string;
   city: string;
   street_address: string;
-  is_night_market: boolean;
   vendor_space_available: boolean;
-  // Markets recur (day_of_week + recurrence_type, anchored by anchor_date);
-  // pop-ups have an exact start.
+  // Recurring events have day_of_week + recurrence_type (anchored by
+  // anchor_date); specific-date events have an exact event_start.
   day_of_week: string | null;
   recurrence_type: string | null;
   anchor_date: string | null;
@@ -31,7 +30,7 @@ type Event = {
 };
 
 type DateFilter = "all" | "today" | "weekend" | "week" | "month";
-type TimeFilter = "all" | "morning" | "afternoon" | "evening" | "night_market";
+type TimeFilter = "all" | "morning" | "afternoon" | "evening";
 
 export default function EventList() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -40,6 +39,7 @@ export default function EventList() {
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
+  const [vendorSpacesOnly, setVendorSpacesOnly] = useState(false);
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -49,6 +49,7 @@ export default function EventList() {
           ...EMPTY_FILTERS,
           eventDate: dateFilter,
           eventTime: timeFilter,
+          vendorSpaces: vendorSpacesOnly,
         });
         if (searchQuery) params.set("q", searchQuery);
         const res = await fetch(`/api/businesses/events?${params.toString()}`);
@@ -62,7 +63,7 @@ export default function EventList() {
     };
 
     fetchEvents();
-  }, [searchQuery, dateFilter, timeFilter]);
+  }, [searchQuery, dateFilter, timeFilter, vendorSpacesOnly]);
 
   const DATE_FILTERS: { value: DateFilter; label: string }[] = [
     { value: "all", label: "All" },
@@ -77,7 +78,6 @@ export default function EventList() {
     { value: "morning", label: "Morning" },
     { value: "afternoon", label: "Afternoon" },
     { value: "evening", label: "Evening" },
-    { value: "night_market", label: "🌙 Night Market" },
   ];
 
   const handleClearAll = () => {
@@ -85,6 +85,7 @@ export default function EventList() {
     setSearchQuery("");
     setDateFilter("all");
     setTimeFilter("all");
+    setVendorSpacesOnly(false);
   };
 
   return (
@@ -122,7 +123,7 @@ export default function EventList() {
         </div>
 
         {/* Time filters */}
-        <div className="px-4 pb-3 overflow-x-auto">
+        <div className="px-4 pb-2 overflow-x-auto">
           <div className="flex gap-2 min-w-max">
             {TIME_FILTERS.map((f) => (
               <button
@@ -139,6 +140,21 @@ export default function EventList() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Vendor spaces filter */}
+        <div className="px-4 pb-3">
+          <button
+            onClick={() => setVendorSpacesOnly((v) => !v)}
+            className={`px-4 py-2 rounded-full text-xs font-medium
+              transition whitespace-nowrap border
+              ${vendorSpacesOnly
+                ? "bg-green-600 text-white border-green-600"
+                : "bg-white text-green-700 border-green-300"
+              }`}
+          >
+            Vendor Spaces
+          </button>
         </div>
       </div>
 
@@ -417,14 +433,6 @@ function EventCard({ event }: { event: Event }) {
             px-2.5 py-1 rounded-full text-[11px] font-medium text-white
             bg-black/45 backdrop-blur-sm">
             {event.category}
-          </span>
-        )}
-
-        {/* Bottom-left: night market badge */}
-        {event.is_night_market && (
-          <span className="absolute bottom-2.5 left-2.5 px-2.5 py-1 rounded-full
-            text-[11px] font-medium text-white bg-gray-900/80 backdrop-blur-sm">
-            🌙 Night Market
           </span>
         )}
       </div>

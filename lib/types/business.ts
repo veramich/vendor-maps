@@ -68,20 +68,17 @@ export type MarketSchedule = {
   startTime:      string;
   endTime:        string;
   closesNextDay:  boolean;
-  isNightMarket:  boolean;
   seasonStart:    string;
   seasonEnd:      string;
 };
 
-export type PopUpEvent = {
-  eventName:  string;
-  startDate:  string;
-  startTime:  string;
-  endDate:    string;
-  endTime:    string;
+// One discrete date in the "specific dates" event mode (up to 6). Each date
+// carries its own start/end time and an "ends after midnight" flag.
+export type EventDate = {
+  date:          string;
+  startTime:     string;
+  endTime:       string;
   closesNextDay: boolean;
-  isNightMarket: boolean;
-  notes:      string;
 };
 
 export type VendorSpace = {
@@ -138,6 +135,9 @@ export type BusinessFormData = {
   // Event admission
   isFreeEntry:    boolean;
   admissionPrice: string;
+  // Optional event name (all events). Stored on popup_events.event_name in
+  // specific-dates mode; shown as a heading on the listing.
+  eventName:      string;
 
   // Step 5 — details
   // pricing
@@ -152,10 +152,14 @@ export type BusinessFormData = {
   // hours (small business)
   hours:              BusinessHours[];
   hoursSubjectToChange:   boolean;
-  // schedule (market)
+  // event dates — the chosen mode derives sub_type at submit:
+  // "recurring" → market_schedules (sub_type=market);
+  // "specific"  → popup_events rows (sub_type=pop_up)
+  eventDateMode:      "specific" | "recurring" | null;
+  // schedule (recurring mode)
   marketSchedules:    MarketSchedule[];
-  // event (pop_up)
-  popUpEvent:         PopUpEvent | null;
+  // discrete dates (specific mode, up to 6)
+  eventDates:         EventDate[];
   // vendor space (market and pop_up only)
   vendorSpace:        VendorSpace | null;
   vendorFees:         VendorFee[];
@@ -212,6 +216,7 @@ export const INITIAL_FORM_DATA: BusinessFormData = {
   logoUrl:          "",
   isFreeEntry:    true,
   admissionPrice: "",
+  eventName:        "",
   priceTier:        null,
   priceContext:     "",
   paymentOptions:   [],
@@ -221,8 +226,9 @@ export const INITIAL_FORM_DATA: BusinessFormData = {
   locationAmenities: [],
   hours:            [],
   hoursSubjectToChange: false,
+  eventDateMode:    null,
   marketSchedules:  [],
-  popUpEvent:       null,
+  eventDates:       [],
   vendorSpace:      null,
   vendorFees:       [],
   images:           [],

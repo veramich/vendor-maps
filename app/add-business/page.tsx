@@ -8,8 +8,6 @@ import {
 } from "@/lib/types/business";
 import Step1Type from
   "@/components/forms/add-business/Step1Type";
-import Step2SubType from
-  "@/components/forms/add-business/Step2SubType";
 import Step2bSubType from
   "@/components/forms/add-business/Step2bSubType";
 import Step3Location from
@@ -18,6 +16,8 @@ import Step4Info from
   "@/components/forms/add-business/Step4Info";
 import Step5Details from
   "@/components/forms/add-business/Step5Details";
+import Step5bVendorSpace from
+  "@/components/forms/add-business/Step5bVendorSpace";
 import Step6Media from
   "@/components/forms/add-business/Step6Media";
 import Step7Review from
@@ -35,40 +35,49 @@ export default function AddBusinessPage() {
   const [submittedName, setSubmittedName] = useState("");
   const [currentBrandId, setCurrentBrandId] =
     useState<string | null>(null);
+  // Events insert a "Vendor spaces" screen between Details (step 5) and Photos
+  // (step 6) without renumbering the later steps: while this is true and
+  // step === 5, the vendor screen renders in place of Step5Details.
+  const [vendorSubStep, setVendorSubStep] = useState(false);
 
-  // Total steps depends on path taken. Small business now always shows the
-  // location step (directory-only is a checkbox there), so both small
-  // business paths are 7 steps. Events are 6 (pop_up) or 7 (market).
-  const getTotalSteps = () => {
-    if (formData.type === "event") {
-      return formData.subType === "pop_up" ? 6 : 7;
-    }
-    return 7;
-  };
+  const isEvent = formData.type === "event";
+
+  // Events skip the Step-2 type screen (the kind is derived from the date mode
+  // in Step 5), so the internal step sequence is 1 → 3 → 4 → 5(+vendor) → 6 → 7.
+  // Both event paths therefore show 7 steps: Type, Location, Info, Event
+  // details, Vendor spaces, Photos, Review. Small business stays 7.
+  const getTotalSteps = () => 7;
 
   const totalSteps = getTotalSteps();
 
   const getStepTitle = () => {
+    // Vendor spaces is a sub-screen of step 5 for events.
+    if (step === 5 && vendorSubStep) return "Vendor spaces";
     switch (step) {
       case 1:  return "What are you adding?";
-      case 2:
-        return formData.type === "small_business"
-          ? "What type of business?"
-          : "Tell us about the event";
+      case 2:  return "What type of business?";
       case 3:
-        return formData.type === "small_business"
-          ? "Where is the business located?"
-          : "Where is the event located?";
+        return isEvent
+          ? "Where is the event located?"
+          : "Where is the business located?";
       case 4:  return "Business details";
-      case 5:  return "Hours & amenities";
+      case 5:  return isEvent ? "Event details" : "Hours & amenities";
       case 6:  return "Photos & contact";
       case 7:  return "Review & submit";
       default: return "Add a Business";
     }
   };
 
-  // Step number is now 1:1 with the display step.
-  const getDisplayStep = () => step;
+  // Events skip internal step 2, so display numbers compact it out, and the
+  // vendor screen sits at display 5 (pushing Photos/Review to 6/7).
+  //   internal 1→1, 3→2, 4→3, 5→4, vendor→5, 6→6, 7→7
+  const getDisplayStep = () => {
+    if (!isEvent) return step;
+    if (step === 1) return 1;
+    if (step === 5) return vendorSubStep ? 5 : 4;
+    if (step >= 6) return step;     // 6→6, 7→7
+    return step - 1;                // 3→2, 4→3
+  };
 
   const updateForm = (data: Partial<BusinessFormData>) => {
     setFormData(prev => ({ ...prev, ...data }));
@@ -83,6 +92,22 @@ export default function AddBusinessPage() {
   };
 
   const prevStep = () => {
+    // Back out of the vendor sub-screen to Details without changing step.
+    if (step === 5 && vendorSubStep) {
+      setVendorSubStep(false);
+      return;
+    }
+    // Returning from Photos (step 6) to an event's vendor screen.
+    if (isEvent && step === 6) {
+      setStep(5);
+      setVendorSubStep(true);
+      return;
+    }
+    // Events skip the type screen, so Location (3) goes back to Type (1).
+    if (isEvent && step === 3) {
+      setStep(1);
+      return;
+    }
     setStep(prev => prev - 1);
   };
 
@@ -215,8 +240,15 @@ export default function AddBusinessPage() {
     );
   }
 
-  const goToStep = (step: number) => {
-    setStep(step);
+  const goToStep = (target: number) => {
+    // 5.5 is the sentinel for the event-only vendor-spaces sub-screen.
+    if (target === 5.5) {
+      setStep(5);
+      setVendorSubStep(true);
+      return;
+    }
+    setVendorSubStep(false);
+    setStep(target);
   };
 
   return (
@@ -271,18 +303,14 @@ export default function AddBusinessPage() {
           <Step1Type
             formData={formData}
             updateForm={updateForm}
-            nextStep={nextStep}
+            // Events skip the type screen and go straight to Location.
+            nextStep={(type) =>
+              setStep(type === "event" ? 3 : 2)
+            }
           />
         )}
-        {step === 2 && formData.type === "small_business" && (
+        {step === 2 && (
           <Step2bSubType
-            formData={formData}
-            updateForm={updateForm}
-            nextStep={nextStep}
-          />
-        )}
-        {step === 2 && formData.type === "event" && (
-          <Step2SubType
             formData={formData}
             updateForm={updateForm}
             nextStep={nextStep}
@@ -302,11 +330,26 @@ export default function AddBusinessPage() {
             nextStep={nextStep}
           />
         )}
-        {step === 5 && (
+        {step === 5 && !vendorSubStep && (
           <Step5Details
             formData={formData}
             updateForm={updateForm}
-            nextStep={nextStep}
+            nextStep={
+              // Events branch into the vendor screen before Photos.
+              isEvent
+                ? () => setVendorSubStep(true)
+                : nextStep
+            }
+          />
+        )}
+        {step === 5 && vendorSubStep && (
+          <Step5bVendorSpace
+            formData={formData}
+            updateForm={updateForm}
+            nextStep={() => {
+              setVendorSubStep(false);
+              setStep(6);
+            }}
           />
         )}
         {step === 6 && (
