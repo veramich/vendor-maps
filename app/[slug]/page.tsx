@@ -497,6 +497,43 @@ export default async function BusinessProfilePage({
           </div>
         )}
 
+        {/* Service area — directory-only businesses have no address but may
+            list the zip codes they serve. */}
+        {!address && business.served_zips?.length > 0 && (
+          <div className="py-5 border-b border-gray-100">
+            <h2 className="text-sm font-semibold text-black mb-2">
+              Service Area
+            </h2>
+            <div className="flex items-start gap-2">
+              <svg width="16" height="16"
+                viewBox="0 0 24 24" fill="none"
+                stroke="var(--primary)" strokeWidth="2"
+                strokeLinecap="round" strokeLinejoin="round"
+                className="flex-shrink-0 mt-0.5">
+                <path d="M21 10c0 7-9 13-9 13S3
+                  17 3 10a9 9 0 0 1 18 0z"/>
+                <circle cx="12" cy="10" r="3"/>
+              </svg>
+              <div>
+                <p className="text-xs text-gray-500 mb-1">
+                  Serves these zip codes
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {business.served_zips.map((zip: string) => (
+                    <span
+                      key={zip}
+                      className="text-xs font-medium text-black
+                        bg-gray-100 rounded-full px-3 py-1"
+                    >
+                      {zip}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Description */}
         {business.description && (
           <div className="py-5 border-b

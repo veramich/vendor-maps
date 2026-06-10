@@ -50,6 +50,22 @@ export async function GET(
 
     const business = result[0];
 
+    // The businesses row comes back snake_case, but the edit form
+    // (BusinessFormData) reads camelCase keys. Without this mapping the
+    // amenity/pricing selections silently fail to pre-fill. Spreading
+    // `...business` afterwards keeps the raw columns too (status, sub_type,
+    // etc. that the page reads directly).
+    const businessFields = {
+      priceTier:         business.price_tier ?? null,
+      priceContext:      business.price_context || "",
+      paymentOptions:    business.payment_options || [],
+      orderingMethods:   business.ordering_methods || [],
+      dietaryOptions:    business.dietary_options || [],
+      businessAmenities: business.business_amenities || [],
+      hoursSubjectToChange: business.hours_subject_to_change || false,
+      servedZips:        business.served_zips || [],
+    };
+
     // Claimed listings can only be edited by their verified owner.
     if (
       business.claim_status === "claimed" &&
@@ -80,6 +96,7 @@ export async function GET(
       SELECT
         street_1, street_2, street_address,
         city, state, state_code, zip, neighborhood,
+        location_amenities,
         ST_X(coordinates) AS lng,
         ST_Y(coordinates) AS lat
       FROM locations
@@ -97,6 +114,7 @@ export async function GET(
       stateCode:     locRow?.state_code || "",
       zip:           locRow?.zip || "",
       neighborhood:  locRow?.neighborhood || "",
+      locationAmenities: locRow?.location_amenities || [],
       lat:           locRow?.lat ?? null,
       lng:           locRow?.lng ?? null,
       // Directory-only when the business has no map coordinates.
@@ -105,6 +123,30 @@ export async function GET(
         locRow?.lat == null ||
         locRow?.lng == null,
     };
+
+    // Business hours (small business). Mapped to the camelCase shape
+    // Step5Details expects so existing hours pre-fill and can be edited.
+    const hourRows = await sql`
+      SELECT
+        day_of_week, open_time, close_time, closes_next_day,
+        is_closed, hours_vary, season_start, season_end
+      FROM business_hours
+      WHERE business_id = ${business.id}
+    `;
+    const hours = hourRows.map(h => ({
+      dayOfWeek:     h.day_of_week,
+      openTime:      h.open_time ? String(h.open_time).slice(0, 5) : "",
+      closeTime:     h.close_time ? String(h.close_time).slice(0, 5) : "",
+      closesNextDay: h.closes_next_day || false,
+      isClosed:      h.is_closed || false,
+      hoursVary:     h.hours_vary || false,
+      seasonStart:   h.season_start
+        ? new Date(h.season_start).toISOString().split("T")[0]
+        : "",
+      seasonEnd:     h.season_end
+        ? new Date(h.season_end).toISOString().split("T")[0]
+        : "",
+    }));
 
     // Vendor spaces + fees (events). Shape into the camelCase form the
     // edit form / BusinessFormData expects so it pre-fills directly.
@@ -217,7 +259,9 @@ export async function GET(
     return NextResponse.json({
       business: {
         ...business,
+        ...businessFields,
         ...location,
+        hours,
         existingImages: images.map(img => ({
           id:  img.id,
           url: img.cloudinary_url,
@@ -331,6 +375,27 @@ export async function PATCH(
 
     const socialUrls = buildSocialUrls(data);
 
+    // Served zips apply only to directory-only small businesses; prune blanks,
+    // dedupe, cap at 5 (mirrors the submit route). The directory-only decision
+    // is finalized in the location block below, but the zip cleanup is value-
+    // only here — anything non-directory ends up cleared when type realigns.
+    const isEventRowForZips = existing[0].type === "event";
+    const directoryOnlyForZips =
+      !isEventRowForZips &&
+      (data.noFixedLocation === true ||
+        data.lat == null ||
+        data.lng == null);
+    const servedZips: string[] =
+      data.servedZips !== undefined && directoryOnlyForZips
+        ? Array.from(
+            new Set<string>(
+              (data.servedZips || [])
+                .map((z: string) => (z || "").replace(/\D/g, "").slice(0, 5))
+                .filter((z: string) => z.length === 5)
+            )
+          ).slice(0, 5)
+        : [];
+
     await sql`
       UPDATE businesses SET
         name               = ${data.name?.trim() || null},
@@ -350,6 +415,8 @@ export async function PATCH(
         ordering_methods   = ${data.orderingMethods || []},
         dietary_options    = ${data.dietaryOptions || []},
         business_amenities = ${data.businessAmenities || []},
+        hours_subject_to_change = ${data.hoursSubjectToChange || false},
+        served_zips        = ${servedZips.length > 0 ? servedZips : null},
         status             = 'pending',
         updated_at         = NOW()
       WHERE id = ${id}
@@ -401,6 +468,7 @@ export async function PATCH(
             state_code     = ${data.stateCode || null},
             zip            = ${data.zip || null},
             neighborhood   = ${data.neighborhood || null},
+            location_amenities = ${data.locationAmenities || []},
             coordinates    = ${
               hasCoords
                 ? sql`ST_MakePoint(${data.lng}, ${data.lat})`
@@ -416,7 +484,7 @@ export async function PATCH(
           INSERT INTO locations (
             business_id, street_1, street_2, street_address,
             city, state, state_code, zip, country, neighborhood,
-            coordinates, is_active_area
+            location_amenities, coordinates, is_active_area
           ) VALUES (
             ${id},
             ${data.street1 || null},
@@ -428,9 +496,37 @@ export async function PATCH(
             ${data.zip || null},
             'USA',
             ${data.neighborhood || null},
+            ${data.locationAmenities || []},
             ${hasCoords ? sql`ST_MakePoint(${data.lng}, ${data.lat})` : sql`NULL`},
             true
           )
+        `;
+      }
+    }
+
+    // Business hours (small business). Replace-all: clear then re-insert what
+    // the form sent. Only reconcile when the field is present so older callers
+    // that omit it don't wipe existing hours.
+    if (Array.isArray(data.hours)) {
+      await sql`DELETE FROM business_hours WHERE business_id = ${id}`;
+      for (const h of data.hours) {
+        if (!h.dayOfWeek) continue;
+        await sql`
+          INSERT INTO business_hours (
+            business_id, day_of_week, open_time, close_time,
+            closes_next_day, is_closed, hours_vary, season_start, season_end
+          ) VALUES (
+            ${id},
+            ${h.dayOfWeek},
+            ${h.openTime || null},
+            ${h.closeTime || null},
+            ${h.closesNextDay || false},
+            ${h.isClosed || false},
+            ${h.hoursVary || false},
+            ${h.seasonStart || null},
+            ${h.seasonEnd || null}
+          )
+          ON CONFLICT (business_id, day_of_week) DO NOTHING
         `;
       }
     }

@@ -7,6 +7,8 @@ import {
   BusinessFormData,
   INITIAL_FORM_DATA,
 } from "@/lib/types/business";
+import { extractSocialHandles } from
+  "@/lib/utils/buildSocialUrls";
 import Step3Location from
   "@/components/forms/add-business/Step3Location";
 import Step4Info from
@@ -59,10 +61,13 @@ export default function EditSubmissionPage() {
         return;
       }
 
-      // Pre-fill form with existing data
+      // Pre-fill form with existing data. Social fields are stored as full
+      // URLs but the prefixed inputs expect a bare username, so convert them
+      // back to handles (otherwise the whole URL shows after the prefix and
+      // re-saving mangles the link).
       setFormData(prev => ({
         ...prev,
-        ...data.business,
+        ...extractSocialHandles(data.business),
       }));
 
     } catch (err) {

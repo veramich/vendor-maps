@@ -128,6 +128,19 @@ export async function POST(req: NextRequest) {
         : null
       : data.priceContext || null;
 
+    // Served zips only apply to directory-only businesses; prune blanks,
+    // dedupe, and cap at 5. Anything else (located biz, events) stores null.
+    const servedZips: string[] =
+      isSmallBiz && isDirectoryOnly
+        ? Array.from(
+            new Set<string>(
+              (data.servedZips || [])
+                .map((z: string) => (z || "").replace(/\D/g, "").slice(0, 5))
+                .filter((z: string) => z.length === 5)
+            )
+          ).slice(0, 5)
+        : [];
+
     // Generate slug
     const slug = await generateSlug(
       data.name,
@@ -163,6 +176,7 @@ export async function POST(req: NextRequest) {
         hours_subject_to_change,
         is_chain_location,
         location_nickname,
+        served_zips,
         slug,
         status,
         claim_status,
@@ -198,6 +212,7 @@ export async function POST(req: NextRequest) {
         },
         ${data.isChainLocation || false},
         ${data.locationNickname || null},
+        ${servedZips.length > 0 ? sql.array(servedZips, 25) : null},
         ${slug},
         'pending',
         'unclaimed',

@@ -42,6 +42,23 @@ const CATEGORY_ICONS: Record<string, string> = {
 
 const CLUSTER_ZOOM_THRESHOLD = 13;
 
+// Marker color per business sub_type — the single source of truth shared by the
+// map markers (getMarkerColor) and the map page's legend/filter chips. Order
+// here is the order chips render in. Only sub_types that actually appear on the
+// map are listed; getMarkerColor falls back to type-based colors for the rest.
+export const SUB_TYPE_LEGEND: { value: string; label: string; color: string }[] =
+  [
+    { value: "street_vendor", label: "Street Vendor", color: "#E63946" },
+    { value: "food_truck",    label: "Food Truck",    color: "#123C38" },
+    { value: "home_based",    label: "Home-Based",    color: "#7B2D8B" },
+    { value: "market",        label: "Market",        color: "#2D6A4F" },
+    { value: "pop_up",        label: "Pop-Up",        color: "#FF006E" },
+  ];
+
+const SUB_TYPE_COLORS: Record<string, string> = Object.fromEntries(
+  SUB_TYPE_LEGEND.map((s) => [s.value, s.color])
+);
+
 const loadScript = (src: string): Promise<void> => {
   return new Promise((resolve, reject) => {
     if (document.querySelector(`script[src="${src}"]`)) {
@@ -135,11 +152,7 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
     type: string,
     subType: string | null
   ): string | null => {
-    if (subType === "street_vendor") return "#E63946";
-    if (subType === "food_truck")    return "#1B4FE4";
-    if (subType === "home_based")    return "#7B2D8B";
-    if (subType === "pop_up")        return "#FF006E";
-    if (subType === "market")        return "#2D6A4F";
+    if (subType && SUB_TYPE_COLORS[subType]) return SUB_TYPE_COLORS[subType];
     if (type === "permanent_location") return "#E63946";
     return null;
   };

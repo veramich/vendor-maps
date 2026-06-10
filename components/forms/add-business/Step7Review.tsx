@@ -151,6 +151,24 @@ export default function Step7Review({
             <p className="text-xs text-gray-500 mt-0.5">
               The listing will appear in the directory list
             </p>
+            {formData.servedZips.filter(Boolean).length > 0 && (
+              <div className="mt-2">
+                <p className="text-xs text-gray-500 mb-1">
+                  Serves these zip codes
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {formData.servedZips.filter(Boolean).map((zip) => (
+                    <span
+                      key={zip}
+                      className="text-xs font-medium text-black
+                        bg-gray-100 rounded-full px-2.5 py-0.5"
+                    >
+                      {zip}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </ReviewSection>
         )}
 

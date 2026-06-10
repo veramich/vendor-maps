@@ -112,6 +112,9 @@ export type BusinessFormData = {
   // when true the business is directory-only with no map marker; this is the
   // source of truth that derives subType (no_location vs permanent_location)
   noFixedLocation: boolean;
+  // directory-only businesses can list up to 5 zip codes they serve; ignored
+  // for located businesses and events
+  servedZips:     string[];
   // cross streets (all except market and pop_up)
   street1:        string;
   street2:        string;
@@ -200,6 +203,7 @@ export const INITIAL_FORM_DATA: BusinessFormData = {
   subType:          null,
   detailedSubType: null,
   noFixedLocation:  false,
+  servedZips:       [],
   street1:          "",
   street2:          "",
   streetAddress:    "",

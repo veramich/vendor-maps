@@ -424,6 +424,86 @@ export default function Step3Location({
     }
   };
 
+  // Served zip editor for directory-only businesses. Up to 5 zips, 5-digit
+  // each; blank entries are pruned at submit. Keeps at least one input row so
+  // there is always somewhere to type.
+  const MAX_SERVED_ZIPS = 5;
+  const servedZips =
+    formData.servedZips.length > 0 ? formData.servedZips : [""];
+
+  const updateServedZip = (index: number, value: string) => {
+    const digits = value.replace(/\D/g, "").slice(0, 5);
+    const next = [...servedZips];
+    next[index] = digits;
+    updateForm({ servedZips: next });
+  };
+
+  const addServedZip = () => {
+    if (servedZips.length >= MAX_SERVED_ZIPS) return;
+    updateForm({ servedZips: [...servedZips, ""] });
+  };
+
+  const removeServedZip = (index: number) => {
+    const next = servedZips.filter((_, i) => i !== index);
+    updateForm({ servedZips: next.length > 0 ? next : [""] });
+  };
+
+  // A render helper (not a nested component) so the inputs keep focus across
+  // keystrokes — a nested component would remount on every parent render.
+  const renderServedZipEditor = () => (
+    <div className="space-y-2">
+      <label className="block text-sm font-medium text-black">
+        Zip codes served
+        <span className="text-gray-400 text-xs font-normal ml-2">
+          Optional · up to {MAX_SERVED_ZIPS}
+        </span>
+      </label>
+      <p className="text-xs text-gray-500">
+        Add the zip code(s) this business delivers to or serves.
+      </p>
+      {servedZips.map((zip, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <input
+            type="text"
+            inputMode="numeric"
+            value={zip}
+            onChange={(e) => updateServedZip(i, e.target.value)}
+            placeholder="e.g. 90012"
+            maxLength={5}
+            className="flex-1 border-2 border-gray-200 rounded-xl
+              px-4 py-3 text-sm text-black focus:outline-none
+              focus:border-black transition"
+          />
+          {(servedZips.length > 1 || zip) && (
+            <button
+              type="button"
+              onClick={() => removeServedZip(i)}
+              className="p-2 text-gray-400 hover:text-gray-700"
+              aria-label="Remove zip code"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" strokeWidth="2"
+                strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          )}
+        </div>
+      ))}
+      {servedZips.length < MAX_SERVED_ZIPS && (
+        <button
+          type="button"
+          onClick={addServedZip}
+          className="text-xs font-medium text-black underline
+            hover:text-gray-600"
+        >
+          + Add another zip code
+        </button>
+      )}
+    </div>
+  );
+
   const canContinue =
     selectedResult !== null || notOnMap;
 
@@ -503,6 +583,7 @@ export default function Step3Location({
                     on the map.
                   </p>
                 </div>
+                {renderServedZipEditor()}
                 <button
                   onClick={nextStep}
                   className="w-full bg-black text-white
@@ -888,6 +969,13 @@ export default function Step3Location({
                 </p>
               </div>
             </label>
+            )}
+
+            {/* Served zips for the post-search directory-only path */}
+            {!isEvent && notOnMap && (
+              <div className="bg-gray-50 rounded-xl p-4">
+                {renderServedZipEditor()}
+              </div>
             )}
 
             {/* Map preview */}

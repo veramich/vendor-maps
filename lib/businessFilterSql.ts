@@ -20,8 +20,10 @@ const EVENT_TIMES = new Set([
   "evening",
 ]);
 
-// Small-business sub types selectable in the filter panel. Event sub types
-// (market / pop_up) are handled by the event date/time filter instead.
+// Sub types selectable via filters. Includes the small-business detailed sub
+// types (filter panel) plus the event sub types market / pop_up, which the map
+// page's legend chips filter on directly (b.sub_type holds the raw value for
+// both event and permanent_location rows).
 const VALID_SUB_TYPES = new Set([
   "street_vendor",
   "food_truck",
@@ -29,6 +31,8 @@ const VALID_SUB_TYPES = new Set([
   "market_based",
   "pop_up_based",
   "other",
+  "market",
+  "pop_up",
 ]);
 
 export type ParsedFilters = {

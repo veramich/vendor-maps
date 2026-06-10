@@ -5,39 +5,17 @@ import { useEffect, useRef, useState } from "react";
 import SearchBar from "@/components/ui/SearchBar";
 import FilterPanel from "@/components/ui/FilterPanel";
 import type { HereMapHandle } from "@/components/map/HereMap";
+import { SUB_TYPE_LEGEND } from "@/components/map/HereMap";
 import { BusinessFilters, EMPTY_FILTERS } from "@/lib/businessFilters";
 
 const HereMap = dynamic(() => import("@/components/map/HereMap"), {
   ssr: false,
 });
 
-const MAP_CATEGORIES = [
-  "All",
-  "Events",
-  "Food",
-  "Coffee",
-  "Desserts",
-  "Beverages",
-  "Fresh Fruit",
-  "Candy",
-  "Personal Care",
-  "Wellness",
-  "Fitness",
-  "Handmade",
-  "Art",
-  "Jewelry",
-  "Apparel",
-  "Merchandise",
-  "Flowers",
-  "General Services",
-  "Other",
-];
-
 export default function MapPage() {
   const [popup, setPopup] = useState<any>(null);
   const [inputValue, setInputValue] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("");
   const [filters, setFilters] = useState<BusinessFilters>(EMPTY_FILTERS);
   const [userLocation, setUserLocation] = useState<{
     lat: number;
@@ -67,8 +45,15 @@ export default function MapPage() {
     setPopup(null);
   };
 
-  const handleCategory = (cat: string) => {
-    setCategoryFilter(cat === "All" ? "" : cat);
+  // The legend chips are a single-select view of the sub_types filter: picking
+  // one replaces the whole subTypes array, "All" clears it. This keeps the chip
+  // row and the FilterPanel's sub-type checkboxes reading from one source.
+  const activeSubType = filters.subTypes[0] ?? "";
+  const handleSubType = (value: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      subTypes: value === "" ? [] : [value],
+    }));
     setPopup(null);
   };
 
@@ -91,7 +76,6 @@ export default function MapPage() {
         ref={mapHandleRef}
         onMarkerTap={setPopup}
         searchQuery={searchQuery}
-        categoryFilter={categoryFilter}
         filters={filters}
         userLocation={userLocation}
       />
@@ -173,7 +157,9 @@ export default function MapPage() {
           />
         </div>
 
-        {/* Category filter pills */}
+        {/* Sub-type legend / filter pills. Each chip carries its marker color
+            (as a dot when inactive, as the fill when active), so the row
+            doubles as a color key for the map markers. Single-select. */}
         <div
           style={{
             marginTop: "8px",
@@ -183,14 +169,34 @@ export default function MapPage() {
           }}
         >
           <div style={{ display: "flex", gap: "8px", minWidth: "max-content" }}>
-            {MAP_CATEGORIES.map((cat) => {
-              const isActive =
-                cat === "All" ? categoryFilter === "" : categoryFilter === cat;
+            <button
+              onClick={() => handleSubType("")}
+              style={{
+                padding: "6px 14px",
+                borderRadius: "9999px",
+                fontSize: "11px",
+                fontWeight: 500,
+                whiteSpace: "nowrap",
+                border: "none",
+                cursor: "pointer",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
+                backgroundColor: activeSubType === "" ? "#111" : "white",
+                color: activeSubType === "" ? "white" : "#4b5563",
+                transition: "background 0.15s, color 0.15s",
+              }}
+            >
+              All
+            </button>
+            {SUB_TYPE_LEGEND.map(({ value, label, color }) => {
+              const isActive = activeSubType === value;
               return (
                 <button
-                  key={cat}
-                  onClick={() => handleCategory(cat)}
+                  key={value}
+                  onClick={() => handleSubType(value)}
                   style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
                     padding: "6px 14px",
                     borderRadius: "9999px",
                     fontSize: "11px",
@@ -199,12 +205,25 @@ export default function MapPage() {
                     border: "none",
                     cursor: "pointer",
                     boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
-                    backgroundColor: isActive ? "#111" : "white",
+                    backgroundColor: isActive ? color : "white",
                     color: isActive ? "white" : "#4b5563",
                     transition: "background 0.15s, color 0.15s",
                   }}
                 >
-                  {cat}
+                  {/* Color dot — hidden when active since the chip itself is
+                      the color. */}
+                  {!isActive && (
+                    <span
+                      style={{
+                        width: "10px",
+                        height: "10px",
+                        borderRadius: "9999px",
+                        backgroundColor: color,
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+                  {label}
                 </button>
               );
             })}
