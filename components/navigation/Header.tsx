@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSession, signOut } from "@/lib/auth-client";
+import NotificationBell from "./NotificationBell";
 
 export default function Header() {
   const { data: session } = useSession();
@@ -42,18 +43,23 @@ export default function Header() {
             </span>
           </Link>
 
-          {/* Hamburger Button — right */}
-          <button
-            onClick={() => setMenuOpen(true)}
-            className="ml-auto p-2 rounded-lg hover:bg-orange-600 transition text-white"
-            aria-label="Open menu"
-          >
+          {/* Right cluster — notifications + hamburger */}
+          <div className="ml-auto flex items-center gap-1">
+            <NotificationBell />
+
+            {/* Hamburger Button */}
+            <button
+              onClick={() => setMenuOpen(true)}
+              className="p-2 rounded-lg hover:bg-orange-600 transition text-white"
+              aria-label="Open menu"
+            >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <line x1="3" y1="6" x2="21" y2="6"/>
               <line x1="3" y1="12" x2="21" y2="12"/>
               <line x1="3" y1="18" x2="21" y2="18"/>
             </svg>
-          </button>
+            </button>
+          </div>
         </div>
       </header>
 
