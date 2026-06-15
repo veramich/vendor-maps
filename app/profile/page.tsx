@@ -122,7 +122,7 @@ export default function ProfilePage() {
 
   const { user } = session;
 
-  const displayName = nameValue || user.name || "Vendor Maps User";
+  const displayName = nameValue || user.name || "VendorMaps User";
 
   const initials = displayName
     .split(" ")

@@ -1,9 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import SearchBar from "@/components/ui/SearchBar";
 import FilterPanel from "@/components/ui/FilterPanel";
+import LocationBanner from "@/components/ui/LocationBanner";
 import type { HereMapHandle } from "@/components/map/HereMap";
 import { SUB_TYPE_LEGEND } from "@/components/map/HereMap";
 import { BusinessFilters, EMPTY_FILTERS } from "@/lib/businessFilters";
@@ -23,22 +24,10 @@ export default function MapPage() {
   } | null>(null);
   const mapHandleRef = useRef<HereMapHandle>(null);
 
-  // Ask for the visitor's location on load and keep the "you are here" dot in
-  // sync as they move (like Google Maps). Failures (denied / unavailable) are
-  // silent — the map just works without the dot. Cleared on unmount.
-  useEffect(() => {
-    if (!("geolocation" in navigator)) return;
-    const id = navigator.geolocation.watchPosition(
-      (pos) =>
-        setUserLocation({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-        }),
-      () => {},
-      { enableHighAccuracy: true, maximumAge: 30000, timeout: 15000 }
-    );
-    return () => navigator.geolocation.clearWatch(id);
-  }, []);
+  // Location is requested via an in-app banner (LocationBanner) rather than
+  // firing the native prompt on load — unsolicited prompts get auto-blocked by
+  // browsers. The banner only calls geolocation after a user taps "Enable",
+  // then streams position fixes here to keep the "you are here" dot in sync.
 
   const handleSearch = (q: string) => {
     setSearchQuery(q.trim());
@@ -79,6 +68,10 @@ export default function MapPage() {
         filters={filters}
         userLocation={userLocation}
       />
+
+      {/* In-app location request — shows a banner instead of letting the
+          browser auto-fire (and auto-block) the native permission prompt. */}
+      <LocationBanner onLocation={setUserLocation} />
 
       {/* Recenter-on-me control — only useful once we have a fix. */}
       {userLocation && (

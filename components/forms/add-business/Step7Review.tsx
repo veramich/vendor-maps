@@ -505,7 +505,7 @@ export default function Step7Review({
 
         <p className="text-center text-xs text-gray-400">
           The listing will be reviewed before
-          going live on Vendor Maps
+          going live on VendorMaps
         </p>
 
       </div>

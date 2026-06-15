@@ -185,7 +185,7 @@ export default function ClaimPage() {
         </h2>
         <p className="text-gray-500 text-sm mb-8">
           You need an account to claim a business
-          listing on Vendor Maps
+          listing on VendorMaps
         </p>
         <div className="w-full max-w-xs space-y-3">
           <Link

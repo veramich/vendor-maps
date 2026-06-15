@@ -3,9 +3,9 @@ import Image from "next/image";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "About | Vendor Maps",
+  title: "About | VendorMaps",
   description:
-    "Vendor Maps is a community-powered map that gives street vendors and home-based businesses an equal platform to be found.",
+    "VendorMaps is a community-powered map that gives street vendors and home-based businesses an equal platform to be found.",
 };
 
 const SURVEY_SPLIT = [
@@ -59,7 +59,7 @@ export default function AboutPage() {
             Putting Every Vendor on the Map
           </h1>
           <p className="text-lg leading-relaxed">
-            Vendor Maps is a community-powered map that gives street vendors and home-based businesses 
+            VendorMaps is a community-powered map that gives street vendors and home-based businesses 
             an equal platform to be found.
           </p>
         </header>
@@ -68,14 +68,14 @@ export default function AboutPage() {
         <section className="mb-12">
           <h2 className="text-xl font-medium mb-3">How it started</h2>
           <p className="leading-relaxed mb-4">
-            Vendor Maps was created by Patricia. The idea began in 2023, while
+            VendorMaps was created by Patricia. The idea began in 2023, while
             she was providing graphic design and web services to small
             businesses. She kept noticing the same thing: a widening digital gap
             between street vendors and more established businesses.
           </p>
           <p className="leading-relaxed">
             We live in a digital age, and we tend to put more trust in
-            businesses that have an online presence. Vendor Maps is an
+            businesses that have an online presence. VendorMaps is an
             interactive map built to give every vendor that same platform. This way
             a wider audience can find them, whether they're active on
             social media or not.
@@ -86,7 +86,7 @@ export default function AboutPage() {
         <section className="mb-12">
           <h2 className="text-xl font-medium mb-3">What we learned</h2>
           <p className="leading-relaxed mb-6">
-            In early 2026, before building Vendor Maps, Patricia ran a survey to
+            In early 2026, before building VendorMaps, Patricia ran a survey to
             understand how people decide who to buy from.
           </p>
 
@@ -129,7 +129,7 @@ export default function AboutPage() {
           <p className="leading-relaxed">
             Most participants admitted they had been discouraged from buying
             food or drinks from a street vendor simply because they hadn&rsquo;t
-            heard any reviews. Vendor Maps is built to close that gap.
+            heard any reviews. VendorMaps is built to close that gap.
           </p>
         </section>
 
@@ -137,7 +137,7 @@ export default function AboutPage() {
         <section className="mb-12">
           <h2 className="text-xl font-medium mb-3">What makes us different</h2>
           <p className="leading-relaxed">
-            Unlike Google Maps or Yelp, Vendor Maps never displays a
+            Unlike Google Maps or Yelp, VendorMaps never displays a
             business&rsquo;s exact address unless a verified owner chooses to
             share it. This protects the privacy of home-based businesses and
             gives street vendors the flexibility they need.
@@ -148,7 +148,7 @@ export default function AboutPage() {
         <section className="mb-12">
           <h2 className="text-xl font-medium mb-3">A community app</h2>
           <p className="leading-relaxed">
-            Vendor Maps is community-powered. Anyone can add a business &mdash;
+            VendorMaps is community-powered. Anyone can add a business &mdash;
             whether it&rsquo;s their own or one they love &mdash; along with
             photos, menus, hours and reviews to help it stand out.
           </p>

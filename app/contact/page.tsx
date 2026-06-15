@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Contact · Vendor Maps",
+  title: "Contact · VendorMaps",
   description:
-    "Get in touch with Vendor Maps. Share suggestions, report issues, or list your business — every message is read and answered personally.",
+    "Get in touch with VendorMaps. Share suggestions, report issues, or list your business — every message is read and answered personally.",
 };
  
 export default function ContactPage() {
@@ -11,7 +11,7 @@ export default function ContactPage() {
     <div className="max-w-lg mx-auto px-6 py-12">
       <h1 className="text-2xl font-semibold text-black">Get in touch</h1>
       <p className="mt-3 leading-relaxed text-gray-600">
-        This is the very first version of Vendor Maps, and your input genuinely
+        This is the very first version of VendorMaps, and your input genuinely
         shapes where it goes next. Have a suggestion, ran into a bug, or
         something just didn't work the way you expected? Please reach
         out. No issue is too small. I read and reply to every
@@ -40,7 +40,7 @@ export default function ContactPage() {
 
         {/* Instagram */}
         <a
-          href="https://www.instagram.com/vendor_directory"
+          href="https://www.instagram.com/vendormaps"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-3 rounded-lg border border-gray-200 px-4 py-3 transition hover:border-orange-300 hover:bg-gray-50"
@@ -52,13 +52,13 @@ export default function ContactPage() {
           </svg>
           <div>
             <div className="text-sm font-medium text-black">Instagram</div>
-            <div className="text-sm text-gray-500">@vendor_directory</div>
+            <div className="text-sm text-gray-500">@vendormaps</div>
           </div>
         </a>
       </div>
 
       <p className="mt-6 text-sm leading-relaxed text-gray-500">
-        Thank you for being one of the first to use Vendor Maps. Every
+        Thank you for being one of the first to use VendorMaps. Every
         suggestion helps make it better for vendors and the people who love
         them.
       </p>

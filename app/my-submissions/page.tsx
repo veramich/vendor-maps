@@ -258,7 +258,7 @@ export default function MySubmissionsPage() {
                     {sub.status === "listed" && (
                       <p>
                         Your listing is live on
-                        Vendor Maps.
+                        VendorMaps.
                       </p>
                     )}
 
@@ -272,7 +272,7 @@ export default function MySubmissionsPage() {
                     {sub.status === "duplicate" && (
                       <p>
                         A listing for this business
-                        already exists on Vendor Maps.
+                        already exists on VendorMaps.
                       </p>
                     )}
                   </div>

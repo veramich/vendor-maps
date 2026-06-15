@@ -4,6 +4,7 @@ import Link from "next/link";
 import SaveButton from "@/components/ui/SaveButton";
 import OwnerResponse from "@/components/ui/OwnerResponse";
 import PhotoLightbox from "@/components/ui/PhotoLightbox";
+import BannerImage from "@/components/ui/BannerImage";
 import { headers } from "next/dist/server/request/headers";
 import { auth } from "@/lib/auth";
 
@@ -171,12 +172,12 @@ export async function generateMetadata({
   if (!data) return { title: "Business Not Found" };
 
   return {
-    title: `${data.business.name} — Vendor Maps`,
+    title: `${data.business.name} — VendorMaps`,
     description:
       data.business.description?.slice(0, 160) ||
-      `Find ${data.business.name} on Vendor Maps`,
+      `Find ${data.business.name} on VendorMaps`,
     openGraph: {
-      title: `${data.business.name} — Vendor Maps`,
+      title: `${data.business.name} — VendorMaps`,
       description:
         data.business.description?.slice(0, 160) || "",
       images: data.images[0]?.cloudinary_url
@@ -281,14 +282,10 @@ export default async function BusinessProfilePage({
 
       {/* Cover image */}
       {coverImage ? (
-        <div className="w-full h-56 bg-gray-100
-          overflow-hidden">
-          <img
-            src={coverImage.cloudinary_url}
-            alt={business.name}
-            className="w-full h-full object-cover"
-          />
-        </div>
+        <BannerImage
+          src={coverImage.cloudinary_url}
+          businessName={business.name}
+        />
       ) : (
         <div className="w-full h-56 bg-gray-100
           flex items-center justify-center">

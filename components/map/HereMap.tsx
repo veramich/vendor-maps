@@ -5,7 +5,17 @@ import {
   useEffect,
   useImperativeHandle,
   useRef,
+  useState,
 } from "react";
+import Image from "next/image";
+import { AnimatePresence, motion } from "framer-motion";
+
+const LOADER_FRAMES = [
+  "/Loader-1.png",
+  "/Loader-2.png",
+  "/Loader-3.png",
+  "/Loader-3-1.png",
+];
 
 const PRIMARY = "#FF7300";
 import { getIconBase64 } from "@/lib/getIconBase64";
@@ -109,6 +119,9 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
   },
   ref
 ) {
+  const [mapReady, setMapReady] = useState(false);
+  const [frameIdx, setFrameIdx] = useState(0);
+
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const hRef = useRef<any>(null);
@@ -131,6 +144,14 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
   // tracks whether the last render was in cluster mode so we only
   // re-render from the viewport listener when crossing the threshold
   const lastWasClusteredRef = useRef<boolean | null>(null);
+
+  useEffect(() => {
+    if (mapReady) return;
+    const id = setInterval(() => {
+      setFrameIdx((i) => (i + 1) % LOADER_FRAMES.length);
+    }, 700);
+    return () => clearInterval(id);
+  }, [mapReady]);
 
   useEffect(() => {
     onMarkerTapRef.current = onMarkerTap;
@@ -495,6 +516,7 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
 
         await fetchLocations(searchQuery, categoryFilter, filters);
 
+        if (!cancelled) setMapReady(true);
         console.log("HERE Maps initialized");
       } catch (error) {
         console.error("HERE Maps error:", error);
@@ -556,6 +578,40 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
   return (
     <div style={{ width: "100%", height: "100%", position: "relative" }}>
       <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
+
+      {!mapReady && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 10,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "#FF7300",
+          }}
+        >
+          <AnimatePresence mode="sync">
+            <motion.div
+              key={frameIdx}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.35, ease: "easeInOut" }}
+              style={{ position: "absolute" }}
+            >
+              <Image
+                src={LOADER_FRAMES[frameIdx]}
+                alt="Loading map…"
+                width={402}
+                height={874}
+                style={{ objectFit: "contain", maxWidth: "100%", maxHeight: "100%" }}
+                priority
+              />
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      )}
     </div>
   );
 });

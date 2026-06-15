@@ -60,7 +60,7 @@ export async function approveSubmission(formData: FormData) {
       userId: business.submitted_by,
       type: "submission_approved",
       title: `${business.name} is now listed`,
-      body: "Your submission was approved and is live on Vendor Maps.",
+      body: "Your submission was approved and is live on VendorMaps.",
       link: `/${slug}`,
       data: { businessId, slug },
     });
@@ -122,7 +122,7 @@ export async function markDuplicate(formData: FormData) {
       userId: business.submitted_by,
       type: "submission_duplicate",
       title: `${business.name} is already listed`,
-      body: "This business is already on Vendor Maps, so we marked your submission as a duplicate.",
+      body: "This business is already on VendorMaps, so we marked your submission as a duplicate.",
       link: "/directory",
       data: { businessId },
     });

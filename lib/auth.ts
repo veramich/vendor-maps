@@ -60,9 +60,9 @@ export const auth = betterAuth({
 
     sendResetPassword: async ({ user, url }) => {
       await resend.emails.send({
-        from: "Vendor Maps <noreply@vendormaps.net>",
+        from: "VendorMaps <noreply@vendormaps.net>",
         to: user.email,
-        subject: "Reset your Vendor Maps password",
+        subject: "Reset your VendorMaps password",
         html: `
           <h2>Reset your password</h2>
           <p>Click the link below to reset
@@ -81,11 +81,11 @@ export const auth = betterAuth({
 
     sendVerificationEmail: async ({ user, url }) => {
       await resend.emails.send({
-        from: "Vendor Maps <noreply@vendormaps.net>",
+        from: "VendorMaps <noreply@vendormaps.net>",
         to: user.email,
-        subject: "Verify your Vendor Maps email",
+        subject: "Verify your VendorMaps email",
         html: `
-          <h2>Welcome to Vendor Maps</h2>
+          <h2>Welcome to VendorMaps</h2>
           <p>Click the link below to verify
              your email address.</p>
           <a href="${url}">Verify Email</a>

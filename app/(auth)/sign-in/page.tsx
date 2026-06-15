@@ -45,7 +45,7 @@ export default function SignInPage() {
 
         {/* Logo */}
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-medium">Vendor Maps</h1>
+          <h1 className="text-2xl font-medium">VendorMaps</h1>
           <p className="text-gray-500 mt-1">Sign in to your account</p>
         </div>
 

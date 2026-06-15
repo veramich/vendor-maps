@@ -21,7 +21,7 @@ export default async function AdminLayout({
               className="text-white opacity-60
                 hover:opacity-100 text-sm"
             >
-              ← Vendor Maps
+              ← VendorMaps
             </Link>
             <span className="text-white opacity-30">
               /

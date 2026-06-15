@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useSession, signOut } from "@/lib/auth-client";
 import NotificationBell from "./NotificationBell";
+import { openCookieSettings } from "@/components/ui/CookieConsent";
 
 export default function Header() {
   const { data: session } = useSession();
@@ -31,7 +32,7 @@ export default function Header() {
           >
             <Image
               src="/vmapsLOGO.png"
-              alt="Vendor Maps"
+              alt="VendorMaps"
               width={32}
               height={32}
               className="object-contain"
@@ -39,7 +40,7 @@ export default function Header() {
               priority
             />
             <span className="text-white font-semibold text-base tracking-tight">
-              Vendor Maps
+              VendorMaps
             </span>
           </Link>
 
@@ -130,6 +131,54 @@ export default function Header() {
           >
             Contact
           </MenuLink>
+
+          <MenuLink
+            href="/terms"
+            onClick={() => setMenuOpen(false)}
+            icon={
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+            }
+          >
+            Terms &amp; Conditions
+          </MenuLink>
+
+          <MenuLink
+            href="/privacy"
+            onClick={() => setMenuOpen(false)}
+            icon={
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            }
+          >
+            Privacy Policy
+          </MenuLink>
+
+          {/* Cookie settings — re-opens the consent banner so users can change
+              or withdraw analytics consent at any time (GDPR). */}
+          <button
+            onClick={() => {
+              setMenuOpen(false);
+              openCookieSettings();
+            }}
+            className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-gray-50 transition text-left"
+          >
+            <span className="text-gray-500">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5"/>
+                <circle cx="8.5" cy="10.5" r="0.6" fill="currentColor"/>
+                <circle cx="11.5" cy="14.5" r="0.6" fill="currentColor"/>
+                <circle cx="15" cy="11" r="0.6" fill="currentColor"/>
+              </svg>
+            </span>
+            Cookie settings
+          </button>
 
           {/* Divider */}
           <div className="h-px bg-gray-100 my-3 mx-4" />
