@@ -7,12 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-
-const LOADER_FRAMES = [
-  "/Loader-1.png",
-  "/Loader-2.png",
-];
+import { motion } from "framer-motion";
 
 const PRIMARY = "#FF7300";
 import { getIconBase64 } from "@/lib/getIconBase64";
@@ -117,7 +112,6 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
   ref
 ) {
   const [mapReady, setMapReady] = useState(false);
-  const [frameIdx, setFrameIdx] = useState(0);
 
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
@@ -142,13 +136,6 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
   // re-render from the viewport listener when crossing the threshold
   const lastWasClusteredRef = useRef<boolean | null>(null);
 
-  useEffect(() => {
-    if (mapReady) return;
-    const id = setInterval(() => {
-      setFrameIdx((i) => (i + 1) % LOADER_FRAMES.length);
-    }, 700);
-    return () => clearInterval(id);
-  }, [mapReady]);
 
   useEffect(() => {
     onMarkerTapRef.current = onMarkerTap;
@@ -588,23 +575,14 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
             backgroundColor: "#FF7300",
           }}
         >
-          <AnimatePresence mode="sync">
-            <motion.div
-              key={frameIdx}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.35, ease: "easeInOut" }}
-              style={{ position: "absolute" }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={LOADER_FRAMES[frameIdx]}
-                alt="Loading map…"
-                style={{ width: 402, height: 874, display: "block" }}
-              />
-            </motion.div>
-          </AnimatePresence>
+          <motion.img
+            src="/VmapsSlogan.png"
+            alt="VendorMaps"
+            initial={{ scale: 0.6, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            style={{ width: 280, height: 280, objectFit: "contain" }}
+          />
         </div>
       )}
     </div>
