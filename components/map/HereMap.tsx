@@ -42,7 +42,7 @@ const CATEGORY_ICONS: Record<string, string> = {
   "Art":              "art",
 };
 
-const CLUSTER_ZOOM_THRESHOLD = 13;
+const CLUSTER_ZOOM_THRESHOLD = 12;
 
 // Marker color per business sub_type — the single source of truth shared by the
 // map markers (getMarkerColor) and the map page's legend/filter chips. Order
@@ -310,7 +310,9 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
               position: { lat: avgLat, lng: avgLng },
               zoom: CLUSTER_ZOOM_THRESHOLD + 1,
             },
-            true
+            true,
+            // Faster zoom-in: shorten the animation duration (default ~600ms).
+            { duration: 250, ease: H.util.animation.ease.EASE_OUT }
           );
         });
         objects.push(clusterMarker);
