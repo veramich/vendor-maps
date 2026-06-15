@@ -7,14 +7,11 @@ import {
   useRef,
   useState,
 } from "react";
-import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 
 const LOADER_FRAMES = [
   "/Loader-1.png",
   "/Loader-2.png",
-  "/Loader-3.png",
-  "/Loader-3-1.png",
 ];
 
 const PRIMARY = "#FF7300";
@@ -600,13 +597,11 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
               transition={{ duration: 0.35, ease: "easeInOut" }}
               style={{ position: "absolute" }}
             >
-              <Image
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
                 src={LOADER_FRAMES[frameIdx]}
                 alt="Loading map…"
-                width={402}
-                height={874}
-                style={{ objectFit: "contain", maxWidth: "100%", maxHeight: "100%" }}
-                priority
+                style={{ width: 402, height: 874, display: "block" }}
               />
             </motion.div>
           </AnimatePresence>
