@@ -56,7 +56,7 @@ export default function Step2bSubType({
     <div>
       <h2 className="text-2xl font-semibold mb-2
         text-black">
-        What type of business is this?
+        How does this business primarily operate?
       </h2>
       <p className="text-gray-500 text-sm mb-8">
         This helps us show the listing correctly

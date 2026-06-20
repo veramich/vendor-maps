@@ -6,6 +6,8 @@ import {
   BusinessFormData,
   INITIAL_FORM_DATA,
 } from "@/lib/types/business";
+import Step0Ownership from
+  "@/components/forms/add-business/Step0Ownership";
 import Step1Type from
   "@/components/forms/add-business/Step1Type";
 import Step2bSubType from
@@ -27,7 +29,9 @@ import ConfirmationScreen from
 
 export default function AddBusinessPage() {
   const router = useRouter();
-  const [step, setStep] = useState(1);
+  // Step 0 is the ownership screen (this is my business / someone else's). It
+  // sits before the numbered flow, so it's excluded from "Step X of N".
+  const [step, setStep] = useState(0);
   const [formData, setFormData] =
     useState<BusinessFormData>(INITIAL_FORM_DATA);
   const [showConfirmation, setShowConfirmation] =
@@ -54,6 +58,7 @@ export default function AddBusinessPage() {
     // Vendor spaces is a sub-screen of step 5 for events.
     if (step === 5 && vendorSubStep) return "Vendor spaces";
     switch (step) {
+      case 0:  return "Who's this for?";
       case 1:  return "What are you adding?";
       case 2:  return "What type of business?";
       case 3:
@@ -197,6 +202,8 @@ export default function AddBusinessPage() {
       // submits with the same DB type and marker; only the location resets.
       type:            formData.type,
       detailedSubType: formData.detailedSubType,
+      // Same chain → same owner, so carry the ownership choice (and logo).
+      submittedAsOwner: formData.submittedAsOwner,
       name:            formData.name,
       category:        formData.category,
       description:     formData.description,
@@ -221,7 +228,9 @@ export default function AddBusinessPage() {
   const handleDifferentBusiness = () => {
     setFormData(INITIAL_FORM_DATA);
     setCurrentBrandId(null);
-    setStep(1);
+    // Back to the ownership pre-step — a different business may have a
+    // different owner.
+    setStep(0);
     setShowConfirmation(false);
   };
 
@@ -259,7 +268,7 @@ export default function AddBusinessPage() {
         border-gray-100">
         <div className="max-w-lg mx-auto flex
           items-center gap-4">
-          {step > 1 && (
+          {step > 0 && (
             <button
               onClick={prevStep}
               className="p-1 text-gray-500
@@ -279,26 +288,38 @@ export default function AddBusinessPage() {
               text-black">
               {getStepTitle()}
             </h1>
-            <p className="text-sm text-gray-400">
-              Step {getDisplayStep()} of {totalSteps}
-            </p>
+            {/* Ownership (step 0) sits before the numbered flow. */}
+            {step > 0 && (
+              <p className="text-sm text-gray-400">
+                Step {getDisplayStep()} of {totalSteps}
+              </p>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Progress bar */}
-      <div className="h-1 bg-gray-100">
-        <div
-          className="h-1 bg-black transition-all
-            duration-300"
-          style={{
-            width: `${(getDisplayStep() / totalSteps) * 100}%`
-          }}
-        />
-      </div>
+      {/* Progress bar — hidden on the ownership pre-step */}
+      {step > 0 && (
+        <div className="h-1 bg-gray-100">
+          <div
+            className="h-1 bg-black transition-all
+              duration-300"
+            style={{
+              width: `${(getDisplayStep() / totalSteps) * 100}%`
+            }}
+          />
+        </div>
+      )}
 
       {/* Step content */}
       <div className="max-w-lg mx-auto px-4 py-6">
+        {step === 0 && (
+          <Step0Ownership
+            formData={formData}
+            updateForm={updateForm}
+            nextStep={() => setStep(1)}
+          />
+        )}
         {step === 1 && (
           <Step1Type
             formData={formData}
@@ -328,6 +349,9 @@ export default function AddBusinessPage() {
             formData={formData}
             updateForm={updateForm}
             nextStep={nextStep}
+            // Owners can add a logo; community submitters of someone
+            // else's business cannot.
+            allowLogo={formData.submittedAsOwner}
           />
         )}
         {step === 5 && !vendorSubStep && (

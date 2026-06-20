@@ -82,6 +82,14 @@ export async function POST(req: NextRequest) {
     // is derived from the location step: no fixed location (or no coords)
     // means directory-only. Events carry their subType ("market" | "pop_up")
     // directly from the form.
+    // Owner intent from step 0 of the form. When the submitter is also signed
+    // in we can auto-start the claiming process (insert a claims row + flip
+    // claim_status to 'pending'); when they're not signed in we still record
+    // the intent so they can finish claiming after creating an account.
+    const submittedAsOwner = data.submittedAsOwner === true;
+    const ownerCanClaim = submittedAsOwner && Boolean(submittedBy);
+    const claimStatus = ownerCanClaim ? "pending" : "unclaimed";
+
     const isSmallBiz = data.type === "small_business";
     const isDirectoryOnly =
       data.noFixedLocation === true ||
@@ -180,6 +188,7 @@ export async function POST(req: NextRequest) {
         slug,
         status,
         claim_status,
+        submitted_as_owner,
         added_by,
         submitted_by,
         submitter_ip
@@ -215,7 +224,8 @@ export async function POST(req: NextRequest) {
         ${servedZips.length > 0 ? sql.array(servedZips, 25) : null},
         ${slug},
         'pending',
-        'unclaimed',
+        ${claimStatus},
+        ${submittedAsOwner},
         'user_submission',
         ${submittedBy},
         ${ip}
@@ -224,6 +234,34 @@ export async function POST(req: NextRequest) {
     `;
 
     const businessId = business.id;
+
+    // Owner submitting their own business while signed in → auto-start the
+    // claiming process so an admin can approve it (mirrors the /claim flow).
+    // The business above was already set to claim_status='pending'. Use any
+    // contact details they provided as the claim contact for verification.
+    if (ownerCanClaim) {
+      const claimContact =
+        [data.email, data.phone, socialUrls.instagram]
+          .map((v: string | undefined) => (v || "").trim())
+          .filter(Boolean)
+          .join(" / ") || "Submitted via add-business form";
+
+      await sql`
+        INSERT INTO claims (
+          business_id,
+          user_id,
+          claim_contact,
+          status,
+          requested_at
+        ) VALUES (
+          ${businessId},
+          ${submittedBy},
+          ${claimContact},
+          'pending',
+          NOW()
+        )
+      `;
+    }
 
     // Insert location if applicable. Small business: anything that resolved
     // to a permanent_location (has coords, not directory-only). Events always

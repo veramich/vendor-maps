@@ -99,6 +99,11 @@ export type VendorFee = {
 };
 
 export type BusinessFormData = {
+  // Step 0 — ownership. true when the submitter says "this is my business"
+  // (unlocks the logo upload and auto-starts the claiming process at submit);
+  // false when they're adding someone else's business.
+  submittedAsOwner: boolean;
+
   // Step 1 — top level type
   type:           BusinessType | null;
 
@@ -199,6 +204,7 @@ export type BusinessFormData = {
 };
 
 export const INITIAL_FORM_DATA: BusinessFormData = {
+  submittedAsOwner: false,
   type:             null,
   subType:          null,
   detailedSubType: null,
