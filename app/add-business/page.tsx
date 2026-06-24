@@ -6,6 +6,7 @@ import {
   BusinessFormData,
   INITIAL_FORM_DATA,
 } from "@/lib/types/business";
+import { addPendingSubmission } from "@/lib/utils/pendingSubmissions";
 import Step0Ownership from
   "@/components/forms/add-business/Step0Ownership";
 import Step1Type from
@@ -183,6 +184,14 @@ export default function AddBusinessPage() {
         throw new Error(
           result.error || "Submission failed"
         );
+      }
+
+      // Stash the id so an anonymous submission can be adopted onto the user's
+      // account if they sign up / sign in later (drained by SubmissionAdopter).
+      // No-op for signed-in submitters: the row is already owned server-side,
+      // and the adopt endpoint only claims rows where submitted_by IS NULL.
+      if (result.businessId) {
+        addPendingSubmission(result.businessId);
       }
 
       setSubmittedName(formData.name);

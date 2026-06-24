@@ -7,6 +7,7 @@ import PhotoLightbox from "@/components/ui/PhotoLightbox";
 import BannerImage from "@/components/ui/BannerImage";
 import { headers } from "next/dist/server/request/headers";
 import { auth } from "@/lib/auth";
+import { buildBusinessJsonLd } from "./jsonLd";
 
 
 async function getBusinessBySlug(slug: string) {
@@ -277,8 +278,16 @@ export default async function BusinessProfilePage({
     images.find((img: any) => img.is_primary) ||
     images[0];
 
+  const jsonLd = buildBusinessJsonLd({ business, images, hours, popupEvents });
+
   return (
     <div className="min-h-screen bg-white pb-8">
+
+      {/* Structured data for search engines (LocalBusiness / Event). */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
 
       {/* Cover image */}
       {coverImage ? (

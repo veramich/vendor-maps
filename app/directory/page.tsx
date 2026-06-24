@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import BusinessList from "@/app/directory/BusinessList";
 import EventList from "@/app/directory/EventList";
 
@@ -44,6 +45,15 @@ export default function DirectoryPage() {
       {/* Tab Content */}
       {activeTab === "businesses" && <BusinessList />}
       {activeTab === "events" && <EventList />}
+
+      {/* Crawlable link to the server-rendered link hub. The list above loads
+          client-side, so this static link gives search engines a path into the
+          full index of listing pages. */}
+      <div className="max-w-lg mx-auto px-4 py-6 text-center">
+        <Link href="/browse" className="text-xs text-gray-400 underline">
+          Browse all vendors
+        </Link>
+      </div>
 
     </div>
   );
