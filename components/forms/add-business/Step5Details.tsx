@@ -164,8 +164,8 @@ export default function Step5Details({
 
     if (
       isEvent &&
-      !(formData as any).isFreeEntry &&
-      !(formData as any).admissionPrice
+      !formData.isFreeEntry &&
+      !formData.admissionPrice
     ) {
       newErrors.admissionPrice =
         "Please enter an admission price";
@@ -416,11 +416,11 @@ export default function Step5Details({
                     updateForm({
                       isFreeEntry:    true,
                       admissionPrice: "",
-                    } as any)
+                    })
                   }
                   className={`border-2 rounded-xl py-4
                     text-center transition
-                    ${(formData as any).isFreeEntry
+                    ${formData.isFreeEntry
                       ? "border-black bg-black text-white"
                       : "border-gray-200 text-black"
                     }`}
@@ -438,11 +438,11 @@ export default function Step5Details({
                   onClick={() =>
                     updateForm({
                       isFreeEntry: false,
-                    } as any)
+                    })
                   }
                   className={`border-2 rounded-xl py-4
                     text-center transition
-                    ${!(formData as any).isFreeEntry
+                    ${!formData.isFreeEntry
                       ? "border-black bg-black text-white"
                       : "border-gray-200 text-black"
                     }`}
@@ -456,7 +456,7 @@ export default function Step5Details({
                 </button>
               </div>
 
-              {!(formData as any).isFreeEntry && (
+              {!formData.isFreeEntry && (
                 <div>
                   <label className="block text-xs
                     text-gray-500 mb-1">
@@ -472,12 +472,12 @@ export default function Step5Details({
                     <input
                       type="text"
                       value={
-                        (formData as any).admissionPrice
+                        formData.admissionPrice
                       }
                       onChange={(e) =>
                         updateForm({
                           admissionPrice: e.target.value
-                        } as any)
+                        })
                       }
                       placeholder="e.g. 5 or 5-10"
                       className="flex-1 px-3 py-3 text-sm
@@ -1072,14 +1072,14 @@ export default function Step5Details({
                 <input
                   type="checkbox"
                   checked={
-                    (formData as any).hoursSubjectToChange
+                    formData.hoursSubjectToChange
                     || false
                   }
                   onChange={(e) =>
                     updateForm({
                       hoursSubjectToChange:
                         e.target.checked
-                    } as any)
+                    })
                   }
                   className="w-4 h-4 rounded mt-0.5
                     flex-shrink-0"
@@ -1215,7 +1215,7 @@ export default function Step5Details({
                 })}
 
                 {/* Hours subject to change note */}
-                {(formData as any).hoursSubjectToChange && (
+                {formData.hoursSubjectToChange && (
                   <div className="mt-3 p-4 bg-amber-50
                     border-2 border-amber-200 rounded-xl">
                     <div className="flex items-start

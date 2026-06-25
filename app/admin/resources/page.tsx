@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { requireAdmin } from "@/lib/adminAuth";
 import sql from "@/lib/db";
 import {
@@ -8,7 +9,29 @@ import {
 
 export const dynamic = "force-dynamic";
 
-function fmtDate(d: any): string {
+interface ResourceRow {
+  id: string;
+  resource_type: string | null;
+  title: string;
+  description: string | null;
+  availability: string | null;
+  timing_type: string | null;
+  always_available: boolean | null;
+  start_date: string | null;
+  end_date: string | null;
+  signup_url: string | null;
+  walk_in_welcome: boolean | null;
+  street_address: string | null;
+  city: string | null;
+  state_code: string | null;
+  contacts: string[] | null;
+  websites: string[] | null;
+  social_urls: string[] | null;
+  flyers: { url: string; publicId: string }[] | null;
+  created_at: string;
+}
+
+function fmtDate(d: string | Date | null): string {
   if (!d) return "";
   return new Date(d).toLocaleDateString("en-US", {
     month: "short",
@@ -17,7 +40,7 @@ function fmtDate(d: any): string {
   });
 }
 
-function timeRange(r: any): string {
+function timeRange(r: ResourceRow): string {
   if (r.always_available || r.timing_type === "always")
     return "Always available";
   const start = fmtDate(r.start_date);
@@ -31,13 +54,13 @@ function timeRange(r: any): string {
 export default async function AdminResources() {
   await requireAdmin();
 
-  const pending = await sql`
+  const pending = await sql<ResourceRow[]>`
     SELECT * FROM resources
     WHERE status = 'pending'
     ORDER BY created_at ASC
   `;
 
-  const listed = await sql`
+  const listed = await sql<ResourceRow[]>`
     SELECT * FROM resources
     WHERE status = 'listed'
     AND (expires_at IS NULL OR expires_at > NOW())
@@ -45,7 +68,7 @@ export default async function AdminResources() {
     LIMIT 50
   `;
 
-  const renderCard = (r: any, isPending: boolean) => {
+  const renderCard = (r: ResourceRow, isPending: boolean) => {
     const flyers = Array.isArray(r.flyers) ? r.flyers : [];
     return (
       <div
@@ -54,9 +77,11 @@ export default async function AdminResources() {
       >
         <div className="flex items-start gap-4">
           {flyers[0] && (
-            <img
+            <Image
               src={flyers[0].url}
               alt=""
+              width={64}
+              height={64}
               className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
             />
           )}
@@ -185,7 +210,7 @@ export default async function AdminResources() {
             <p className="text-gray-400">No pending resources</p>
           </div>
         ) : (
-          pending.map((r: any) => renderCard(r, true))
+          pending.map((r) => renderCard(r, true))
         )}
       </div>
 
@@ -195,7 +220,7 @@ export default async function AdminResources() {
           <h2 className="text-sm font-semibold text-black">
             Live resources ({listed.length})
           </h2>
-          {listed.map((r: any) => renderCard(r, false))}
+          {listed.map((r) => renderCard(r, false))}
         </div>
       )}
     </div>

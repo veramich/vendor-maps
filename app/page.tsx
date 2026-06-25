@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 import SearchBar from "@/components/ui/SearchBar";
 import FilterPanel from "@/components/ui/FilterPanel";
 import LocationBanner from "@/components/ui/LocationBanner";
-import type { HereMapHandle } from "@/components/map/HereMap";
+import type { HereMapHandle, MapLocation } from "@/components/map/HereMap";
 import { SUB_TYPE_LEGEND } from "@/components/map/HereMap";
 import { BusinessFilters, EMPTY_FILTERS } from "@/lib/businessFilters";
 
@@ -14,7 +14,7 @@ const HereMap = dynamic(() => import("@/components/map/HereMap"), {
 });
 
 export default function MapPage() {
-  const [popup, setPopup] = useState<any>(null);
+  const [popup, setPopup] = useState<MapLocation | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState<BusinessFilters>(EMPTY_FILTERS);
@@ -290,7 +290,7 @@ export default function MapPage() {
               <span style={{ fontSize: "12px", color: "#666" }}>
                 {"$".repeat(popup.price_tier || 1)}
               </span>
-              {popup.avg_rating > 0 && (
+              {(popup.avg_rating ?? 0) > 0 && (
                 <span style={{ fontSize: "12px", color: "#666" }}>
                   ★ {Number(popup.avg_rating).toFixed(1)} ({popup.review_count})
                 </span>

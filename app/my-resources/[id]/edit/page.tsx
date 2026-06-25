@@ -41,7 +41,7 @@ export default function EditResourcePage() {
         .catch(() => setError("Failed to load resource"))
         .finally(() => setLoading(false));
     }
-  }, [session, isPending, resourceId]);
+  }, [session, isPending, resourceId, router]);
 
   if (isPending || loading) {
     return (

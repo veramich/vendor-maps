@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 
 type Listing = {
   id:           string;
@@ -46,15 +47,7 @@ export default function MyListingsPage() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!isPending && !session) {
-      router.push("/sign-in");
-      return;
-    }
-    if (session) fetchListings();
-  }, [session, isPending]);
-
-  const fetchListings = async () => {
+  const fetchListings = useCallback(async () => {
     try {
       const res = await fetch("/api/user/listings");
       const data = await res.json();
@@ -64,7 +57,16 @@ export default function MyListingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!isPending && !session) {
+      router.push("/sign-in");
+      return;
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (session) fetchListings();
+  }, [session, isPending, router, fetchListings]);
 
   if (isPending || loading) {
     return (
@@ -124,9 +126,11 @@ export default function MyListingsPage() {
 
                   {/* Logo */}
                   {listing.logo_url ? (
-                    <img
+                    <Image
                       src={listing.logo_url}
                       alt={listing.name}
+                      width={56}
+                      height={56}
                       className="w-14 h-14 rounded-xl
                         object-cover border
                         border-gray-100 flex-shrink-0"

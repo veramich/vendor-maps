@@ -17,6 +17,25 @@ import {
   filtersToParams,
 } from "@/lib/businessFilters";
 
+// A business location as returned by /api/businesses/locations. lat/lng come
+// from PostGIS (ST_X/ST_Y) so are always present for mapped rows.
+export interface MapLocation {
+  id: string;
+  slug: string;
+  name: string;
+  type: string;
+  sub_type: string | null;
+  category: string;
+  icon_name: string | null;
+  price_tier: number | null;
+  avg_rating: number | null;
+  review_count: number | null;
+  lng: number;
+  lat: number;
+  neighborhood: string | null;
+  city: string | null;
+}
+
 const CATEGORY_ICONS: Record<string, string> = {
   "Food":             "food",
   "Coffee":           "cafe",
@@ -87,7 +106,7 @@ const loadCSS = (href: string): void => {
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 interface HereMapProps {
-  onMarkerTap: (location: any) => void;
+  onMarkerTap: (location: MapLocation) => void;
   searchQuery?: string;
   categoryFilter?: string;
   filters?: BusinessFilters;
@@ -114,13 +133,13 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
   const [mapReady, setMapReady] = useState(false);
 
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstance = useRef<any>(null);
-  const hRef = useRef<any>(null);
-  const locationsRef = useRef<any[]>([]);
+  const mapInstance = useRef<HMap | null>(null);
+  const hRef = useRef<HNamespace | null>(null);
+  const locationsRef = useRef<MapLocation[]>([]);
   // The "you are here" marker is kept off to the side of the business markers
   // so it survives the removeObjects() wipe in renderMarkers and can be
   // re-added after every marker swap.
-  const userMarkerRef = useRef<any>(null);
+  const userMarkerRef = useRef<HMapObject | null>(null);
   // Latest known position, mirrored into a ref so initMap can place the dot
   // immediately if a fix arrived before the map finished loading.
   const userLocationRef = useRef(userLocation);
@@ -164,7 +183,7 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
 
   // Google-Maps-style blue location dot: a soft accuracy halo behind a solid
   // blue dot with a white ring. Used for the visitor's own position.
-  const createUserMarker = (H: any, lat: number, lng: number) => {
+  const createUserMarker = (H: HNamespace, lat: number, lng: number) => {
     const svgMarkup = `<svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg"><circle cx="18" cy="18" r="16" fill="#4285F4" fill-opacity="0.18"/><circle cx="18" cy="18" r="7" fill="#4285F4" stroke="white" stroke-width="2.5"/></svg>`;
     const icon = new H.map.Icon(
       `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`,
@@ -175,7 +194,7 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
   };
 
   const createClusterMarker = (
-    H: any,
+    H: HNamespace,
     lat: number,
     lng: number,
     count: number
@@ -210,8 +229,8 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
   // Builds a single business marker (off-map). Returns null if the location
   // has no color mapping. Does NOT add anything to the map.
   const buildMarker = async (
-    H: any,
-    location: any,
+    H: HNamespace,
+    location: MapLocation,
     lat: number,
     lng: number
   ) => {
@@ -233,15 +252,15 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
 
     const marker = new H.map.Marker({ lat, lng }, { icon });
     marker.setData(location);
-    marker.addEventListener("tap", (evt: any) => {
-      onMarkerTapRef.current(evt.target.getData());
+    marker.addEventListener("tap", (evt) => {
+      onMarkerTapRef.current(evt.target.getData<MapLocation>());
     });
     return marker;
   };
 
   // Builds fanned-out markers for locations that share the exact same point,
   // plus a small center dot. Returns the array of objects (off-map).
-  const buildOffsetMarkers = async (H: any, locations: any[]) => {
+  const buildOffsetMarkers = async (H: HNamespace, locations: MapLocation[]) => {
     const offsetDistance = 0.0002;
 
     const built = await Promise.all(
@@ -253,7 +272,9 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
       })
     );
 
-    const objects: any[] = built.filter(Boolean);
+    const objects: HMapObject[] = built.filter(
+      (m): m is HMapObject => m !== null
+    );
 
     const dotSvg = `<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg"><circle cx="6" cy="6" r="5" fill="white" stroke="#ccc" stroke-width="1.5"/></svg>`;
     const dotIcon = new H.map.Icon(
@@ -270,11 +291,15 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
   };
 
   // Builds cluster bubbles + standalone markers (off-map).
-  const buildClusterObjects = async (H: any, map: any, locations: any[]) => {
+  const buildClusterObjects = async (
+    H: HNamespace,
+    map: HMap,
+    locations: MapLocation[]
+  ) => {
     const gridSize = 0.05;
     const clusters: Record<
       string,
-      { lats: number[]; lngs: number[]; count: number; locations: any[] }
+      { lats: number[]; lngs: number[]; count: number; locations: MapLocation[] }
     > = {};
 
     locations.forEach((location) => {
@@ -290,7 +315,7 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
       clusters[key].locations.push(location);
     });
 
-    const objects: any[] = [];
+    const objects: HMapObject[] = [];
 
     for (const cluster of Object.values(clusters)) {
       const avgLat =
@@ -325,19 +350,19 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
   // `gen` guards against stale renders: if a newer request started while we
   // were building, we abort before touching the map.
   const renderMarkers = async (
-    H: any,
-    map: any,
-    locations: any[],
+    H: HNamespace,
+    map: HMap,
+    locations: MapLocation[],
     zoom: number,
     gen: number
   ) => {
-    let objects: any[] = [];
+    let objects: HMapObject[] = [];
 
     if (locations.length) {
       if (zoom < CLUSTER_ZOOM_THRESHOLD) {
         objects = await buildClusterObjects(H, map, locations);
       } else {
-        const grouped: Record<string, any[]> = {};
+        const grouped: Record<string, MapLocation[]> = {};
         for (const location of locations) {
           const key = `${location.lat},${location.lng}`;
           if (!grouped[key]) grouped[key] = [];
@@ -430,7 +455,7 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
 
         if (cancelled || mapInstance.current) return;
 
-        const H = (window as any).H;
+        const H = window.H;
         if (!H || !H.mapevents) {
           console.error("HERE Maps not available");
           return;
@@ -447,7 +472,10 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
           })
         );
 
-        const map = new H.Map(mapRef.current, positronLayer, {
+        const container = mapRef.current;
+        if (!container) return;
+
+        const map = new H.Map(container, positronLayer, {
           zoom: 11,
           center: { lat: 34.0522, lng: -118.2437 },
           pixelRatio: window.devicePixelRatio || 1,
@@ -497,7 +525,7 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
           lastWasClusteredRef.current = isClustered;
 
           const gen = ++renderGenRef.current;
-          await renderMarkers(hRef.current, map, locationsRef.current, zoom, gen);
+          await renderMarkers(H, map, locationsRef.current, zoom, gen);
         });
 
         await fetchLocations(searchQuery, categoryFilter, filters);
@@ -519,11 +547,18 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
         hRef.current = null;
       }
     };
+    // Map initialization must run exactly once. Including the fetch/render
+    // closures or filter props here would tear down and rebuild the map on
+    // every change; the dedicated effect below handles re-fetching instead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Re-fetch markers whenever search, category, or filters change
+  // Re-fetch markers whenever search, category, or filters change. Keyed only
+  // on those inputs on purpose: fetchLocations is recreated every render, so
+  // depending on it would re-fetch in a loop.
   useEffect(() => {
     fetchLocations(searchQuery, categoryFilter, filters);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, categoryFilter, filters]);
 
   // Add / move / remove the "you are here" dot as the visitor's position

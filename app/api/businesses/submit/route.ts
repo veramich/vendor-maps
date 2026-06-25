@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import sql from "@/lib/db";
+import sql, { isPgError } from "@/lib/db";
 import { uploadImage } from "@/lib/utils/uploadImage";
 import { buildSocialUrls } from "@/lib/utils/buildSocialUrls";
 import { generateSlug } from "@/lib/utils/generateSlug";
@@ -572,14 +572,14 @@ export async function POST(req: NextRequest) {
     console.error("Submission error:", error);
 
     // Log full PostgreSQL error details if available
-    if (error && typeof error === "object" && "code" in error) {
+    if (isPgError(error)) {
       console.error("DB error details:", {
-        code:    (error as any).code,
-        detail:  (error as any).detail,
-        hint:    (error as any).hint,
-        column:  (error as any).column,
-        table:   (error as any).table,
-        constraint: (error as any).constraint,
+        code:    error.code,
+        detail:  error.detail,
+        hint:    error.hint,
+        column:  error.column,
+        table:   error.table,
+        constraint: error.constraint,
       });
     }
 

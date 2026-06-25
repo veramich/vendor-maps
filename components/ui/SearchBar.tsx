@@ -36,6 +36,8 @@ export default function SearchBar({
         style={{ backgroundColor: "var(--primary)" }}
         aria-label="Search"
       >
+        {/* Inline base64 icon — nothing for next/image to optimize. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={SEARCH_ICON}
           width={16}

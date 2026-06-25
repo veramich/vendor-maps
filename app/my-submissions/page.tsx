@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -38,17 +38,7 @@ export default function MySubmissionsPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"submissions" | "claims">("submissions");
 
-  useEffect(() => {
-    if (!isPending && !session) {
-      router.push("/sign-in");
-      return;
-    }
-    if (session) {
-      fetchData();
-    }
-  }, [session, isPending]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const res = await fetch("/api/user/submissions");
       const data = await res.json();
@@ -59,7 +49,18 @@ export default function MySubmissionsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!isPending && !session) {
+      router.push("/sign-in");
+      return;
+    }
+    if (session) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      fetchData();
+    }
+  }, [session, isPending, router, fetchData]);
 
   const getStatusColor = (status: string) => {
     switch (status) {

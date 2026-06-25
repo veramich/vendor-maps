@@ -2,10 +2,22 @@ import { requireAdmin } from "@/lib/adminAuth";
 import sql from "@/lib/db";
 import { approveReview, rejectReview } from "./actions";
 
+interface ReviewRow {
+  id: string;
+  business_name: string;
+  business_slug: string;
+  user_email: string | null;
+  stars: number;
+  review_text: string | null;
+  review_length: number | null;
+  flagged: boolean | null;
+  created_at: string;
+}
+
 export default async function AdminReviews() {
   await requireAdmin();
 
-  const reviews = await sql`
+  const reviews = await sql<ReviewRow[]>`
     SELECT
       r.*,
       b.name as business_name,
@@ -39,7 +51,7 @@ export default async function AdminReviews() {
         </div>
       ) : (
         <div className="space-y-4">
-          {reviews.map((review: any) => (
+          {reviews.map((review) => (
             <div
               key={review.id}
               className="bg-white rounded-2xl p-5

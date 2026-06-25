@@ -64,13 +64,17 @@ export default function FilterPanel({
   );
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Sync the draft from the committed value each time the panel opens.
+  // Sync the draft from the committed value each time the panel opens. This is
+  // an intentional reset-on-transition (open false→true), so the synchronous
+  // setState in the effect is by design.
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDraft(value);
       setGeoStatus(value.lat != null ? "granted" : "idle");
     }
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // Apply changes live while the panel is open, so selections take effect
   // immediately (matching the instant category pills on the map). Committing
@@ -169,6 +173,8 @@ export default function FilterPanel({
           font-medium text-gray-700 whitespace-nowrap"
         style={buttonStyle}
       >
+        {/* Inline base64 icon — nothing for next/image to optimize. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={FILTER_ICON} width={16} height={16} alt="" />
         Filters
         {count > 0 && (

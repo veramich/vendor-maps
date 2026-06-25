@@ -180,6 +180,8 @@ export default function Step7Review({
           <div className="flex items-center
             gap-3 mb-2">
             {formData.logoUrl && (
+              // Local preview of the just-picked logo — next/image can't optimize it.
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={formData.logoUrl}
                 alt="Logo"
@@ -221,9 +223,9 @@ export default function Step7Review({
           )}
           {isEvent && (
             <p className="text-sm text-black mb-1">
-              {(formData as any).isFreeEntry
+              {formData.isFreeEntry
                 ? "Free Entry"
-                : `$${(formData as any).admissionPrice} admission`
+                : `$${formData.admissionPrice} admission`
               }
             </p>
           )}
@@ -396,6 +398,8 @@ export default function Step7Review({
                     rounded-xl overflow-hidden
                     flex-shrink-0"
                 >
+                  {/* Object-URL preview of a picked file — not optimizable. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={URL.createObjectURL(img)}
                     alt={`Photo ${i + 1}`}

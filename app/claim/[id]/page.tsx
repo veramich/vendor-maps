@@ -1,9 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
 import Link from "next/link";
+
+interface ClaimBusiness {
+  name: string;
+  slug: string;
+  city: string | null;
+  state_code: string | null;
+}
 
 export default function ClaimPage() {
   const { data: session, isPending } = useSession();
@@ -11,7 +18,7 @@ export default function ClaimPage() {
   const params = useParams();
   const businessId = params.id as string;
 
-  const [business, setBusiness] = useState<any>(null);
+  const [business, setBusiness] = useState<ClaimBusiness | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -21,11 +28,7 @@ export default function ClaimPage() {
   const [contactInfo, setContactInfo] = useState("");
   const [confirmOwner, setConfirmOwner] = useState(false);
 
-  useEffect(() => {
-    fetchBusiness();
-  }, [businessId]);
-
-  const fetchBusiness = async () => {
+  const fetchBusiness = useCallback(async () => {
     try {
       const res = await fetch(
         `/api/businesses/${businessId}/claim`
@@ -38,12 +41,17 @@ export default function ClaimPage() {
       }
 
       setBusiness(data.business);
-    } catch (err) {
+    } catch {
       setError("Failed to load business");
     } finally {
       setLoading(false);
     }
-  };
+  }, [businessId]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchBusiness();
+  }, [fetchBusiness]);
 
   const handleSubmit = async () => {
     if (!confirmOwner) {
@@ -82,7 +90,7 @@ export default function ClaimPage() {
 
       setSubmitted(true);
 
-    } catch (err) {
+    } catch {
       setError("Failed to submit claim");
     } finally {
       setSubmitting(false);

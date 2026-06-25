@@ -102,7 +102,6 @@ export default function Step6Media({
     formData.subType === "pop_up";
 
   const maxImages = isEvent ? 5 : 5;
-  const maxFlyers = 2;
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -397,6 +396,9 @@ export default function Step6Media({
               {gallery.map((item, i) => (
                 <div key={item.key} className="relative
                   aspect-square">
+                  {/* Mix of existing URLs and client-side object-URL previews;
+                      next/image can't optimize the latter. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={item.url}
                     alt={`Photo ${i + 1}`}
@@ -662,7 +664,7 @@ export default function Step6Media({
 
             {/* Social links */}
             {socialFields.map(
-            ({ field, label, placeholder, prefix, icon }) => (
+            ({ field, placeholder, prefix, icon }) => (
             <div key={field}>
                 <div className={`flex items-center border-2
                 rounded-xl overflow-hidden

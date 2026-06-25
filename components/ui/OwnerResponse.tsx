@@ -65,7 +65,7 @@ export default function OwnerResponse({
       setSaved(response.trim());
       setEditing(false);
 
-    } catch (err) {
+    } catch {
       setError("Failed to submit response");
     } finally {
       setSubmitting(false);

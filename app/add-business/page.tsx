@@ -181,7 +181,12 @@ export default function AddBusinessPage() {
         );
       }
 
-      let result: any;
+      let result: {
+        success?: boolean;
+        error?: string;
+        business?: unknown;
+        businessId?: string;
+      };
       try {
         result = await res.json();
       } catch {
@@ -205,7 +210,7 @@ export default function AddBusinessPage() {
       }
 
       setSubmittedName(formData.name);
-      setCurrentBrandId(result.businessId);
+      setCurrentBrandId(result.businessId ?? null);
       setShowConfirmation(true);
 
     } catch (error) {

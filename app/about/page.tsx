@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -77,7 +76,7 @@ export default function AboutPage() {
             We live in a digital age, and we tend to put more trust in
             businesses that have an online presence. VendorMaps is an
             interactive map built to give every vendor that same platform. This way
-            a wider audience can find them, whether they're active on
+            a wider audience can find them, whether they&apos;re active on
             social media or not.
           </p>
         </section>

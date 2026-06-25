@@ -2,6 +2,14 @@ import { requireAdmin } from "@/lib/adminAuth";
 import sql from "@/lib/db";
 import Link from "next/link";
 
+interface RecentRow {
+  id: string;
+  name: string;
+  status: string;
+  sub_type: string | null;
+  created_at: string;
+}
+
 export default async function AdminDashboard() {
   await requireAdmin();
 
@@ -36,7 +44,7 @@ export default async function AdminDashboard() {
     WHERE status = 'pending'
   `;
 
-  const byType = await sql`
+  const byType = await sql<{ type: string; count: number }[]>`
     SELECT type, COUNT(*) as count
     FROM businesses
     WHERE status = 'listed'
@@ -45,7 +53,7 @@ export default async function AdminDashboard() {
   `;
 
   // Recent submissions
-  const recent = await sql`
+  const recent = await sql<RecentRow[]>`
     SELECT id, name, type, sub_type,
            status, created_at
     FROM businesses
@@ -137,7 +145,7 @@ export default async function AdminDashboard() {
             Listed By Type
           </h2>
           <div className="space-y-2">
-            {byType.map((row: any) => (
+            {byType.map((row) => (
               <div key={row.type}
                 className="flex justify-between
                   text-sm">
@@ -178,7 +186,7 @@ export default async function AdminDashboard() {
           </p>
         ) : (
           <div className="space-y-3">
-            {recent.map((b: any) => (
+            {recent.map((b) => (
               <div key={b.id}
                 className="flex items-center
                   justify-between">

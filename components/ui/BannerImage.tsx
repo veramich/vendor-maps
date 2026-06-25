@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Lightbox from "./Lightbox";
 
 interface Props {
@@ -18,13 +19,15 @@ export default function BannerImage({ src, businessName }: Props) {
         type="button"
         onClick={() => setActiveIndex(0)}
         aria-label={`View ${businessName} cover photo`}
-        className="w-full h-56 bg-gray-100 overflow-hidden
+        className="relative w-full h-56 bg-gray-100 overflow-hidden
           block cursor-pointer focus:outline-none"
       >
-        <img
+        <Image
           src={src}
           alt={businessName}
-          className="w-full h-full object-cover
+          fill
+          sizes="(max-width: 768px) 100vw, 768px"
+          className="object-cover
             hover:opacity-95 transition-opacity"
         />
       </button>

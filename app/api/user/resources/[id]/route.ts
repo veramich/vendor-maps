@@ -61,7 +61,12 @@ function parseTimingType(value: unknown): TimingType {
 // Timing type for the edit form: trust the stored column
 // (it alone distinguishes range vs. window), falling back
 // to the dates for older rows that predate the column.
-function deriveTimingType(r: any): TimingType {
+function deriveTimingType(r: {
+  timing_type?: string | null;
+  always_available?: boolean | null;
+  start_date?: unknown;
+  end_date?: unknown;
+}): TimingType {
   if (
     r.timing_type === "deadline" ||
     r.timing_type === "range" ||
@@ -125,12 +130,14 @@ function resolveTiming(
   return { alwaysAvailable: false, startDate, endDate };
 }
 
-// Load a resource the caller is allowed to edit, or null.
-async function loadOwned(id: string, userId: string) {
+// Load a resource the caller is allowed to edit, or null. This is a community
+// directory: any logged-in user can edit any listed/pending resource (edits
+// bounce back to 'pending' for re-moderation below), so we don't scope by
+// submitter — only by editable status.
+async function loadEditable(id: string) {
   const rows = await sql`
     SELECT * FROM resources
     WHERE id = ${id}
-    AND submitted_by = ${userId}
     AND status IN ('pending', 'listed')
   `;
   return rows[0] || null;
@@ -152,7 +159,7 @@ export async function GET(
       );
     }
 
-    const r = await loadOwned(id, session.user.id);
+    const r = await loadEditable(id);
     if (!r) {
       return NextResponse.json(
         { error: "Resource not found or not editable" },
@@ -225,7 +232,7 @@ export async function PATCH(
       );
     }
 
-    const existing = await loadOwned(id, session.user.id);
+    const existing = await loadEditable(id);
     if (!existing) {
       return NextResponse.json(
         { error: "Resource not found or not editable" },
@@ -317,13 +324,20 @@ export async function PATCH(
       : [];
 
     // --- Flyers: keep the retained ones, append any new uploads ---
-    const keptFlyers = Array.isArray(data.keptFlyers)
-      ? data.keptFlyers
-          .filter(
-            (f: any) =>
-              f && typeof f.url === "string" && typeof f.publicId === "string"
-          )
-          .map((f: any) => ({ url: f.url, publicId: f.publicId }))
+    const isFlyer = (
+      f: unknown
+    ): f is { url: string; publicId: string } =>
+      typeof f === "object" &&
+      f !== null &&
+      typeof (f as { url?: unknown }).url === "string" &&
+      typeof (f as { publicId?: unknown }).publicId === "string";
+
+    const keptFlyers: { url: string; publicId: string }[] = Array.isArray(
+      data.keptFlyers
+    )
+      ? (data.keptFlyers as unknown[])
+          .filter(isFlyer)
+          .map((f) => ({ url: f.url, publicId: f.publicId }))
       : [];
 
     const newFiles: File[] = [];
@@ -370,7 +384,6 @@ export async function PATCH(
         flyers             = ${JSON.stringify(flyers)},
         status             = 'pending'
       WHERE id = ${id}
-      AND submitted_by = ${session.user.id}
     `;
 
     return NextResponse.json({ success: true, wasListed });

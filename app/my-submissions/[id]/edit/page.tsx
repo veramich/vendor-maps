@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "@/lib/auth-client";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import {
@@ -41,15 +41,7 @@ export default function EditSubmissionPage() {
   const [error, setError] = useState("");
   const [step, setStep] = useState(initialStep);
 
-  useEffect(() => {
-    if (!isPending && !session) {
-      router.push("/sign-in");
-      return;
-    }
-    if (session) fetchSubmission();
-  }, [session, isPending]);
-
-  const fetchSubmission = async () => {
+  const fetchSubmission = useCallback(async () => {
     try {
       const res = await fetch(
         `/api/user/submissions/${businessId}`
@@ -70,12 +62,21 @@ export default function EditSubmissionPage() {
         ...extractSocialHandles(data.business),
       }));
 
-    } catch (err) {
+    } catch {
       setError("Failed to load submission");
     } finally {
       setLoading(false);
     }
-  };
+  }, [businessId]);
+
+  useEffect(() => {
+    if (!isPending && !session) {
+      router.push("/sign-in");
+      return;
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (session) fetchSubmission();
+  }, [session, isPending, router, fetchSubmission]);
 
   const updateForm = (
     data: Partial<BusinessFormData>
@@ -139,7 +140,7 @@ export default function EditSubmissionPage() {
         router.push("/my-submissions");
       }, 1500);
 
-    } catch (err) {
+    } catch {
       setError("Failed to save changes");
     } finally {
       setSaving(false);
@@ -147,10 +148,10 @@ export default function EditSubmissionPage() {
   };
 
   // Events (market / pop_up) expose the vendor-spaces editor between Details
-  // and Photos.
-  const isEvent =
-    (formData as any).sub_type === "market" ||
-    (formData as any).sub_type === "pop_up";
+  // and Photos. The edit GET hydrates formData with the raw row, which carries
+  // snake_case sub_type alongside the camelCase form fields.
+  const subType = (formData as { sub_type?: string }).sub_type;
+  const isEvent = subType === "market" || subType === "pop_up";
 
   const STEPS = [
     { num: 3, label: "Location" },

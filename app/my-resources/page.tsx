@@ -65,7 +65,7 @@ export default function MyResourcesPage() {
         .catch(() => {})
         .finally(() => setLoading(false));
     }
-  }, [session, isPending]);
+  }, [session, isPending, router]);
 
   const statusBadge = (r: MyResource) => {
     if (isExpired(r))

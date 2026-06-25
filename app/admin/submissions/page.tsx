@@ -3,10 +3,26 @@ import sql from "@/lib/db";
 import Link from "next/link";
 import { approveSubmission, rejectSubmission, markDuplicate } from "./actions";
 
+interface SubmissionRow {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  category: string | null;
+  sub_type: string | null;
+  status: string;
+  city: string | null;
+  state_code: string | null;
+  street_1: string | null;
+  street_2: string | null;
+  street_address: string | null;
+  created_at: string;
+}
+
 export default async function AdminSubmissions() {
   await requireAdmin();
 
-  const submissions = await sql`
+  const submissions = await sql<SubmissionRow[]>`
     SELECT
       b.*,
       l.city,
@@ -44,7 +60,7 @@ export default async function AdminSubmissions() {
         </div>
       ) : (
         <div className="space-y-4">
-          {submissions.map((b: any) => (
+          {submissions.map((b) => (
             <div key={b.id}
               className="bg-white rounded-2xl p-5
                 border-2 border-gray-100">

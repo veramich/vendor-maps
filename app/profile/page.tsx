@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession, signOut } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -32,18 +32,7 @@ export default function ProfilePage() {
   const [nameError, setNameError] = useState("");
   const [nameSaved, setNameSaved] = useState(false);
 
-  useEffect(() => {
-    if (!isPending && !session) {
-      router.push("/sign-in");
-      return;
-    }
-    if (session) {
-      setNameValue(session.user.name || "");
-      fetchStats();
-    }
-  }, [session, isPending]);
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const res = await fetch("/api/user/profile");
       const data = await res.json();
@@ -59,7 +48,26 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!isPending && !session) {
+      router.push("/sign-in");
+      return;
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (session) fetchStats();
+  }, [session, isPending, router, fetchStats]);
+
+  // Seed the editable name field from the session. Keyed on the name itself so
+  // it doesn't clobber what the user is typing while the editor is open.
+  const sessionName = session?.user?.name;
+  useEffect(() => {
+    if (sessionName && !editingName) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setNameValue(sessionName);
+    }
+  }, [sessionName, editingName]);
 
   const handleSaveName = async () => {
     if (!nameValue.trim()) {
@@ -94,7 +102,7 @@ export default function ProfilePage() {
       setNameSaved(true);
       setTimeout(() => setNameSaved(false), 3000);
 
-    } catch (err) {
+    } catch {
       setNameError("Failed to save name");
     } finally {
       setNameSaving(false);

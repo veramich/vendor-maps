@@ -8,7 +8,17 @@ const nextConfig: NextConfig = {
     "localhost",
     "http://localhost:3000",
   ],
-  /* config options here */
+  images: {
+    // All user-uploaded media (logos, cover photos, flyers) is served from
+    // Cloudinary, so next/image needs to be allowed to optimize it.
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+        pathname: "/dyvpt7u6b/**",
+      },
+    ],
+  },
 };
 
 export default nextConfig;

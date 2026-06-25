@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 
@@ -50,11 +50,7 @@ export default function SaveButton({
   const [showMenu, setShowMenu] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (session) fetchSaved();
-  }, [session, businessId]);
-
-  const fetchSaved = async () => {
+  const fetchSaved = useCallback(async () => {
     try {
       const res = await fetch(
         `/api/saved/${businessId}`
@@ -64,7 +60,13 @@ export default function SaveButton({
     } catch (error) {
       console.error("Error fetching saved:", error);
     }
-  };
+  }, [businessId]);
+
+  useEffect(() => {
+    // Loading the saved state on mount is the intended effect here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (session) fetchSaved();
+  }, [session, fetchSaved]);
 
   const handleSave = async (
     collection: Collection

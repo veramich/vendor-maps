@@ -66,12 +66,12 @@ export default function AddressAutocomplete({
     if (debounce.current) clearTimeout(debounce.current);
 
     const q = query.trim();
-    if (q.length < 3) {
-      setSuggestions([]);
-      return;
-    }
 
     debounce.current = setTimeout(async () => {
+      if (q.length < 3) {
+        setSuggestions([]);
+        return;
+      }
       setLoading(true);
       try {
         const res = await fetch(

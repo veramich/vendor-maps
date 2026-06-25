@@ -112,7 +112,7 @@ export default function ConfirmationScreen({
               font-medium hover:bg-gray-800
               transition active:scale-95"
           >
-            I'm done
+            I&apos;m done
           </button>
 
         </div>

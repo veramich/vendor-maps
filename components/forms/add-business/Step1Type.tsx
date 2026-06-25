@@ -9,7 +9,6 @@ interface Step1TypeProps {
 }
 
 export default function Step1Type({
-  formData,
   updateForm,
   nextStep,
 }: Step1TypeProps) {

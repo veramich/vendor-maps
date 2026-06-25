@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 import { Resource, deliveryModeLabel } from "@/lib/types/resource";
 
 // "June 3, 2026"
@@ -277,14 +278,16 @@ export default function ResourceCard({
                   <button
                     key={flyer.publicId || i}
                     onClick={() => setLightbox(i)}
-                    className="aspect-[4/3] bg-gray-100 overflow-hidden
+                    className="relative aspect-[4/3] bg-gray-100 overflow-hidden
                       focus:outline-none"
                     aria-label={`View flyer ${i + 1}`}
                   >
-                    <img
+                    <Image
                       src={flyer.url}
                       alt={`${resource.title} flyer ${i + 1}`}
-                      className="w-full h-full object-cover
+                      fill
+                      sizes="(max-width: 640px) 50vw, 300px"
+                      className="object-cover
                         hover:opacity-90 transition-opacity"
                     />
                   </button>
@@ -379,6 +382,10 @@ export default function ResourceCard({
               <line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
           </button>
+          {/* Full-resolution zoom view shown at the flyer's natural aspect
+              ratio — stays a plain <img> for the same reason as the photo
+              lightbox. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={flyers[lightbox].url}
             alt={`${resource.title} flyer`}

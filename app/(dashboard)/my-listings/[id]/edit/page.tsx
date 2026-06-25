@@ -1,8 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "@/lib/auth-client";
 import { useRouter, useParams } from "next/navigation";
+
+interface OwnerBusiness {
+  name: string;
+  claim_status: string | null;
+  claimed_by: string | null;
+}
+
+interface OwnerLocation {
+  city: string | null;
+  state_code: string | null;
+  street_1: string | null;
+  street_2: string | null;
+  show_exact_address: boolean | null;
+  exact_address: string | null;
+  state: string | null;
+  zip: string | null;
+}
 
 export default function EditListingPage() {
   const { data: session } = useSession();
@@ -10,8 +27,8 @@ export default function EditListingPage() {
   const params = useParams();
   const businessId = params.id as string;
 
-  const [business, setBusiness] = useState<any>(null);
-  const [location, setLocation] = useState<any>(null);
+  const [business, setBusiness] = useState<OwnerBusiness | null>(null);
+  const [location, setLocation] = useState<OwnerLocation | null>(null);
   const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -26,15 +43,7 @@ export default function EditListingPage() {
   const [exactState, setExactState] = useState("");
   const [exactZip, setExactZip] = useState("");
 
-  useEffect(() => {
-    if (!session) {
-      router.push("/sign-in");
-      return;
-    }
-    fetchBusiness();
-  }, [session]);
-
-  const fetchBusiness = async () => {
+  const fetchBusiness = useCallback(async () => {
     try {
       const res = await fetch(
         `/api/businesses/${businessId}/owner`
@@ -62,12 +71,21 @@ export default function EditListingPage() {
       setExactState(data.location?.state || "");
       setExactZip(data.location?.zip || "");
 
-    } catch (err) {
+    } catch {
       setError("Failed to load business");
     } finally {
       setLoading(false);
     }
-  };
+  }, [businessId, session]);
+
+  useEffect(() => {
+    if (!session) {
+      router.push("/sign-in");
+      return;
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchBusiness();
+  }, [session, router, fetchBusiness]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -99,7 +117,7 @@ export default function EditListingPage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
 
-    } catch (err) {
+    } catch {
       setError("Failed to save changes");
     } finally {
       setSaving(false);

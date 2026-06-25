@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import SearchBar from "@/components/ui/SearchBar";
 import { EMPTY_FILTERS, filtersToParams } from "@/lib/businessFilters";
 
@@ -382,18 +383,22 @@ function EventCard({ event }: { event: Event }) {
       {/* Cover image */}
       <div className="relative w-full aspect-[16/10]">
         {event.image_url ? (
-          <img
+          <Image
             src={event.image_url}
             alt={event.name}
-            className="w-full h-full object-cover"
+            fill
+            sizes="(max-width: 640px) 100vw, 400px"
+            className="object-cover"
           />
         ) : (
           // No flyer: brand-tinted block with the logo or category icon.
           <div className="w-full h-full flex items-center justify-center bg-primary/10">
             {logo || iconSrc ? (
-              <img
-                src={logo || iconSrc || ""}
+              <Image
+                src={(logo || iconSrc) as string}
                 alt={event.name}
+                width={64}
+                height={64}
                 className="w-16 h-16 object-contain opacity-70"
               />
             ) : (
@@ -409,12 +414,14 @@ function EventCard({ event }: { event: Event }) {
           <div className="pointer-events-none absolute top-2.5 left-2.5 w-11 h-11
             rounded-full bg-primary ring-2 ring-white overflow-hidden
             flex items-center justify-center">
-            <img src={logo} alt="" className="w-full h-full object-cover" />
+            <Image src={logo} alt="" width={44} height={44} className="w-full h-full object-cover" />
           </div>
         ) : iconSrc ? (
-          <img
+          <Image
             src={iconSrc}
             alt=""
+            width={32}
+            height={32}
             className="pointer-events-none absolute top-3 left-3 w-8 h-8 object-contain
               [filter:brightness(0)_invert(1)_drop-shadow(0_1px_2px_rgba(0,0,0,0.7))]"
           />

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import sql from "@/lib/db";
+import sql, { isPgError } from "@/lib/db";
 import { uploadImage } from "@/lib/utils/uploadImage";
 import { auth } from "@/lib/auth";
 import { sendSubmissionReceivedEmail } from "@/lib/email";
@@ -360,11 +360,11 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("Resource submission error:", error);
 
-    if (error && typeof error === "object" && "code" in error) {
+    if (isPgError(error)) {
       console.error("DB error details:", {
-        code:       (error as any).code,
-        detail:     (error as any).detail,
-        constraint: (error as any).constraint,
+        code:       error.code,
+        detail:     error.detail,
+        constraint: error.constraint,
       });
     }
 

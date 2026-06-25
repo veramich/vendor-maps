@@ -6,6 +6,7 @@ import { buildSocialUrls } from
   "@/lib/utils/buildSocialUrls";
 import { uploadImage } from "@/lib/utils/uploadImage";
 import cloudinary from "@/lib/cloudinary";
+import { BusinessFormData } from "@/lib/types/business";
 
 // Add one day to a YYYY-MM-DD string (UTC noon, so it never drifts across a
 // timezone boundary). Mirrors the helper in the submit route.
@@ -237,7 +238,7 @@ export async function GET(
         : [];
 
     // A timestamp string "YYYY-MM-DD HH:MM:SS" → date / HH:MM parts.
-    const splitTs = (ts: any) => {
+    const splitTs = (ts: string | Date) => {
       const [datePart, timePart] = String(ts).split(/[ T]/);
       return { date: datePart, time: (timePart || "").slice(0, 5) };
     };
@@ -337,7 +338,9 @@ export async function PATCH(
     // kept image ids as JSON, plus new image files). Older callers may still
     // send raw JSON, so fall back to that.
     const contentType = req.headers.get("content-type") || "";
-    let data: any;
+    // The parsed edit body. The form sends BusinessFormData-shaped JSON (it may
+    // omit fields, which the reconciliation below handles defensively).
+    let data: BusinessFormData;
     let keptImageIds: string[] | null = null;
     let imageOrder: string[] | null = null;
     const newImageFiles: File[] = [];

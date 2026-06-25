@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 
 type SavedBusiness = {
   id:           string;
@@ -49,15 +50,7 @@ export default function SavedPage() {
   const [activeCollection, setActiveCollection] =
     useState<Collection>("all");
 
-  useEffect(() => {
-    if (!isPending && !session) {
-      router.push("/sign-in");
-      return;
-    }
-    if (session) fetchSaved();
-  }, [session, isPending]);
-
-  const fetchSaved = async () => {
+  const fetchSaved = useCallback(async () => {
     try {
       const res = await fetch("/api/saved");
       const data = await res.json();
@@ -67,7 +60,16 @@ export default function SavedPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!isPending && !session) {
+      router.push("/sign-in");
+      return;
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (session) fetchSaved();
+  }, [session, isPending, router, fetchSaved]);
 
   const filtered = activeCollection === "all"
     ? saved
@@ -191,9 +193,11 @@ export default function SavedPage() {
               >
                 {/* Logo */}
                 {business.logo_url ? (
-                  <img
+                  <Image
                     src={business.logo_url}
                     alt={business.name}
+                    width={56}
+                    height={56}
                     className="w-14 h-14 rounded-xl
                       object-cover flex-shrink-0
                       border border-gray-100"

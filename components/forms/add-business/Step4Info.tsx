@@ -295,6 +295,8 @@ export default function Step4Info({
 
           {logoPreview ? (
             <div className="flex items-center gap-4">
+              {/* Client-side object URL preview — next/image can't optimize it. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={logoPreview}
                 alt="Logo preview"

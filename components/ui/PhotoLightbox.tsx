@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import Lightbox from "./Lightbox";
+import Image from "next/image";
+import Lightbox, { type LightboxPhoto } from "./Lightbox";
 
 interface Props {
-  photos: any[];
+  photos: LightboxPhoto[];
   businessName: string;
 }
 
@@ -16,16 +17,18 @@ export default function PhotoLightbox({ photos, businessName }: Props) {
       <div className="grid grid-cols-3 gap-2">
         {photos.map((img, i) => (
           <button
-            key={img.id}
+            key={img.id ?? i}
             onClick={() => setActiveIndex(i)}
-            className="aspect-square rounded-xl
+            className="relative aspect-square rounded-xl
               overflow-hidden bg-gray-100 cursor-pointer
               focus:outline-none"
           >
-            <img
+            <Image
               src={img.cloudinary_url}
               alt={businessName}
-              className="w-full h-full object-cover
+              fill
+              sizes="(max-width: 640px) 33vw, 200px"
+              className="object-cover
                 hover:opacity-90 transition-opacity"
             />
           </button>

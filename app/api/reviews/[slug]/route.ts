@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import sql from "@/lib/db";
+import sql, { isPgError } from "@/lib/db";
 
 export async function POST(
   req: NextRequest,
@@ -63,8 +63,8 @@ export async function POST(
         ${reviewText.trim()}
       )
     `;
-  } catch (err: any) {
-    if (err.code === "23505") {
+  } catch (err) {
+    if (isPgError(err) && err.code === "23505") {
       return NextResponse.json(
         { error: "You have already reviewed this business" },
         { status: 409 }

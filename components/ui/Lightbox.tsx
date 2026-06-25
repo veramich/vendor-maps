@@ -2,8 +2,15 @@
 
 import { useEffect, useCallback, useRef } from "react";
 
+export interface LightboxPhoto {
+  // Used by PhotoLightbox's thumbnail grid as a React key; Lightbox itself
+  // only needs cloudinary_url, so id is optional for single-photo callers.
+  id?: string;
+  cloudinary_url: string;
+}
+
 interface Props {
-  photos: any[];
+  photos: LightboxPhoto[];
   businessName: string;
   /** Index of the photo to show, or null when closed. */
   activeIndex: number | null;
@@ -18,7 +25,10 @@ export default function Lightbox({
 }: Props) {
   const touchStartX = useRef<number | null>(null);
 
-  const close = () => setActiveIndex(null);
+  const close = useCallback(
+    () => setActiveIndex(null),
+    [setActiveIndex]
+  );
 
   const prev = useCallback(() => {
     setActiveIndex(
@@ -45,7 +55,7 @@ export default function Lightbox({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [activeIndex, prev, next]);
+  }, [activeIndex, prev, next, close]);
 
   useEffect(() => {
     document.body.style.overflow =
@@ -60,7 +70,10 @@ export default function Lightbox({
   const onTouchEnd = (e: React.TouchEvent) => {
     if (touchStartX.current === null) return;
     const dx = e.changedTouches[0].clientX - touchStartX.current;
-    if (Math.abs(dx) > 50) dx < 0 ? next() : prev();
+    if (Math.abs(dx) > 50) {
+      if (dx < 0) next();
+      else prev();
+    }
     touchStartX.current = null;
   };
 
@@ -100,7 +113,10 @@ export default function Lightbox({
         </svg>
       </button>
 
-      {/* Image */}
+      {/* Image — full-resolution zoom view shown at the photo's natural aspect
+          ratio, which next/image's fixed width/height or fill can't reproduce
+          without distortion, so this intentionally stays a plain <img>. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={photos[activeIndex].cloudinary_url}
         alt={businessName}

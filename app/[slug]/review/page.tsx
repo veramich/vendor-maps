@@ -1,9 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "@/lib/auth-client";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
+
+interface ReviewBusiness {
+  name: string;
+  category: string | null;
+  logo_url: string | null;
+}
 
 export default function ReviewPage() {
   const { data: session, isPending } = useSession();
@@ -11,7 +18,7 @@ export default function ReviewPage() {
   const params = useParams();
   const slug = params.slug as string;
 
-  const [business, setBusiness] = useState<any>(null);
+  const [business, setBusiness] = useState<ReviewBusiness | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -24,11 +31,7 @@ export default function ReviewPage() {
 
   const charCount = reviewText.trim().length;
 
-  useEffect(() => {
-    fetchBusiness();
-  }, [slug]);
-
-  const fetchBusiness = async () => {
+  const fetchBusiness = useCallback(async () => {
     try {
       const res = await fetch(
         `/api/reviews/${slug}/business`
@@ -39,12 +42,17 @@ export default function ReviewPage() {
         return;
       }
       setBusiness(data.business);
-    } catch (err) {
+    } catch {
       setError("Failed to load business");
     } finally {
       setLoading(false);
     }
-  };
+  }, [slug]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchBusiness();
+  }, [fetchBusiness]);
 
   const handleSubmit = async () => {
     if (stars === 0) {
@@ -82,7 +90,7 @@ export default function ReviewPage() {
 
       setSubmitted(true);
 
-    } catch (err) {
+    } catch {
       setError("Failed to submit review");
     } finally {
       setSubmitting(false);
@@ -231,9 +239,11 @@ export default function ReviewPage() {
           <div className="bg-gray-50 rounded-2xl p-4
             flex items-center gap-3">
             {business.logo_url && (
-              <img
+              <Image
                 src={business.logo_url}
                 alt={business.name}
+                width={48}
+                height={48}
                 className="w-12 h-12 rounded-xl
                   object-cover flex-shrink-0"
               />

@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// Subset of a HERE Autocomplete API result item that we surface.
+interface HereAutocompleteItem {
+  id: string;
+  title: string;
+  address?: { label?: string };
+}
+
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q");
 
@@ -10,18 +17,15 @@ export async function GET(req: NextRequest) {
   try {
     const url = `https://autocomplete.search.hereapi.com/v1/autocomplete?q=${encodeURIComponent(q)}&in=countryCode:USA&limit=5&apiKey=${process.env.HERE_API_KEY}`;
 
-    console.log("HERE URL:", url);
-
     const res = await fetch(url);
     const data = await res.json();
 
-    console.log("HERE Response:", JSON.stringify(data));
-
-    const suggestions = data.items?.map((item: any) => ({
-      id:      item.id,
-      title:   item.title,
-      address: item.address?.label || "",
-    })) || [];
+    const suggestions =
+      (data.items as HereAutocompleteItem[] | undefined)?.map((item) => ({
+        id:      item.id,
+        title:   item.title,
+        address: item.address?.label || "",
+      })) || [];
 
     return NextResponse.json({ suggestions });
 

@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
 import imageCompression from "browser-image-compression";
@@ -318,7 +319,7 @@ export default function ResourceForm({
         );
       }
 
-      let result: any;
+      let result: { success?: boolean; error?: string };
       try {
         result = await res.json();
       } catch {
@@ -928,10 +929,12 @@ export default function ResourceForm({
                     key={flyer.publicId || i}
                     className="relative aspect-[4/3]"
                   >
-                    <img
+                    <Image
                       src={flyer.url}
                       alt={`Flyer ${i + 1}`}
-                      className="w-full h-full object-cover rounded-xl"
+                      fill
+                      sizes="(max-width: 640px) 50vw, 300px"
+                      className="object-cover rounded-xl"
                     />
                     <button
                       type="button"
@@ -948,6 +951,8 @@ export default function ResourceForm({
                 {/* Newly added flyers */}
                 {previews.map((preview, i) => (
                   <div key={i} className="relative aspect-[4/3]">
+                    {/* Object-URL preview of a picked file — not optimizable. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={preview}
                       alt={`Flyer ${i + 1}`}

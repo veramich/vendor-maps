@@ -2,10 +2,21 @@ import { requireAdmin } from "@/lib/adminAuth";
 import sql from "@/lib/db";
 import { approveClaim, rejectClaim } from "./actions";
 
+interface ClaimRow {
+  id: string;
+  business_id: string;
+  business_name: string;
+  user_id: string;
+  user_name: string | null;
+  user_email: string | null;
+  claim_contact: string | null;
+  requested_at: string;
+}
+
 export default async function AdminClaims() {
   await requireAdmin();
 
-  const claims = await sql`
+  const claims = await sql<ClaimRow[]>`
     SELECT
       c.*,
       b.name as business_name,
@@ -42,7 +53,7 @@ export default async function AdminClaims() {
         </div>
       ) : (
         <div className="space-y-4">
-          {claims.map((claim: any) => (
+          {claims.map((claim) => (
             <div key={claim.id}
               className="bg-white rounded-2xl p-5
                 border-2 border-gray-100">

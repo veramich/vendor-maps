@@ -7,7 +7,74 @@ import PhotoLightbox from "@/components/ui/PhotoLightbox";
 import BannerImage from "@/components/ui/BannerImage";
 import { headers } from "next/dist/server/request/headers";
 import { auth } from "@/lib/auth";
-import { buildBusinessJsonLd } from "./jsonLd";
+import { buildBusinessJsonLd, type BusinessRow } from "./jsonLd";
+
+// Row shapes for the profile page's related collections. These cover the
+// columns the page renders; the underlying SELECT * queries return more.
+interface ImageRow {
+  id: string;
+  cloudinary_url: string;
+  is_primary: boolean | null;
+  display_order: number | null;
+}
+
+interface HoursRow {
+  day_of_week: string;
+  open_time: string | null;
+  close_time: string | null;
+  closes_next_day: boolean | null;
+  is_closed: boolean | null;
+  hours_vary: boolean | null;
+}
+
+interface ScheduleRow {
+  day_of_week: string;
+  recurrence_type: string;
+  start_time: string | null;
+  end_time: string | null;
+  season_start: string | null;
+  season_end: string | null;
+}
+
+interface PopupEventRow {
+  id: string;
+  event_name: string | null;
+  // lower()/upper() of the event_range; always present for the rows this page
+  // selects (the query filters on upper(event_range) > NOW()).
+  start_time: string;
+  end_time: string;
+}
+
+interface VendorFeeRow {
+  id: string;
+  fee_type: string;
+  amount: number | null;
+  is_free: boolean | null;
+  description: string | null;
+}
+
+interface OtherLocationRow {
+  id: string;
+  slug: string;
+  name: string;
+  location_nickname: string | null;
+  street_1: string | null;
+  street_2: string | null;
+  city: string | null;
+  neighborhood: string | null;
+  avg_rating: number | null;
+}
+
+interface ReviewRow {
+  id: string;
+  stars: number;
+  review_text: string | null;
+  helpful_count: number | null;
+  is_edited: boolean | null;
+  created_at: string;
+  response_text: string | null;
+  response_date: string | null;
+}
 
 
 async function getBusinessBySlug(slug: string) {
@@ -42,14 +109,14 @@ async function getBusinessBySlug(slug: string) {
 
     const business = result[0];
 
-    const images = await sql`
+    const images = await sql<ImageRow[]>`
       SELECT *
       FROM business_images
       WHERE business_id = ${business.id}
       ORDER BY is_primary DESC, display_order ASC
     `;
 
-    const hours = await sql`
+    const hours = await sql<HoursRow[]>`
       SELECT *
       FROM business_hours
       WHERE business_id = ${business.id}
@@ -65,7 +132,7 @@ async function getBusinessBySlug(slug: string) {
         END
     `;
 
-    const schedules = await sql`
+    const schedules = await sql<ScheduleRow[]>`
       SELECT *
       FROM market_schedules
       WHERE business_id = ${business.id}
@@ -73,7 +140,7 @@ async function getBusinessBySlug(slug: string) {
 
     // All upcoming dates for a specific-date event (a market/event can have
     // several scattered dates), soonest first.
-    const popupEvents = await sql`
+    const popupEvents = await sql<PopupEventRow[]>`
       SELECT *,
         lower(event_range) as start_time,
         upper(event_range) as end_time
@@ -93,7 +160,7 @@ async function getBusinessBySlug(slug: string) {
     const vendorSpace = vendorSpaceResult[0] || null;
 
     const vendorFees = vendorSpace
-      ? await sql`
+      ? await sql<VendorFeeRow[]>`
           SELECT *
           FROM vendor_fees
           WHERE business_id = ${business.id}
@@ -108,7 +175,7 @@ async function getBusinessBySlug(slug: string) {
         `
       : [];
 
-    const reviews = await sql`
+    const reviews = await sql<ReviewRow[]>`
       SELECT
         r.*,
         rr.response_text,
@@ -122,9 +189,9 @@ async function getBusinessBySlug(slug: string) {
       LIMIT 10
     `;
 
-    let otherLocations: any[] = [];
+    let otherLocations: OtherLocationRow[] = [];
     if (business.brand_id) {
-      otherLocations = await sql`
+      otherLocations = await sql<OtherLocationRow[]>`
         SELECT
           b.id,
           b.slug,
@@ -275,10 +342,15 @@ export default async function BusinessProfilePage({
       : business.street_address || "";
 
   const coverImage =
-    images.find((img: any) => img.is_primary) ||
+    images.find((img) => img.is_primary) ||
     images[0];
 
-  const jsonLd = buildBusinessJsonLd({ business, images, hours, popupEvents });
+  const jsonLd = buildBusinessJsonLd({
+    business: business as unknown as BusinessRow,
+    images,
+    hours,
+    popupEvents,
+  });
 
   return (
     <div className="min-h-screen bg-white pb-8">
@@ -319,6 +391,10 @@ export default async function BusinessProfilePage({
 
             {(business.logo_url ||
               business.brand_logo) && (
+              // brand_logo comes from the brands table and isn't guaranteed to
+              // be a Cloudinary URL, so this stays a plain <img> rather than
+              // next/image (which would 400 on an unconfigured remote host).
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={
                   business.logo_url ||
@@ -563,13 +639,13 @@ export default async function BusinessProfilePage({
               text-black mb-3">
               Hours
             </h2>
-            {hours.some((h: any) => h.hours_vary) ? (
+            {hours.some((h) => h.hours_vary) ? (
               <p className="text-sm text-gray-500">
                 Hours posted weekly on social media
               </p>
             ) : (
               <div className="space-y-2">
-                {hours.map((h: any) => (
+                {hours.map((h) => (
                   <div
                     key={h.day_of_week}
                     className="flex justify-between
@@ -608,7 +684,7 @@ export default async function BusinessProfilePage({
               Schedule
             </h2>
             <div className="space-y-3">
-              {schedules.map((s: any, i: number) => (
+              {schedules.map((s, i: number) => (
                 <div key={i}>
                   <p className="text-sm font-medium
                     text-black capitalize">
@@ -628,13 +704,13 @@ export default async function BusinessProfilePage({
                   </p>
                   {(s.season_start || s.season_end) && (
                     <p className="text-xs text-gray-400">
-                      {new Date(s.season_start)
+                      {new Date(s.season_start ?? "")
                         .toLocaleDateString("en-US", {
                           month: "short",
                           day: "numeric",
                         })}
                       {" — "}
-                      {new Date(s.season_end)
+                      {new Date(s.season_end ?? "")
                         .toLocaleDateString("en-US", {
                           month: "short",
                           day: "numeric",
@@ -664,7 +740,7 @@ export default async function BusinessProfilePage({
               </p>
             )}
             <div className="space-y-2">
-              {popupEvents.map((pe: any) => (
+              {popupEvents.map((pe) => (
                 <div
                   key={pe.id}
                   className="bg-orange-50 border
@@ -744,7 +820,7 @@ export default async function BusinessProfilePage({
                     Vendor fees
                   </p>
                   <div className="space-y-1">
-                    {vendorFees.map((fee: any) => (
+                    {vendorFees.map((fee) => (
                       <div
                         key={fee.id}
                         className="flex justify-between text-sm"
@@ -993,7 +1069,7 @@ export default async function BusinessProfilePage({
               Other Locations
             </h2>
             <div className="space-y-2">
-              {otherLocations.map((loc: any) => (
+              {otherLocations.map((loc) => (
                 <Link
                   key={loc.id}
                   href={`/${loc.slug || loc.id}`}
@@ -1012,7 +1088,7 @@ export default async function BusinessProfilePage({
                       : ""
                     }
                   </p>
-                  {loc.avg_rating > 0 && (
+                  {(loc.avg_rating ?? 0) > 0 && (
                     <p className="text-xs text-gray-400">
                       ★{" "}
                       {Number(loc.avg_rating).toFixed(1)}
@@ -1058,7 +1134,7 @@ export default async function BusinessProfilePage({
             </div>
           ) : (
             <div className="space-y-5">
-              {reviews.map((review: any) => (
+              {reviews.map((review) => (
                 <div
                   key={review.id}
                   className="border-b border-gray-100
@@ -1096,7 +1172,7 @@ export default async function BusinessProfilePage({
                     {review.review_text}
                   </p>
 
-                  {review.helpful_count > 0 && (
+                  {(review.helpful_count ?? 0) > 0 && (
                     <p className="text-xs text-gray-400
                       mt-2">
                       👍 {review.helpful_count} found
@@ -1123,7 +1199,7 @@ export default async function BusinessProfilePage({
   );
 }
 
-function formatTime12h(time: string): string {
+function formatTime12h(time: string | null): string {
   if (!time) return "";
   const [hourStr, minStr] = time.split(":");
   const hour = parseInt(hourStr, 10);

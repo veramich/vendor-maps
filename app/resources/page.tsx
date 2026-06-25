@@ -1,14 +1,48 @@
 import Link from "next/link";
 import sql from "@/lib/db";
 import ResourceList from "@/components/resources/ResourceList";
-import { Resource } from "@/lib/types/resource";
+import {
+  Resource,
+  ResourceFlyer,
+  DeliveryMode,
+  TimingType,
+} from "@/lib/types/resource";
 
 // Always render fresh so newly approved / expired
 // resources show up without a stale cache.
 export const dynamic = "force-dynamic";
 
+// Maps to a listed `resources` row. Columns that are NOT NULL in the schema
+// (and so always present for listed rows) are typed non-null to match the
+// public Resource shape this builds.
+interface ResourceRow {
+  id: string;
+  resource_type: string;
+  title: string;
+  description: string | null;
+  delivery_mode: DeliveryMode;
+  timing_type: TimingType;
+  always_available: boolean;
+  start_date: string | null;
+  end_date: string | null;
+  availability: string;
+  availability_cutoff: string | null;
+  signup_url: string | null;
+  walk_in_welcome: boolean;
+  street_address: string | null;
+  city: string | null;
+  state: string | null;
+  state_code: string | null;
+  contacts: string[] | null;
+  websites: string[] | null;
+  social_urls: string[] | null;
+  flyers: ResourceFlyer[] | null;
+  status: string;
+  created_at: string;
+}
+
 async function getResources(): Promise<Resource[]> {
-  const rows = await sql`
+  const rows = await sql<ResourceRow[]>`
     SELECT
       id,
       resource_type,
@@ -45,7 +79,7 @@ async function getResources(): Promise<Resource[]> {
   const toIso = (d: unknown): string | null =>
     d ? new Date(d as string).toISOString().slice(0, 10) : null;
 
-  return rows.map((r: any) => ({
+  return rows.map((r) => ({
     id:                 r.id,
     resourceType:       r.resource_type,
     title:              r.title,

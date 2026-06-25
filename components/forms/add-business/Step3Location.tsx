@@ -118,7 +118,7 @@ export default function Step3Location({
   // Open straight to the summary/results view when a saved location exists.
   const [showResults, setShowResults] = useState(hasSavedLocation);
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstance = useRef<any>(null);
+  const mapInstance = useRef<HMap | null>(null);
 
   // Events no longer set subType in the merged flow — key off the top-level
   // type instead.
@@ -190,7 +190,7 @@ export default function Step3Location({
 
         await new Promise(r => setTimeout(r, 300));
 
-        const H = (window as any).H;
+        const H = window.H;
         if (!H) return;
 
         if (mapInstance.current) {
@@ -212,8 +212,11 @@ export default function Step3Location({
           })
         );
 
+        const container = mapRef.current;
+        if (!container) return;
+
         const map = new H.Map(
-          mapRef.current,
+          container,
           positronLayer,
           {
             zoom: 15,
@@ -364,7 +367,7 @@ export default function Step3Location({
       setResults(geocoded);
       setShowResults(true);
 
-    } catch (error) {
+    } catch {
       setSearchError(
         "Search failed. Please try again."
       );

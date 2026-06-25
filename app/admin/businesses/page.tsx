@@ -2,10 +2,23 @@ import { requireAdmin } from "@/lib/adminAuth";
 import sql from "@/lib/db";
 import Link from "next/link";
 
+interface BusinessRow {
+  id: string;
+  name: string;
+  slug: string;
+  type: string;
+  sub_type: string | null;
+  status: string;
+  claim_status: string | null;
+  city: string | null;
+  state_code: string | null;
+  created_at: string;
+}
+
 export default async function AdminBusinesses() {
   await requireAdmin();
 
-  const businesses = await sql`
+  const businesses = await sql<BusinessRow[]>`
     SELECT
       b.id,
       b.name,
@@ -48,7 +61,7 @@ export default async function AdminBusinesses() {
             </tr>
           </thead>
           <tbody>
-            {businesses.map((b: any) => (
+            {businesses.map((b) => (
               <tr key={b.id}
                 className="border-b border-gray-100
                   last:border-0 hover:bg-gray-50">

@@ -13,13 +13,13 @@ export default function ContactPage() {
       <p className="mt-3 leading-relaxed text-gray-600">
         This is the very first version of VendorMaps, and your input genuinely
         shapes where it goes next. Have a suggestion, ran into a bug, or
-        something just didn't work the way you expected? Please reach
+        something just didn&apos;t work the way you expected? Please reach
         out. No issue is too small. I read and reply to every
         message personally.
       </p>
       <p className="mt-3 leading-relaxed text-gray-600">
         Whether you want to share feedback, get your business listed, or just
-        say hello, I'd love to hear from you.
+        say hello, I&apos;d love to hear from you.
       </p>
 
       <div className="mt-8 space-y-4">
