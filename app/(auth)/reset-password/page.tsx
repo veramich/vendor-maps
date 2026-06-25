@@ -1,11 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { authClient } from "@/lib/auth-client";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token");
+  // Better Auth redirects here with ?error=INVALID_TOKEN when the reset link
+  // is malformed or expired, instead of a usable ?token=...
+  const linkError = searchParams.get("error");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
@@ -15,6 +21,12 @@ export default function ResetPasswordPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
+
+    if (!token) {
+      setError("This reset link is invalid or has expired.");
+      setLoading(false);
+      return;
+    }
 
     if (password.length < 8) {
       setError("Password must be at least 8 characters");
@@ -30,6 +42,7 @@ export default function ResetPasswordPage() {
 
     const { error } = await authClient.resetPassword({
       newPassword: password,
+      token,
     });
 
     if (error) {
@@ -40,6 +53,28 @@ export default function ResetPasswordPage() {
 
     router.push("/sign-in");
   };
+
+  // No usable token in the URL — the link was bad or expired. Show a recovery
+  // path instead of a form that can never succeed.
+  if (!token || linkError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="w-full max-w-md text-center">
+          <h1 className="text-2xl font-medium mb-3">Link expired</h1>
+          <p className="text-gray-500 mb-6">
+            This password reset link is invalid or has expired. Request a new
+            one to continue.
+          </p>
+          <Link
+            href="/forgot-password"
+            className="inline-block bg-black text-white rounded-lg px-4 py-3 text-sm font-medium hover:bg-gray-800 transition"
+          >
+            Request a new link
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -100,5 +135,15 @@ export default function ResetPasswordPage() {
 
       </div>
     </div>
+  );
+}
+
+// useSearchParams() requires a Suspense boundary above it, or the page
+// de-opts to fully client-side rendering (and the build warns/errors).
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen" />}>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }

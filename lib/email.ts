@@ -108,10 +108,11 @@ export function sendPasswordResetEmail(to: string, url: string) {
     subject: "Reset your VendorMaps password",
     html: layout({
       heading: "Reset your password",
-      bodyHtml: `<p style="margin:0 0 16px;">Click below to choose a new
-        password. This link expires in 1 hour.</p>
-        <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">If you didn't
-        request this, you can safely ignore this email.</p>`,
+      bodyHtml: `<p style="margin:0 0 16px;">We got a request to reset the
+        password for your VendorMaps account. Click the button below to choose
+        a new one — this link expires in 1 hour for your security.</p>
+        <p style="margin:0 0 16px;color:#6b7280;font-size:13px;">Didn't request
+        this? You can safely ignore this email; your password won't change.</p>`,
       cta: { label: "Reset password", href: url },
     }),
   });
