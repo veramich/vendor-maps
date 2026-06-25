@@ -158,19 +158,22 @@ export async function POST(req: NextRequest) {
         ?.split(",")[0]
         .trim() || "unknown";
 
-    // Rate limit — max 5 resource posts per IP per day
-    const recent = await sql`
-      SELECT COUNT(*) AS count
-      FROM resources
-      WHERE submitter_ip = ${ip}
-      AND created_at > NOW() - INTERVAL '24 hours'
-    `;
+    // Rate limit — max 5 resource posts per IP per day. Signed-in users are
+    // trusted and exempt; the limit only guards anonymous spam.
+    if (!submittedBy) {
+      const recent = await sql`
+        SELECT COUNT(*) AS count
+        FROM resources
+        WHERE submitter_ip = ${ip}
+        AND created_at > NOW() - INTERVAL '24 hours'
+      `;
 
-    if (Number(recent[0].count) >= 5) {
-      return NextResponse.json(
-        { error: "You've reached today's submission limit. Please try again tomorrow." },
-        { status: 429 }
-      );
+      if (Number(recent[0].count) >= 5) {
+        return NextResponse.json(
+          { error: "You've reached today's submission limit. Please try again tomorrow." },
+          { status: 429 }
+        );
+      }
     }
 
     // --- Validate required fields ---
