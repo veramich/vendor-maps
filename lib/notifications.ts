@@ -1,4 +1,5 @@
 import sql from "@/lib/db";
+import { sendNotificationEmail } from "@/lib/email";
 
 /**
  * Notification types. Keep in sync with the CHECK constraint in
@@ -7,7 +8,13 @@ import sql from "@/lib/db";
 export type NotificationType =
   | "submission_approved"
   | "submission_rejected"
-  | "submission_duplicate";
+  | "submission_duplicate"
+  | "claim_approved"
+  | "claim_rejected"
+  | "review_approved"
+  | "review_rejected"
+  | "resource_approved"
+  | "resource_rejected";
 
 export type NotificationRow = {
   id: string;
@@ -56,6 +63,23 @@ export async function createNotification(
         ${sql.json((input.data ?? {}) as Record<string, never>)}
       )
     `;
+
+    // Email delivery: mirror the notification to the user's inbox. Failures
+    // here are swallowed inside sendNotificationEmail, so the in-app
+    // notification is never lost if email is down.
+    const [recipient] = await sql<{ email: string; name: string | null }[]>`
+      SELECT email, name FROM "user" WHERE id = ${input.userId}
+    `;
+
+    if (recipient?.email) {
+      await sendNotificationEmail({
+        to: recipient.email,
+        name: recipient.name ?? undefined,
+        title: input.title,
+        body: input.body,
+        link: input.link,
+      });
+    }
 
     // Future: enqueue web push / native push delivery here.
   } catch (error) {

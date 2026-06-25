@@ -221,6 +221,9 @@ export default function Step4Info({
             Description
             <span className="text-red-500 ml-1">*</span>
           </label>
+          <p className="text-xs text-gray-400 mb-2">
+            What words would people search to find you?
+          </p>
           <textarea
             value={formData.description}
             maxLength={2000}

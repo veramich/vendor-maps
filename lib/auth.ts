@@ -1,13 +1,15 @@
 import { betterAuth } from "better-auth";
-import { Resend } from "resend";
 import { Pool } from "pg";
+import {
+  sendVerificationEmail,
+  sendPasswordResetEmail,
+  sendWelcomeEmail,
+} from "@/lib/email";
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: true,
 });
-
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const auth = betterAuth({
   database: pool,
@@ -59,19 +61,7 @@ export const auth = betterAuth({
     requireEmailVerification: true,
 
     sendResetPassword: async ({ user, url }) => {
-      await resend.emails.send({
-        from: "VendorMaps <noreply@vendormaps.net>",
-        to: user.email,
-        subject: "Reset your VendorMaps password",
-        html: `
-          <h2>Reset your password</h2>
-          <p>Click the link below to reset
-             your password. Expires in 1 hour.</p>
-          <a href="${url}">Reset Password</a>
-          <p>If you did not request this
-             ignore this email.</p>
-        `,
-      });
+      await sendPasswordResetEmail(user.email, url);
     },
   },
 
@@ -80,19 +70,13 @@ export const auth = betterAuth({
     autoSignInAfterVerification: true,
 
     sendVerificationEmail: async ({ user, url }) => {
-      await resend.emails.send({
-        from: "VendorMaps <noreply@vendormaps.net>",
-        to: user.email,
-        subject: "Verify your VendorMaps email",
-        html: `
-          <h2>Welcome to VendorMaps</h2>
-          <p>Click the link below to verify
-             your email address.</p>
-          <a href="${url}">Verify Email</a>
-          <p>If you did not create an account
-             ignore this email.</p>
-        `,
-      });
+      await sendVerificationEmail(user.email, url);
+    },
+
+    // Fires once, after the user actually confirms their email — the right
+    // moment for a real welcome (distinct from the verify-link email).
+    afterEmailVerification: async (user) => {
+      await sendWelcomeEmail(user.email, user.name);
     },
   },
 
