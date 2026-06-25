@@ -3,7 +3,8 @@ import { Resend } from "resend";
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const FROM = "VendorMaps <noreply@vendormaps.net>";
-const BRAND = "#0f766e"; // teal-700, matches VendorMaps accent
+const BRAND = "#FF7300"; // brand orange — matches --primary in globals.css
+const BRAND_DARK = "#C25A00"; // darker orange for small text/links on white
 
 /**
  * Absolute base URL for links inside emails. Email clients can't resolve
@@ -40,8 +41,19 @@ export function layout(opts: {
                 border-radius:12px;overflow:hidden;
                 box-shadow:0 1px 3px rgba(0,0,0,0.08);">
       <div style="background:${BRAND};padding:20px 32px;">
-        <span style="color:#ffffff;font-size:20px;font-weight:700;
-                     letter-spacing:-0.01em;">VendorMaps</span>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td style="padding-right:10px;vertical-align:middle;">
+              <img src="${baseUrl()}/vmapsLOGO.png" width="36" height="36"
+                   alt="VendorMaps"
+                   style="display:block;width:36px;height:36px;" />
+            </td>
+            <td style="vertical-align:middle;">
+              <span style="color:#ffffff;font-size:20px;font-weight:700;
+                           letter-spacing:-0.01em;">VendorMaps</span>
+            </td>
+          </tr>
+        </table>
       </div>
       <div style="padding:32px;color:#111827;font-size:15px;line-height:1.6;">
         <h2 style="margin:0 0 16px;font-size:20px;color:#111827;">
@@ -54,7 +66,7 @@ export function layout(opts: {
                   color:#6b7280;font-size:12px;line-height:1.5;">
         <p style="margin:0;">
           VendorMaps · Find local vendors, markets &amp; pop-ups.<br/>
-          <a href="${baseUrl()}" style="color:#6b7280;">vendormaps.net</a>
+          <a href="${baseUrl()}" style="color:${BRAND_DARK};">vendormaps.net</a>
         </p>
       </div>
     </div>
@@ -121,6 +133,37 @@ export function sendWelcomeEmail(to: string, name?: string) {
           <li style="margin-bottom:6px;">List or claim your own business.</li>
         </ul>`,
       cta: { label: "Explore the map", href: `${baseUrl()}/map` },
+    }),
+  });
+}
+
+/**
+ * Submission received — a confirmation/receipt sent the moment someone
+ * submits a business or a resource, before any moderation outcome. Unlike
+ * the approved/rejected notifications, this isn't tied to a user account:
+ * the submitter may be signed out, so the caller passes whatever email it
+ * has. `kind` only tweaks the wording; both share the branded layout.
+ */
+export function sendSubmissionReceivedEmail(args: {
+  to: string;
+  name?: string;
+  itemName: string;
+  kind: "business" | "resource";
+}) {
+  const greeting = args.name ? `Thanks, ${args.name}!` : "Thanks!";
+  const noun = args.kind === "resource" ? "resource" : "listing";
+  return send({
+    to: args.to,
+    subject: `We received your submission: ${args.itemName}`,
+    html: layout({
+      heading: greeting,
+      bodyHtml: `<p style="margin:0 0 16px;">We received your submission for
+        <strong>${args.itemName}</strong>. Our team reviews every ${noun}
+        to keep VendorMaps accurate, so it isn't live just yet.</p>
+        <p style="margin:0 0 16px;">You'll get another email as soon as it's
+        approved and visible on VendorMaps. Reviews usually take a day or
+        two.</p>`,
+      cta: { label: "Browse VendorMaps", href: `${baseUrl()}/map` },
     }),
   });
 }

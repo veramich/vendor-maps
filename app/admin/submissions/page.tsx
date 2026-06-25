@@ -104,46 +104,61 @@ export default async function AdminSubmissions() {
               )}
 
               {/* Actions */}
-              <div className="flex gap-2">
-                <form action={approveSubmission}>
-                  <input type="hidden"
-                    name="businessId" value={b.id}/>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-green-500
-                      text-white text-xs font-medium
-                      rounded-xl hover:bg-green-600
-                      transition"
-                  >
-                    Approve
-                  </button>
-                </form>
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-2">
+                  <form action={approveSubmission}>
+                    <input type="hidden"
+                      name="businessId" value={b.id}/>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-green-500
+                        text-white text-xs font-medium
+                        rounded-xl hover:bg-green-600
+                        transition"
+                    >
+                      Approve
+                    </button>
+                  </form>
 
-                <form action={rejectSubmission}>
+                  <form action={markDuplicate}>
+                    <input type="hidden"
+                      name="businessId" value={b.id}/>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-gray-200
+                        text-gray-700 text-xs font-medium
+                        rounded-xl hover:bg-gray-300
+                        transition"
+                    >
+                      Duplicate
+                    </button>
+                  </form>
+                </div>
+
+                {/* Reject, with an optional message shown to
+                    the submitter in their notification */}
+                <form action={rejectSubmission}
+                  className="flex flex-col gap-2">
                   <input type="hidden"
                     name="businessId" value={b.id}/>
+                  <textarea
+                    name="message"
+                    rows={2}
+                    placeholder="Optional message to the submitter (shown in their notification)"
+                    className="w-full border-2 border-gray-100
+                      rounded-xl px-3 py-2 text-xs
+                      text-black placeholder:text-gray-400
+                      focus:outline-none focus:border-gray-300
+                      resize-none"
+                  />
                   <button
                     type="submit"
                     className="px-4 py-2 bg-red-500
                       text-white text-xs font-medium
                       rounded-xl hover:bg-red-600
-                      transition"
+                      transition self-start"
                   >
                     Reject
-                  </button>
-                </form>
-
-                <form action={markDuplicate}>
-                  <input type="hidden"
-                    name="businessId" value={b.id}/>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-gray-200
-                      text-gray-700 text-xs font-medium
-                      rounded-xl hover:bg-gray-300
-                      transition"
-                  >
-                    Duplicate
                   </button>
                 </form>
               </div>

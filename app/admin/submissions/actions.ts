@@ -73,6 +73,7 @@ export async function rejectSubmission(formData: FormData) {
   await requireAdmin();
 
   const businessId = formData.get("businessId") as string;
+  const message = (formData.get("message") as string | null)?.trim() || null;
 
   const [business] = await sql`
     SELECT name, submitted_by
@@ -91,7 +92,9 @@ export async function rejectSubmission(formData: FormData) {
       userId: business.submitted_by,
       type: "submission_rejected",
       title: `${business.name} wasn't approved`,
-      body: "Your submission didn't meet our listing guidelines. Contact us if you have questions.",
+      body:
+        message ??
+        "Your submission didn't meet our listing guidelines. Contact us if you have questions.",
       link: "/contact",
       data: { businessId },
     });

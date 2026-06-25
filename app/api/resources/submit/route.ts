@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { uploadImage } from "@/lib/utils/uploadImage";
 import { auth } from "@/lib/auth";
+import { sendSubmissionReceivedEmail } from "@/lib/email";
 import { headers } from "next/headers";
 import {
   MAX_FLYERS,
@@ -147,6 +148,8 @@ export async function POST(req: NextRequest) {
       .catch(() => null);
 
     const submittedBy = session?.user?.id || null;
+    const submitterEmail = session?.user?.email || null;
+    const submitterName = session?.user?.name || null;
 
     // Client IP for rate limiting
     const ip =
@@ -165,7 +168,7 @@ export async function POST(req: NextRequest) {
 
     if (Number(recent[0].count) >= 5) {
       return NextResponse.json(
-        { error: "Too many posts. Try again tomorrow." },
+        { error: "You've reached today's submission limit. Please try again tomorrow." },
         { status: 429 }
       );
     }
@@ -336,6 +339,19 @@ export async function POST(req: NextRequest) {
       )
       RETURNING id
     `;
+
+    // Confirmation email — only to the signed-in submitter. Resources have
+    // no single contact-email field (just free-text contact lines), so
+    // signed-out submissions get no receipt. Fire-and-forget; the send
+    // swallows its own errors so it can't fail the submit.
+    if (submitterEmail) {
+      await sendSubmissionReceivedEmail({
+        to: submitterEmail,
+        name: submitterName ?? undefined,
+        itemName: title,
+        kind: "resource",
+      });
+    }
 
     return NextResponse.json({
       success: true,

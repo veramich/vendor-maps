@@ -4,6 +4,7 @@ import { uploadImage } from "@/lib/utils/uploadImage";
 import { buildSocialUrls } from "@/lib/utils/buildSocialUrls";
 import { generateSlug } from "@/lib/utils/generateSlug";
 import { auth } from "@/lib/auth";
+import { sendSubmissionReceivedEmail } from "@/lib/email";
 import { headers } from "next/headers";
 
 // Add one day to a YYYY-MM-DD string, returning YYYY-MM-DD. Built from the
@@ -35,6 +36,8 @@ export async function POST(req: NextRequest) {
     }).catch(() => null);
 
     const submittedBy = session?.user?.id || null;
+    const submitterEmail = session?.user?.email || null;
+    const submitterName = session?.user?.name || null;
 
     // Get IP for spam prevention (take only the first IP from x-forwarded-for)
     const ip =
@@ -52,7 +55,7 @@ export async function POST(req: NextRequest) {
 
     if (Number(recentSubmissions[0].count) >= 3) {
       return NextResponse.json(
-        { error: "Too many submissions. Try again tomorrow." },
+        { error: "You've reached today's submission limit. Please try again tomorrow." },
         { status: 429 }
       );
     }
@@ -543,6 +546,20 @@ export async function POST(req: NextRequest) {
           ${idx === 0}
         )
       `;
+    }
+
+    // Confirmation email to whoever submitted. Prefer the signed-in user's
+    // email (the actual submitter); fall back to the business contact email
+    // for signed-out submissions. Fire-and-forget — sendSubmissionReceived-
+    // Email swallows its own errors, so a flaky inbox never fails the submit.
+    const recipientEmail = submitterEmail || data.email || null;
+    if (recipientEmail) {
+      await sendSubmissionReceivedEmail({
+        to: recipientEmail,
+        name: submitterName ?? undefined,
+        itemName: data.name.trim(),
+        kind: "business",
+      });
     }
 
     return NextResponse.json({

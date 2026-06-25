@@ -165,6 +165,16 @@ export default function AddBusinessPage() {
         );
       }
 
+      // Rate limit — surface the server's friendly message ("Too many
+      // submissions. Try again tomorrow.") instead of a raw status code.
+      if (res.status === 429) {
+        const { error } = await res.json().catch(() => ({ error: null }));
+        throw new Error(
+          error ||
+            "You've reached today's submission limit. Please try again tomorrow."
+        );
+      }
+
       if (!res.ok && res.status !== 500) {
         throw new Error(
           `Submission failed (${res.status}). Please try again.`
