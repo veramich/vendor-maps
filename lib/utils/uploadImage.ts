@@ -12,7 +12,13 @@ export const uploadImage = async (
 
   const result = await cloudinary.uploader.upload(dataUri, {
     folder: `vendor-maps/${folder}`,
+    // Cap the STORED original so we never warehouse / deliver a 4000px phone
+    // photo. crop:"limit" only shrinks images larger than the cap (never
+    // upscales). Logos stay small; photos top out at 1600px wide. This is the
+    // single biggest lever on Cloudinary bandwidth/storage credits — every
+    // later derived size starts from this smaller master.
     transformation: [
+      { width: 1600, crop: "limit" },
       { quality: "auto" },
       { fetch_format: "auto" },
     ],

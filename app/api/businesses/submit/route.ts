@@ -63,12 +63,33 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Upload logo if provided
+    // Upload all images to Cloudinary BEFORE writing anything to the DB. If
+    // any upload fails (e.g. Cloudinary 403 / account limit) we throw here and
+    // the request 500s with NO business row created — so a failed submission
+    // never lands in the admin queue or triggers an "under review" notice.
     let logoUrl = "";
     const logoFile = formData.get("logo") as File | null;
     if (logoFile && logoFile.size > 0) {
       const uploaded = await uploadImage(logoFile, "logos");
       logoUrl = uploaded.url;
+    }
+
+    // Gather gallery images and upload them up front. We keep the resolved
+    // Cloudinary refs to insert as business_images rows after the DB writes.
+    const imageFiles: File[] = [];
+    let imgIdx = 0;
+    while (formData.get(`image_${imgIdx}`)) {
+      imageFiles.push(formData.get(`image_${imgIdx}`) as File);
+      imgIdx++;
+    }
+
+    const uploadedImages: { publicId: string; url: string }[] = [];
+    for (const file of imageFiles) {
+      const uploaded = await uploadImage(file, "businesses");
+      uploadedImages.push({
+        publicId: uploaded.publicId,
+        url: uploaded.url,
+      });
     }
 
     // Build social URLs
@@ -162,6 +183,33 @@ export async function POST(req: NextRequest) {
       data.neighborhood
     );
 
+    // Resolve the brand this location belongs to. The add-business form's
+    // "add another location" flow groups chain locations under one shared
+    // brands row: the first location mints the brand, later ones reuse the
+    // returned id. We validate any incoming brandId against the brands table
+    // (a stale/foreign id would otherwise trip businesses_brand_id_fkey), and
+    // only mint a new brand for chain locations.
+    let brandId: string | null = null;
+    if (data.brandId) {
+      const [existing] = await sql`
+        SELECT id FROM brands WHERE id = ${data.brandId}
+      `;
+      if (existing) brandId = existing.id;
+    }
+    if (!brandId && data.isChainLocation) {
+      const [brand] = await sql`
+        INSERT INTO brands (name, logo_url, description, claim_status)
+        VALUES (
+          ${data.name.trim()},
+          ${logoUrl || null},
+          ${data.description?.trim() || null},
+          ${claimStatus}
+        )
+        RETURNING id
+      `;
+      brandId = brand.id;
+    }
+
     // Insert business
     const [business] = await sql`
       INSERT INTO businesses (
@@ -199,7 +247,7 @@ export async function POST(req: NextRequest) {
         submitted_by,
         submitter_ip
       ) VALUES (
-        ${data.brandId || null},
+        ${brandId},
         ${dbType},
         ${dbSubType},
         ${data.name.trim()},
@@ -515,22 +563,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Upload and insert business images
-    const imageFiles: File[] = [];
-    let i = 0;
-    while (formData.get(`image_${i}`)) {
-      imageFiles.push(
-        formData.get(`image_${i}`) as File
-      );
-      i++;
-    }
-
-    for (let idx = 0; idx < imageFiles.length; idx++) {
-      const file = imageFiles[idx];
-      const uploaded = await uploadImage(
-        file,
-        "businesses"
-      );
+    // Insert business images. These were already uploaded to Cloudinary up
+    // front (before any DB write), so by the time we get here the only thing
+    // left is to persist the refs.
+    for (let idx = 0; idx < uploadedImages.length; idx++) {
+      const uploaded = uploadedImages[idx];
 
       await sql`
         INSERT INTO business_images (
@@ -568,6 +605,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       businessId,
+      brandId,
       slug,
     });
 

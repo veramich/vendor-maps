@@ -8,6 +8,7 @@ import BannerImage from "@/components/ui/BannerImage";
 import { headers } from "next/dist/server/request/headers";
 import { auth } from "@/lib/auth";
 import { buildBusinessJsonLd, type BusinessRow } from "./jsonLd";
+import { CLD } from "@/lib/utils/cldUrl";
 
 // Row shapes for the profile page's related collections. These cover the
 // columns the page renders; the underlying SELECT * queries return more.
@@ -396,10 +397,10 @@ export default async function BusinessProfilePage({
               // next/image (which would 400 on an unconfigured remote host).
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={
+                src={CLD.thumb(
                   business.logo_url ||
                   business.brand_logo
-                }
+                )}
                 alt={business.name}
                 className="w-16 h-16 rounded-xl
                   object-cover border-2

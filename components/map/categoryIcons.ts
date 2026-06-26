@@ -3,6 +3,7 @@ export const CATEGORY_ICONS: Record<string, string> = {
   "Coffee":           "cafe",
   "Candy":            "candy",
   "Fresh Fruit":      "fruits",
+  "Produce":          "produce",
   "Beverages":        "beverages",
   "Flowers":          "flowers",
   "Desserts":         "desserts",

@@ -5,6 +5,7 @@ import { useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { CLD } from "@/lib/utils/cldUrl";
 
 type Listing = {
   id:           string;
@@ -127,10 +128,11 @@ export default function MyListingsPage() {
                   {/* Logo */}
                   {listing.logo_url ? (
                     <Image
-                      src={listing.logo_url}
+                      src={CLD.thumb(listing.logo_url)}
                       alt={listing.name}
                       width={56}
                       height={56}
+                      unoptimized
                       className="w-14 h-14 rounded-xl
                         object-cover border
                         border-gray-100 flex-shrink-0"

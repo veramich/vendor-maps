@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
         l.city
       FROM businesses b
       JOIN locations l ON l.business_id = b.id
-      LEFT JOIN categories cat ON cat.name = b.category
+      LEFT JOIN categories cat ON cat.id = b.category_id
       WHERE b.status = 'listed'
       AND l.coordinates IS NOT NULL
       AND b.type IN (

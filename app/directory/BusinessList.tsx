@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { CLD } from "@/lib/utils/cldUrl";
 import SearchBar from "@/components/ui/SearchBar";
 import FilterPanel from "@/components/ui/FilterPanel";
 import {
@@ -242,11 +243,12 @@ function BusinessCard({ business }: { business: Business }) {
         {business.image_url ? (
           <a href={businessHref} className="block w-full h-full active:scale-99">
             <Image
-              src={business.image_url}
+              src={CLD.card(business.image_url)}
               alt={business.name}
               fill
               sizes="(max-width: 640px) 100vw, 400px"
               className="object-cover"
+              unoptimized
             />
           </a>
         ) : (
@@ -281,7 +283,7 @@ function BusinessCard({ business }: { business: Business }) {
           <div className="pointer-events-none absolute top-2.5 left-2.5 w-11 h-11
             rounded-full bg-primary ring-2 ring-white overflow-hidden
             flex items-center justify-center">
-            <Image src={logo} alt="" width={44} height={44} className="w-full h-full object-cover" />
+            <Image src={CLD.thumb(logo)} alt="" width={44} height={44} className="w-full h-full object-cover" unoptimized />
           </div>
         ) : iconSrc ? (
           <Image

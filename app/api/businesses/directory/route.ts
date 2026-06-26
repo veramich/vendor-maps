@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
       LEFT JOIN brands br
         ON br.id = b.brand_id
       LEFT JOIN categories cat
-        ON cat.name = b.category
+        ON cat.id = b.category_id
       WHERE b.status = 'listed'
       AND b.type IN (
         'permanent_location',

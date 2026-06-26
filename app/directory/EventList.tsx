@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { CLD } from "@/lib/utils/cldUrl";
 import SearchBar from "@/components/ui/SearchBar";
 import { EMPTY_FILTERS, filtersToParams } from "@/lib/businessFilters";
 
@@ -384,22 +385,24 @@ function EventCard({ event }: { event: Event }) {
       <div className="relative w-full aspect-[16/10]">
         {event.image_url ? (
           <Image
-            src={event.image_url}
+            src={CLD.card(event.image_url)}
             alt={event.name}
             fill
             sizes="(max-width: 640px) 100vw, 400px"
             className="object-cover"
+            unoptimized
           />
         ) : (
           // No flyer: brand-tinted block with the logo or category icon.
           <div className="w-full h-full flex items-center justify-center bg-primary/10">
             {logo || iconSrc ? (
               <Image
-                src={(logo || iconSrc) as string}
+                src={CLD.thumb(logo) || (iconSrc as string)}
                 alt={event.name}
                 width={64}
                 height={64}
                 className="w-16 h-16 object-contain opacity-70"
+                unoptimized
               />
             ) : (
               <span className="text-3xl font-semibold text-primary/40">
@@ -414,7 +417,7 @@ function EventCard({ event }: { event: Event }) {
           <div className="pointer-events-none absolute top-2.5 left-2.5 w-11 h-11
             rounded-full bg-primary ring-2 ring-white overflow-hidden
             flex items-center justify-center">
-            <Image src={logo} alt="" width={44} height={44} className="w-full h-full object-cover" />
+            <Image src={CLD.thumb(logo)} alt="" width={44} height={44} className="w-full h-full object-cover" unoptimized />
           </div>
         ) : iconSrc ? (
           <Image

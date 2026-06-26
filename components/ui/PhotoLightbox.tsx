@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { CLD } from "@/lib/utils/cldUrl";
 import Lightbox, { type LightboxPhoto } from "./Lightbox";
 
 interface Props {
@@ -11,6 +12,14 @@ interface Props {
 
 export default function PhotoLightbox({ photos, businessName }: Props) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+
+  // Lightbox shows photos full-screen, so it gets the larger hero variant; the
+  // grid thumbnails below are tiny, so they get the small thumb variant. Both
+  // are Cloudinary-sized so the browser never downloads the raw master.
+  const lightboxPhotos = photos.map((p) => ({
+    ...p,
+    cloudinary_url: CLD.hero(p.cloudinary_url),
+  }));
 
   return (
     <>
@@ -24,19 +33,20 @@ export default function PhotoLightbox({ photos, businessName }: Props) {
               focus:outline-none"
           >
             <Image
-              src={img.cloudinary_url}
+              src={CLD.square(img.cloudinary_url)}
               alt={businessName}
               fill
               sizes="(max-width: 640px) 33vw, 200px"
               className="object-cover
                 hover:opacity-90 transition-opacity"
+              unoptimized
             />
           </button>
         ))}
       </div>
 
       <Lightbox
-        photos={photos}
+        photos={lightboxPhotos}
         businessName={businessName}
         activeIndex={activeIndex}
         setActiveIndex={setActiveIndex}

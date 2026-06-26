@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
+import { CLD } from "@/lib/utils/cldUrl";
 import { Resource, deliveryModeLabel } from "@/lib/types/resource";
 
 // "June 3, 2026"
@@ -283,12 +284,13 @@ export default function ResourceCard({
                     aria-label={`View flyer ${i + 1}`}
                   >
                     <Image
-                      src={flyer.url}
+                      src={CLD.square(flyer.url)}
                       alt={`${resource.title} flyer ${i + 1}`}
                       fill
                       sizes="(max-width: 640px) 50vw, 300px"
                       className="object-cover
                         hover:opacity-90 transition-opacity"
+                      unoptimized
                     />
                   </button>
                 ))}
@@ -387,7 +389,7 @@ export default function ResourceCard({
               lightbox. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={flyers[lightbox].url}
+            src={CLD.hero(flyers[lightbox].url)}
             alt={`${resource.title} flyer`}
             className="max-w-full max-h-full object-contain px-6"
             onClick={(e) => e.stopPropagation()}

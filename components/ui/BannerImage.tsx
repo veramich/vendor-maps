@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { CLD } from "@/lib/utils/cldUrl";
 import Lightbox from "./Lightbox";
 
 interface Props {
@@ -11,7 +12,11 @@ interface Props {
 
 export default function BannerImage({ src, businessName }: Props) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const photos = [{ cloudinary_url: src }];
+  // Banner renders at ~768px wide; the Lightbox blows it up full-screen, so it
+  // gets the larger hero variant. Both are Cloudinary-sized so we never ship
+  // the raw master to the browser.
+  const bannerSrc = CLD.card(src);
+  const photos = [{ cloudinary_url: CLD.hero(src) }];
 
   return (
     <>
@@ -23,12 +28,13 @@ export default function BannerImage({ src, businessName }: Props) {
           block cursor-pointer focus:outline-none"
       >
         <Image
-          src={src}
+          src={bannerSrc}
           alt={businessName}
           fill
           sizes="(max-width: 768px) 100vw, 768px"
           className="object-cover
             hover:opacity-95 transition-opacity"
+          unoptimized
         />
       </button>
 

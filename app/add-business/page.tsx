@@ -186,6 +186,7 @@ export default function AddBusinessPage() {
         error?: string;
         business?: unknown;
         businessId?: string;
+        brandId?: string | null;
       };
       try {
         result = await res.json();
@@ -210,7 +211,10 @@ export default function AddBusinessPage() {
       }
 
       setSubmittedName(formData.name);
-      setCurrentBrandId(result.businessId ?? null);
+      // Track the real brand id (minted server-side for chain locations) so
+      // "add another location" links the next location to the same brand.
+      // The server returns null for non-chain single businesses.
+      setCurrentBrandId(result.brandId ?? null);
       setShowConfirmation(true);
 
     } catch (error) {

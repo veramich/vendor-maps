@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { CLD } from "@/lib/utils/cldUrl";
 import { requireAdmin } from "@/lib/adminAuth";
 import sql from "@/lib/db";
 import {
@@ -78,10 +79,11 @@ export default async function AdminResources() {
         <div className="flex items-start gap-4">
           {flyers[0] && (
             <Image
-              src={flyers[0].url}
+              src={CLD.thumb(flyers[0].url)}
               alt=""
               width={64}
               height={64}
+              unoptimized
               className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
             />
           )}

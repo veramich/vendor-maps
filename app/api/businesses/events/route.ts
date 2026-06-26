@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
       FROM businesses b
       LEFT JOIN locations l ON l.business_id = b.id
       LEFT JOIN brands br ON br.id = b.brand_id
-      LEFT JOIN categories cat ON cat.name = b.category
+      LEFT JOIN categories cat ON cat.id = b.category_id
       LEFT JOIN vendor_spaces vs ON vs.business_id = b.id
       -- Collapse a market's many schedule rows (and a pop-up's many dates) to a
       -- single "soonest upcoming" occurrence, so each business is one card.

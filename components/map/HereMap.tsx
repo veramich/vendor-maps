@@ -11,6 +11,7 @@ import { motion } from "framer-motion";
 
 const PRIMARY = "#FF7300";
 import { getIconBase64 } from "@/lib/getIconBase64";
+import { CATEGORY_ICONS } from "@/components/map/categoryIcons";
 import {
   BusinessFilters,
   EMPTY_FILTERS,
@@ -35,31 +36,6 @@ export interface MapLocation {
   neighborhood: string | null;
   city: string | null;
 }
-
-const CATEGORY_ICONS: Record<string, string> = {
-  "Food":             "food",
-  "Coffee":           "cafe",
-  "Candy":            "candy",
-  "Fresh Fruit":      "fruits",
-  "Beverages":        "beverages",
-  "Flowers":          "flowers",
-  "Desserts":         "desserts",
-  "Other":            "other",
-  "Personal Care":    "personal-care",
-  "Wellness":         "wellness",
-  "Fitness":          "fitness",
-  "Event Services":   "event-services",
-  "Custom Designs":   "custom-design",
-  "Handmade":         "handmade",
-  "Event":            "event",
-  "Merchandise":      "merchandise",
-  "General Services": "general-services",
-  "Apparel":          "apparel",
-  "Event Space":      "event-space",
-  "Collectables":     "collectables",
-  "Jewelry":          "jewelry",
-  "Art":              "art",
-};
 
 const CLUSTER_ZOOM_THRESHOLD = 12;
 

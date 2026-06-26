@@ -5,6 +5,7 @@ import { useSession } from "@/lib/auth-client";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { CLD } from "@/lib/utils/cldUrl";
 
 interface ReviewBusiness {
   name: string;
@@ -240,10 +241,11 @@ export default function ReviewPage() {
             flex items-center gap-3">
             {business.logo_url && (
               <Image
-                src={business.logo_url}
+                src={CLD.thumb(business.logo_url)}
                 alt={business.name}
                 width={48}
                 height={48}
+                unoptimized
                 className="w-12 h-12 rounded-xl
                   object-cover flex-shrink-0"
               />
