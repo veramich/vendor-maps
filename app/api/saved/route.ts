@@ -27,12 +27,21 @@ export async function GET() {
         b.avg_rating,
         b.review_count,
         b.logo_url,
+        br.logo_url AS brand_logo,
+        (
+          SELECT bi.cloudinary_url
+          FROM business_images bi
+          WHERE bi.business_id = b.id
+          ORDER BY bi.is_primary DESC, bi.display_order ASC
+          LIMIT 1
+        ) AS image_url,
         l.city,
         l.neighborhood,
         sb.collection,
         sb.saved_at
       FROM saved_businesses sb
       JOIN businesses b ON b.id = sb.business_id
+      LEFT JOIN brands br ON br.id = b.brand_id
       LEFT JOIN locations l ON l.business_id = b.id
       WHERE sb.user_id = ${session.user.id}
       AND b.status = 'listed'

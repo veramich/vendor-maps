@@ -19,6 +19,8 @@ type SavedBusiness = {
   city:         string | null;
   neighborhood: string | null;
   logo_url:     string | null;
+  brand_logo:   string | null;
+  image_url:    string | null;
   collection:   string;
   saved_at:     string;
 };
@@ -184,7 +186,14 @@ export default function SavedPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {filtered.map((business) => (
+            {filtered.map((business) => {
+              // Fall back to the brand logo, then the primary gallery photo,
+              // since most listings have no dedicated logo_url of their own.
+              const thumb =
+                business.logo_url ||
+                business.brand_logo ||
+                business.image_url;
+              return (
               <Link
                 key={business.id}
                 href={`/${business.slug}`}
@@ -193,9 +202,9 @@ export default function SavedPage() {
                   p-4 hover:border-gray-200 transition"
               >
                 {/* Logo */}
-                {business.logo_url ? (
+                {thumb ? (
                   <Image
-                    src={CLD.thumb(business.logo_url)}
+                    src={CLD.thumb(thumb)}
                     alt={business.name}
                     width={56}
                     height={56}
@@ -266,7 +275,8 @@ export default function SavedPage() {
                   </span>
                 </div>
               </Link>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
