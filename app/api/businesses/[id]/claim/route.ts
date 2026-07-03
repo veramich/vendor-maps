@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { sendAdminSubmissionAlert } from "@/lib/email";
 
 // GET — fetch business info for claim page
 export async function GET(
@@ -83,7 +84,7 @@ export async function POST(
 
     // Check business exists and is not claimed
     const result = await sql`
-      SELECT id, claim_status
+      SELECT id, name, claim_status
       FROM businesses
       WHERE id = ${id}
       AND status = 'listed'
@@ -143,6 +144,15 @@ export async function POST(
       SET claim_status = 'pending'
       WHERE id = ${id}
     `;
+
+    // Nudge the moderation inbox. Fire-and-forget — the sender swallows its
+    // own errors and no-ops without an admin address, so it never affects
+    // the claim response.
+    await sendAdminSubmissionAlert({
+      itemName: business.name,
+      kind: "claim",
+      submittedBy: session.user.email,
+    });
 
     return NextResponse.json({ success: true });
 

@@ -4,7 +4,7 @@ import { uploadImage } from "@/lib/utils/uploadImage";
 import { buildSocialUrls } from "@/lib/utils/buildSocialUrls";
 import { generateSlug } from "@/lib/utils/generateSlug";
 import { auth } from "@/lib/auth";
-import { sendSubmissionReceivedEmail } from "@/lib/email";
+import { sendSubmissionReceivedEmail, sendAdminSubmissionAlert } from "@/lib/email";
 import { headers } from "next/headers";
 
 // Add one day to a YYYY-MM-DD string, returning YYYY-MM-DD. Built from the
@@ -601,6 +601,15 @@ export async function POST(req: NextRequest) {
         kind: "business",
       });
     }
+
+    // Alert the moderation inbox that something new is waiting. Fire-and-
+    // forget — the sender swallows its own errors and no-ops when no admin
+    // address is configured, so it never affects the submit response.
+    await sendAdminSubmissionAlert({
+      itemName: data.name.trim(),
+      kind: "business",
+      submittedBy: submitterEmail,
+    });
 
     return NextResponse.json({
       success: true,

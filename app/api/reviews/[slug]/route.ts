@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import sql, { isPgError } from "@/lib/db";
+import { sendAdminSubmissionAlert } from "@/lib/email";
 
 export async function POST(
   req: NextRequest,
@@ -36,7 +37,7 @@ export async function POST(
   }
 
   const business = await sql`
-    SELECT id FROM businesses
+    SELECT id, name FROM businesses
     WHERE slug = ${slug} AND status = 'listed'
   `;
 
@@ -72,6 +73,16 @@ export async function POST(
     }
     throw err;
   }
+
+  // Nudge the moderation inbox — reviews are held for approval. Fire-and-
+  // forget; the sender swallows its own errors and no-ops without an admin
+  // address, so it never affects the review response. Only reached when the
+  // insert succeeds (the duplicate case early-returns above).
+  await sendAdminSubmissionAlert({
+    itemName: business[0].name,
+    kind: "review",
+    submittedBy: session.user.email,
+  });
 
   return NextResponse.json({ success: true });
 }

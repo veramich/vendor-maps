@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sql, { isPgError } from "@/lib/db";
 import { uploadImage } from "@/lib/utils/uploadImage";
 import { auth } from "@/lib/auth";
-import { sendSubmissionReceivedEmail } from "@/lib/email";
+import { sendSubmissionReceivedEmail, sendAdminSubmissionAlert } from "@/lib/email";
 import { headers } from "next/headers";
 import {
   MAX_FLYERS,
@@ -355,6 +355,15 @@ export async function POST(req: NextRequest) {
         kind: "resource",
       });
     }
+
+    // Alert the moderation inbox that something new is waiting. Fire-and-
+    // forget — the sender swallows its own errors and no-ops when no admin
+    // address is configured, so it never affects the submit response.
+    await sendAdminSubmissionAlert({
+      itemName: title,
+      kind: "resource",
+      submittedBy: submitterEmail,
+    });
 
     return NextResponse.json({
       success: true,

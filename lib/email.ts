@@ -170,6 +170,69 @@ export function sendSubmissionReceivedEmail(args: {
 }
 
 /**
+ * Where admin alerts go. Prefers a dedicated ADMIN_EMAIL, falls back to the
+ * existing SUPPORT_EMAIL so it works without extra config. Returns null when
+ * neither is set, so the caller can skip sending rather than error.
+ */
+function adminRecipient(): string | null {
+  return process.env.ADMIN_EMAIL || process.env.SUPPORT_EMAIL || null;
+}
+
+type AdminAlertKind = "business" | "resource" | "claim" | "review";
+
+// Per-kind wording + which admin queue to link to. Keeps the sender body a
+// straight lookup instead of a pile of conditionals.
+const ADMIN_ALERT_META: Record<
+  AdminAlertKind,
+  { noun: string; path: string; verb: string }
+> = {
+  business: { noun: "business listing", path: "/admin/submissions", verb: "submitted" },
+  resource: { noun: "resource", path: "/admin/resources", verb: "submitted" },
+  claim: { noun: "business claim", path: "/admin/claims", verb: "requested" },
+  review: { noun: "review", path: "/admin/reviews", verb: "posted" },
+};
+
+/**
+ * Admin alert — fired to the moderation inbox the moment new content needs
+ * review (a submission, claim, or review), so pending items don't sit unseen
+ * until someone opens the admin dashboard. Distinct from
+ * sendSubmissionReceivedEmail (that reassures the submitter); this one nudges
+ * a reviewer to act. No-op if no admin address is configured. `kind` picks
+ * the wording and the review-queue link; `itemName` is the business/resource
+ * the action is about.
+ */
+export function sendAdminSubmissionAlert(args: {
+  itemName: string;
+  kind: AdminAlertKind;
+  submittedBy?: string | null;
+}) {
+  const to = adminRecipient();
+  if (!to) return;
+
+  const { noun, path, verb } = ADMIN_ALERT_META[args.kind];
+  const who = args.submittedBy
+    ? `<p style="margin:0 0 16px;color:#374151;">From
+        <strong>${args.submittedBy}</strong>.</p>`
+    : "";
+  // Claims/reviews are *about* a business; submissions *are* the item.
+  const bodyItem =
+    args.kind === "claim" || args.kind === "review"
+      ? `for <strong>${args.itemName}</strong>`
+      : `<strong>${args.itemName}</strong>`;
+
+  return send({
+    to,
+    subject: `New ${noun} pending review: ${args.itemName}`,
+    html: layout({
+      heading: "New submission needs review",
+      bodyHtml: `<p style="margin:0 0 16px;">A new ${noun} ${bodyItem} was just
+        ${verb} and is waiting for approval.</p>${who}`,
+      cta: { label: "Review in admin", href: `${baseUrl()}${path}` },
+    }),
+  });
+}
+
+/**
  * Generic notification email — mirrors an in-app notification. Called from
  * the notifications layer so every notification type gets email delivery.
  */
