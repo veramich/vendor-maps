@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "DATABASE_URL=postgres://smoke:smoke@localhost:5432/smoke node --import tsx --import ./tests/register-paths.mjs --test \"tests/**/*.test.ts\""
+    "test": "DATABASE_URL=postgres://smoke:smoke@localhost:5432/smoke node --import tsx --import ./tests/register-paths.mjs --test \"tests/*.test.ts\"",
+    "test:db": "node scripts/test-db.mjs"
   },
   "dependencies": {
     "better-auth": "^1.6.23",
