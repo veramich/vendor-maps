@@ -130,14 +130,16 @@ function resolveTiming(
   return { alwaysAvailable: false, startDate, endDate };
 }
 
-// Load a resource the caller is allowed to edit, or null. This is a community
-// directory: any logged-in user can edit any listed/pending resource (edits
-// bounce back to 'pending' for re-moderation below), so we don't scope by
-// submitter — only by editable status.
-async function loadEditable(id: string) {
+// Load a resource the caller is allowed to edit, or null. A resource can only
+// be edited by the user who submitted it (scoped by submitted_by) and only
+// while it's still pending/listed. Returning null for a non-owner or an
+// anonymous-submitted row means the caller gets a 404 — it's indistinguishable
+// from "doesn't exist", which avoids leaking which ids are real.
+async function loadEditable(id: string, userId: string) {
   const rows = await sql`
     SELECT * FROM resources
     WHERE id = ${id}
+    AND submitted_by = ${userId}
     AND status IN ('pending', 'listed')
   `;
   return rows[0] || null;
@@ -159,7 +161,7 @@ export async function GET(
       );
     }
 
-    const r = await loadEditable(id);
+    const r = await loadEditable(id, session.user.id);
     if (!r) {
       return NextResponse.json(
         { error: "Resource not found or not editable" },
@@ -232,7 +234,7 @@ export async function PATCH(
       );
     }
 
-    const existing = await loadEditable(id);
+    const existing = await loadEditable(id, session.user.id);
     if (!existing) {
       return NextResponse.json(
         { error: "Resource not found or not editable" },
@@ -384,6 +386,7 @@ export async function PATCH(
         flyers             = ${JSON.stringify(flyers)},
         status             = 'pending'
       WHERE id = ${id}
+      AND submitted_by = ${session.user.id}
     `;
 
     return NextResponse.json({ success: true, wasListed });

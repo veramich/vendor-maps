@@ -7,12 +7,10 @@ import { installNextMocks, setSessionCookie } from "./helpers/next-mocks.ts";
 
 // PATCH /api/user/resources/[id] — the resource edit flow.
 //
-// DESIGN NOTE (confirmed intentional, not a bug): resources are
-// community-editable. The endpoint checks sign-in but NOT ownership, so any
-// signed-in user may edit any resource. The safety net is that every edit
-// resets status -> 'pending' for admin re-approval. These tests PIN that
-// intended behavior so it can't change silently. (Contrast: the submissions
-// edit route IS ownership-scoped — see resourceEdit's sibling tests.)
+// A resource can only be edited by the user who submitted it (scoped by
+// submitted_by). A non-owner — or an anonymous-submitted row — gets a 404,
+// indistinguishable from "doesn't exist". Every accepted edit also resets
+// status -> 'pending' for admin re-approval. These tests pin both.
 
 installNextMocks();
 let route: typeof import("@/app/api/user/resources/[id]/route");
@@ -86,12 +84,20 @@ test("owner can edit their pending resource; fields update", async () => {
   assert.equal(after?.status, "pending");
 });
 
-test("INTENTIONAL: a non-owner can also edit (community-editable resources)", async () => {
+test("a non-owner cannot edit someone else's resource (404, row unchanged)", async () => {
   const id = await insertResource({ title: "Orig", status: "pending", submittedBy: owner.id });
 
   const res = await patch(id, { ...VALID, title: "Edited By Stranger" }, otherCookie);
-  assert.equal(res.status, 200, "resources are community-editable by design");
-  assert.equal((await row(id))?.title, "Edited By Stranger");
+  assert.equal(res.status, 404, "only the submitter may edit a resource");
+  assert.equal((await row(id))?.title, "Orig", "a blocked edit must not change the row");
+});
+
+test("an anonymous-submitted resource is not editable via this route (404)", async () => {
+  const id = await insertResource({ title: "Orphan", status: "pending", submittedBy: null });
+
+  const res = await patch(id, VALID, ownerCookie);
+  assert.equal(res.status, 404, "no submitted_by means no owner can claim it here");
+  assert.equal((await row(id))?.title, "Orphan");
 });
 
 test("re-moderation net: editing a LISTED resource resets it to pending (wasListed:true)", async () => {
