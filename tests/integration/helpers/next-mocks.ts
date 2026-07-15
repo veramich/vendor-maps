@@ -48,4 +48,12 @@ export function installNextMocks() {
       },
     },
   });
+  // Some actions call revalidatePath()/revalidateTag() before redirecting;
+  // outside a request they'd throw. No-op them so the action's own logic runs.
+  mock.module("next/cache", {
+    namedExports: {
+      revalidatePath: () => {},
+      revalidateTag: () => {},
+    },
+  });
 }
