@@ -1,5 +1,30 @@
 import { BusinessFormData } from "@/lib/types/business";
 
+// Turn whatever the user put in a prefixed handle field into a bare username.
+// The field shows e.g. "tiktok.com/@" as a label, so people paste the whole
+// domain after it ("tiktok.com/@myname" or "www.tiktok.com/@myname"). Left as-is
+// that becomes "https://tiktok.com/@tiktok.com/@myname", which TikTok bounces to
+// its homepage. We strip a leading protocol, www, any known social host, and a
+// leading @, then drop a trailing slash/query — leaving just "myname".
+const KNOWN_SOCIAL_HOSTS =
+  /^(?:instagram|facebook|fb|tiktok|twitter|x|youtube|youtu\.be)\.com\/@?/i;
+
+export const normalizeHandle = (value: string): string => {
+  if (!value) return "";
+  let handle = value.trim();
+
+  // A pasted full URL: strip protocol + optional www, then a known host prefix.
+  if (/^https?:\/\//i.test(handle)) {
+    handle = handle.replace(/^https?:\/\//i, "").replace(/^www\./i, "");
+  }
+  handle = handle.replace(/^www\./i, "");
+  handle = handle.replace(KNOWN_SOCIAL_HOSTS, "");
+
+  // Bare handle form: leading @ and any trailing path/query the username omits.
+  handle = handle.replace(/^@/, "").replace(/[/?#].*$/, "");
+  return handle;
+};
+
 export type SocialUrls = {
   website:   string;
   instagram: string;
@@ -21,16 +46,23 @@ export const buildSocialUrls = (
   ): string => {
     if (!value) return "";
 
-    // Already a full URL — return as is
-    if (value.startsWith("http://") ||
-        value.startsWith("https://")) {
+    // A full URL pointing at some other host (e.g. a Linktree in a profile
+    // field) — leave it alone. A full URL of a KNOWN social host falls through
+    // to normalizeHandle so it's rebuilt cleanly against baseUrl instead of
+    // being double-prefixed.
+    if (
+      (value.startsWith("http://") || value.startsWith("https://")) &&
+      !KNOWN_SOCIAL_HOSTS.test(
+        value.replace(/^https?:\/\//i, "").replace(/^www\./i, "")
+      )
+    ) {
       return value;
     }
 
-    // Just a username — build full URL.
-    // Strip a leading @ so e.g. "@myname" + "tiktok.com/@" doesn't
-    // become a double "@@", and an empty handle stays empty.
-    const handle = value.replace(/^@/, "");
+    // Reduce whatever was entered (bare handle, @handle, or a pasted same-host
+    // URL) to just the username, then build the canonical link. Empty stays
+    // empty so the link is hidden rather than pointing at the bare homepage.
+    const handle = normalizeHandle(value);
     if (!handle) return "";
     return `${baseUrl}${handle}`;
   };
@@ -93,13 +125,15 @@ export const extractSocialHandle = (
 
   for (const base of SOCIAL_BASES[field]) {
     if (stripped.startsWith(base)) {
-      // Drop any trailing slash/query the username wouldn't include.
-      return stripped.slice(base.length).replace(/[/?#].*$/, "");
+      // normalizeHandle heals a legacy row where the host was double-pasted
+      // (e.g. "tiktok.com/@tiktok.com/@myname"): drop the extra host, keep the
+      // real username. A clean row is unaffected.
+      return normalizeHandle(stripped.slice(base.length));
     }
   }
 
   // Not a recognised full URL — assume it's already a handle.
-  return value.replace(/^@/, "");
+  return normalizeHandle(value);
 };
 
 export const extractSocialHandles = <T extends Record<string, unknown>>(

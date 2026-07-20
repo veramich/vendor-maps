@@ -695,12 +695,13 @@ export default function Step6Media({
                     ] as string
                     }
                     onChange={(e) => {
-                    // For prefixed fields store username only
-                    // For website store full URL
-                    const value = prefix
-                        ? e.target.value.replace(/^@/, "")
-                        // strip @ if user types it
-                        : sanitizeText(e.target.value);
+                    // Store exactly what was typed (minus XSS scrubbing) so the
+                    // input never fights the cursor. A leading "@" is stripped
+                    // later, at validate/submit time (attachPrefixForValidation
+                    // and buildSocialUrls), not on every keystroke — doing it
+                    // here swallowed the first "@" a user typed, which read as a
+                    // dead keypress and forced repeated taps.
+                    const value = sanitizeText(e.target.value);
 
                     updateForm({ [field]: value });
                     if (errors[field]) {
