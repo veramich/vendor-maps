@@ -16,7 +16,6 @@ import {
 
 // Mocks must be installed before the action module is imported.
 installNextMocks();
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let actions: typeof import("@/app/admin/submissions/actions");
 
 async function insertPending(name: string, submittedBy?: string) {

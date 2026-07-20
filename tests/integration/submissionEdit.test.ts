@@ -37,13 +37,11 @@ async function insertClaimedBusiness(name: string, ownerId: string) {
 }
 
 let owner: { id: string };
-let ownerCookie: string;
 let intruderCookie: string;
 
 before(async () => {
   route = await import("@/app/api/user/submissions/[id]/route");
   owner = await createUser({ name: "Verified Owner" });
-  ownerCookie = await sessionCookieHeader(owner.id);
   const intruder = await createUser({ name: "Intruder" });
   intruderCookie = await sessionCookieHeader(intruder.id);
 });

@@ -126,7 +126,7 @@ function deleteBranch(branchId) {
   console.log(`→ deleting branch ${branchId}…`);
   try {
     neon(["branches", "delete", branchId]);
-  } catch (e) {
+  } catch {
     console.error(`! failed to delete branch ${branchId} — delete it manually:`);
     console.error(`  neonctl branches delete ${branchId} --org-id ${ORG_ID} --project-id ${PROJECT_ID}`);
   }
