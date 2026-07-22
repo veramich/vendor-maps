@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSession } from "@/lib/auth-client";
 import { useRouter, useParams } from "next/navigation";
+import { US_STATES } from "@/lib/types/resource";
 
 interface OwnerBusiness {
   name: string;
@@ -15,6 +16,7 @@ interface OwnerLocation {
   state_code: string | null;
   street_1: string | null;
   street_2: string | null;
+  street_address: string | null;
   show_exact_address: boolean | null;
   exact_address: string | null;
   state: string | null;
@@ -40,7 +42,8 @@ export default function EditListingPage() {
     useState(false);
   const [exactAddress, setExactAddress] = useState("");
   const [exactCity, setExactCity] = useState("");
-  const [exactState, setExactState] = useState("");
+  // 2-letter code — locations.state_code is what the public listing renders.
+  const [exactStateCode, setExactStateCode] = useState("");
   const [exactZip, setExactZip] = useState("");
 
   const fetchBusiness = useCallback(async () => {
@@ -64,11 +67,14 @@ export default function EditListingPage() {
       setShowExactAddress(
         data.location?.show_exact_address || false
       );
+      // The street-only field. exact_address is the joined
+      // "street, city, state, zip" display string, so loading
+      // it here would duplicate the city/state/zip inputs.
       setExactAddress(
-        data.location?.exact_address || ""
+        data.location?.street_address || ""
       );
       setExactCity(data.location?.city || "");
-      setExactState(data.location?.state || "");
+      setExactStateCode(data.location?.state_code || "");
       setExactZip(data.location?.zip || "");
 
     } catch {
@@ -101,7 +107,7 @@ export default function EditListingPage() {
             showExactAddress,
             exactAddress,
             exactCity,
-            exactState,
+            exactStateCode,
             exactZip,
           }),
         }
@@ -208,9 +214,10 @@ export default function EditListingPage() {
               Location Settings
             </h2>
             <p className="text-xs text-gray-400 mb-5">
-              By default only cross streets are shown.
-              As a verified owner you can choose to
-              display your exact address.
+              By default we show only cross streets, or no
+              address at all for businesses without a fixed
+              location. As a verified owner you can choose
+              to display your exact address instead.
             </p>
 
             {/* Current location display */}
@@ -223,7 +230,9 @@ export default function EditListingPage() {
                 text-black">
                 {showExactAddress && exactAddress
                   ? exactAddress
-                  : `${location.street_1} & ${location.street_2}`
+                  : location.street_1 && location.street_2
+                  ? `${location.street_1} & ${location.street_2}`
+                  : "No address shown"
                 }
               </p>
               <p className="text-xs text-gray-500">
@@ -329,20 +338,24 @@ export default function EditListingPage() {
                       text-gray-500 mb-1">
                       State
                     </label>
-                    <input
-                      type="text"
-                      value={exactState}
+                    <select
+                      value={exactStateCode}
                       onChange={(e) =>
-                        setExactState(e.target.value)
+                        setExactStateCode(e.target.value)
                       }
-                      placeholder="CA"
-                      maxLength={2}
                       className="w-full border-2
                         border-gray-200 rounded-xl
                         px-4 py-3 text-sm text-black
                         focus:outline-none
                         focus:border-black transition"
-                    />
+                    >
+                      <option value="">Select</option>
+                      {US_STATES.map((s) => (
+                        <option key={s.code} value={s.code}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
@@ -371,9 +384,10 @@ export default function EditListingPage() {
                   border-amber-200 rounded-xl
                   px-4 py-3">
                   <p className="text-xs text-amber-700">
-                    ⚠ Your exact address will be
-                    visible to all users once saved
-                    and approved.
+                    ⚠ Your exact address will be visible
+                    to all users as soon as you save, and
+                    your business will appear as a pin on
+                    the map at that address.
                   </p>
                 </div>
               </div>

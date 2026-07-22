@@ -5,6 +5,7 @@ import Image from "next/image";
 import { CLD } from "@/lib/utils/cldUrl";
 import SearchBar from "@/components/ui/SearchBar";
 import FilterPanel from "@/components/ui/FilterPanel";
+import { SUB_TYPE_LEGEND } from "@/components/map/HereMap";
 import {
   BusinessFilters,
   EMPTY_FILTERS,
@@ -35,38 +36,23 @@ type Business = {
   is_open: boolean | null;
 };
 
-const CATEGORIES = [
-  "All",
-  "Food",
-  "Coffee",
-  "Desserts",
-  "Beverages",
-  "Fresh Fruit",
-  "Candy",
-  "Produce",
-  "Personal Care",
-  "Wellness",
-  "Fitness",
-  "Handmade",
-  "Art",
-  "Jewelry",
-  "Apparel",
-  "Merchandise",
-  "Flowers",
-  "General Services",
-  "Event Services",
-  "Custom Designs",
-  "Collectables",
-  "Other",
-];
-
 export default function BusinessList() {
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [loading, setLoading] = useState(true);
   const [inputValue, setInputValue] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("");
   const [filters, setFilters] = useState<BusinessFilters>(EMPTY_FILTERS);
+
+  // The sub-type chip row is a single-select view of the sub_types filter,
+  // mirroring the map's legend chips: picking one replaces the whole subTypes
+  // array, "All" clears it. Both read from the same filters source.
+  const activeSubType = filters.subTypes[0] ?? "";
+  const handleSubType = (value: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      subTypes: value === "" ? [] : [value],
+    }));
+  };
 
   useEffect(() => {
     const fetchBusinesses = async () => {
@@ -82,7 +68,6 @@ export default function BusinessList() {
           params.set("now_time", now.now_time);
         }
         if (searchQuery) params.set("q", searchQuery);
-        if (categoryFilter) params.set("category", categoryFilter);
         const qs = params.toString();
         const res = await fetch(
           `/api/businesses/directory${qs ? `?${qs}` : ""}`
@@ -97,7 +82,7 @@ export default function BusinessList() {
     };
 
     fetchBusinesses();
-  }, [searchQuery, categoryFilter, filters]);
+  }, [searchQuery, filters]);
 
   const handleSearch = (q: string) => {
     setSearchQuery(q.trim());
@@ -106,12 +91,10 @@ export default function BusinessList() {
   const handleClearFilters = () => {
     setInputValue("");
     setSearchQuery("");
-    setCategoryFilter("");
     setFilters(EMPTY_FILTERS);
   };
 
-  const hasFilters =
-    searchQuery || categoryFilter || filters !== EMPTY_FILTERS;
+  const hasFilters = searchQuery || filters !== EMPTY_FILTERS;
 
   return (
     <div>
@@ -127,17 +110,27 @@ export default function BusinessList() {
           />
           <FilterPanel value={filters} onChange={setFilters} />
         </div>
+        {/* Sub-type chips — same set as the map's legend, single-select, but in
+            the directory's plain pill style (no marker color dots here). */}
         <div className="px-4 pb-3 overflow-x-auto">
           <div className="flex gap-2 min-w-max">
-            {CATEGORIES.map((cat) => {
-              const isActive =
-                cat === "All" ? categoryFilter === "" : categoryFilter === cat;
+            <button
+              onClick={() => handleSubType("")}
+              className={`px-4 py-2 rounded-full text-xs font-medium
+                transition whitespace-nowrap
+                ${activeSubType === ""
+                  ? "bg-black text-white"
+                  : "bg-gray-100 text-gray-600"
+                }`}
+            >
+              All
+            </button>
+            {SUB_TYPE_LEGEND.map(({ value, label }) => {
+              const isActive = activeSubType === value;
               return (
                 <button
-                  key={cat}
-                  onClick={() =>
-                    setCategoryFilter(cat === "All" ? "" : cat)
-                  }
+                  key={value}
+                  onClick={() => handleSubType(value)}
                   className={`px-4 py-2 rounded-full text-xs font-medium
                     transition whitespace-nowrap
                     ${isActive
@@ -145,7 +138,7 @@ export default function BusinessList() {
                       : "bg-gray-100 text-gray-600"
                     }`}
                 >
-                  {cat}
+                  {label}
                 </button>
               );
             })}

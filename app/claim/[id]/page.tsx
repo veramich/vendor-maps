@@ -277,7 +277,7 @@ export default function ClaimPage() {
             "Respond to reviews",
             "Update business information",
             "Add photos and videos",
-            "Show your exact address",
+            "Option to show your exact address",
             "Verified owner badge on your listing",
           ].map((benefit) => (
             <div key={benefit}
