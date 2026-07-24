@@ -132,6 +132,24 @@ export default function Step3Location({
       ? "none"
       : "cross"
   );
+  // Per-mode drafts so switching between the three options is non-destructive:
+  // each mode's fields are stashed on the way out and restored on the way back
+  // in. Seeded from the saved listing, so an approved location survives a look
+  // at the other modes. A ref (not state) — nothing here should re-render.
+  const ownerDrafts = useRef({
+    cross: {
+      street1: formData.street1,
+      street2: formData.street2,
+      lat:     formData.showExactAddress ? null : formData.lat,
+      lng:     formData.showExactAddress ? null : formData.lng,
+    },
+    exact: {
+      exactAddress: formData.exactAddress,
+      lat:          formData.showExactAddress ? formData.lat : null,
+      lng:          formData.showExactAddress ? formData.lng : null,
+    },
+  });
+
   // Open straight to the summary/results view when a saved location exists.
   const [showResults, setShowResults] = useState(hasSavedLocation);
   const mapRef = useRef<HTMLDivElement>(null);
@@ -175,29 +193,49 @@ export default function Step3Location({
     }
   };
 
-  // Switch the owner's location mode. Each mode owns a different set of
-  // fields, so clear the ones it doesn't use — otherwise a stale value from a
-  // hidden input gets saved alongside (same reasoning as the event switcher).
+  // Switch the owner's location mode without losing work: the outgoing mode's
+  // fields are stashed and the incoming mode's are restored. Nothing is
+  // discarded here — the inactive mode's values are dropped on the way out of
+  // the step (see `commitAndContinue`), so a stale hidden value still can't
+  // reach the server.
   const switchOwnerMode = (mode: OwnerLocationMode) => {
+    if (mode === ownerMode) return;
+
+    // Stash whatever the mode we're leaving currently holds.
+    if (ownerMode === "cross") {
+      ownerDrafts.current.cross = {
+        street1: formData.street1,
+        street2: formData.street2,
+        lat:     formData.lat,
+        lng:     formData.lng,
+      };
+    } else if (ownerMode === "exact") {
+      ownerDrafts.current.exact = {
+        exactAddress: formData.exactAddress,
+        lat:          formData.lat,
+        lng:          formData.lng,
+      };
+    }
+
     setOwnerMode(mode);
     setErrors({});
     setSearchError("");
+    setResults([]);
+
+    if (mapInstance.current) {
+      mapInstance.current.dispose();
+      mapInstance.current = null;
+    }
 
     if (mode === "none") {
+      // Directory-only: no pin. The other modes' drafts stay in the ref, so
+      // coming back restores them.
       setNotOnMap(true);
       setSelectedResult(null);
-      setResults([]);
       setShowResults(false);
-      if (mapInstance.current) {
-        mapInstance.current.dispose();
-        mapInstance.current = null;
-      }
       updateForm({
         noFixedLocation:  true,
         showExactAddress: false,
-        exactAddress:     "",
-        street1:          "",
-        street2:          "",
         lat:              null,
         lng:              null,
       });
@@ -206,25 +244,75 @@ export default function Step3Location({
 
     setNotOnMap(false);
 
+    const draft =
+      mode === "cross"
+        ? ownerDrafts.current.cross
+        : ownerDrafts.current.exact;
+
+    // A restored draft that still has its coordinates is a location the owner
+    // already confirmed, so drop straight back to the summary/map view.
+    const restoredPin = draft.lat != null && draft.lng != null;
+    setSelectedResult(
+      restoredPin
+        ? {
+            id:           "existing",
+            title:
+              mode === "cross"
+                ? `${ownerDrafts.current.cross.street1} & ` +
+                  `${ownerDrafts.current.cross.street2}`
+                : ownerDrafts.current.exact.exactAddress,
+            address:      "",
+            lat:          draft.lat as number,
+            lng:          draft.lng as number,
+            city:         formData.city,
+            state:        formData.state,
+            stateCode:    formData.stateCode,
+            zip:          formData.zip,
+            neighborhood: formData.neighborhood,
+          }
+        : null
+    );
+    setShowResults(restoredPin);
+
     if (mode === "cross") {
       updateForm({
         noFixedLocation:  false,
         showExactAddress: false,
-        exactAddress:     "",
+        street1:          ownerDrafts.current.cross.street1,
+        street2:          ownerDrafts.current.cross.street2,
+        lat:              ownerDrafts.current.cross.lat,
+        lng:              ownerDrafts.current.cross.lng,
       });
     } else {
-      // Exact address: the pin comes from the address itself, so the
-      // intersection fields are cleared and re-derived server-side.
-      setSelectedResult(null);
-      setResults([]);
-      setShowResults(false);
       updateForm({
         noFixedLocation:  false,
         showExactAddress: true,
-        street1:          "",
-        street2:          "",
+        exactAddress:     ownerDrafts.current.exact.exactAddress,
+        lat:              ownerDrafts.current.exact.lat,
+        lng:              ownerDrafts.current.exact.lng,
       });
     }
+  };
+
+  // Leaving the step commits the active mode: the other modes' drafts live
+  // only in the ref, so the values that reach the server are exactly the ones
+  // the selected mode owns. Without this a stashed intersection would still be
+  // sitting in formData when an exact address is what's being published.
+  const commitAndContinue = () => {
+    if (allowExactAddress && !isEvent) {
+      if (ownerMode === "none") {
+        updateForm({
+          street1:      "",
+          street2:      "",
+          exactAddress: "",
+        });
+      } else if (ownerMode === "cross") {
+        updateForm({ exactAddress: "" });
+      } else {
+        updateForm({ street1: "", street2: "" });
+      }
+    }
+    nextStep();
   };
 
   // Load HERE script
@@ -465,6 +553,16 @@ export default function Step3Location({
     setSelectedResult(result);
     setNotOnMap(false);
 
+    // Record the confirmed pin on the active mode's draft so switching away
+    // and back keeps it (and doesn't force another geocode).
+    if (ownerMode === "cross") {
+      ownerDrafts.current.cross.lat = result.lat;
+      ownerDrafts.current.cross.lng = result.lng;
+    } else if (ownerMode === "exact") {
+      ownerDrafts.current.exact.lat = result.lat;
+      ownerDrafts.current.exact.lng = result.lng;
+    }
+
     updateForm({
       lat:          result.lat,
       lng:          result.lng,
@@ -504,6 +602,16 @@ export default function Step3Location({
     setSelectedResult(null);
     setNotOnMap(false);
     setSearchError("");
+    // Re-editing the address discards the confirmed pin, so drop it from the
+    // active mode's draft as well — otherwise switching away and back would
+    // restore coordinates the user just cleared.
+    if (ownerMode === "cross") {
+      ownerDrafts.current.cross.lat = null;
+      ownerDrafts.current.cross.lng = null;
+    } else if (ownerMode === "exact") {
+      ownerDrafts.current.exact.lat = null;
+      ownerDrafts.current.exact.lng = null;
+    }
     updateForm({ lat: null, lng: null, noFixedLocation: false });
     if (mapInstance.current) {
       mapInstance.current.dispose();
@@ -744,7 +852,7 @@ export default function Step3Location({
                 </div>
                 {renderServedZipEditor()}
                 <button
-                  onClick={nextStep}
+                  onClick={commitAndContinue}
                   className="w-full bg-black text-white
                     rounded-xl py-4 text-sm font-medium
                     hover:bg-gray-800 transition"
@@ -1219,7 +1327,7 @@ export default function Step3Location({
 
             {/* Continue button */}
             <button
-              onClick={nextStep}
+              onClick={commitAndContinue}
               disabled={!canContinue}
               className="w-full bg-black text-white
                 rounded-xl py-4 text-sm font-medium

@@ -40,6 +40,9 @@ export default function EditSubmissionPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [step, setStep] = useState(initialStep);
+  // True once the user edits something, so Cancel only warns when there are
+  // changes to lose. Set from updateForm, never from the initial hydration.
+  const [dirty, setDirty] = useState(false);
 
   const fetchSubmission = useCallback(async () => {
     try {
@@ -82,6 +85,21 @@ export default function EditSubmissionPage() {
     data: Partial<BusinessFormData>
   ) => {
     setFormData(prev => ({ ...prev, ...data }));
+    setDirty(true);
+  };
+
+  // Cancel discards in-progress edits, so confirm first — but only when there
+  // is something to lose. An untouched form just goes back.
+  const handleCancel = () => {
+    if (
+      dirty &&
+      !window.confirm(
+        "Discard your changes? Anything you edited here will be lost."
+      )
+    ) {
+      return;
+    }
+    router.back();
   };
 
   const [saveMessage, setSaveMessage] = useState("");
@@ -323,9 +341,20 @@ export default function EditSubmissionPage() {
             </p>
           )}
           <button
+            onClick={handleCancel}
+            disabled={saving || saved}
+            className="ml-auto border-2 border-gray-200
+              text-black px-6 py-2.5 rounded-xl text-sm
+              font-medium hover:bg-gray-50
+              transition disabled:opacity-50
+              disabled:cursor-not-allowed"
+          >
+            Cancel
+          </button>
+          <button
             onClick={handleSave}
             disabled={saving || saved}
-            className="ml-auto bg-black text-white
+            className="bg-black text-white
               px-6 py-2.5 rounded-xl text-sm
               font-medium hover:bg-gray-800
               transition disabled:opacity-50

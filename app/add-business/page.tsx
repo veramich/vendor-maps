@@ -1,12 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   BusinessFormData,
   INITIAL_FORM_DATA,
 } from "@/lib/types/business";
 import { addPendingSubmission } from "@/lib/utils/pendingSubmissions";
+import {
+  BusinessDraft,
+  saveDraft,
+  loadDraft,
+  clearDraft,
+  isDraftMeaningful,
+} from "@/lib/utils/businessDraft";
 import Step0Ownership from
   "@/components/forms/add-business/Step0Ownership";
 import Step1Type from
@@ -45,7 +52,51 @@ export default function AddBusinessPage() {
   // step === 5, the vendor screen renders in place of Step5Details.
   const [vendorSubStep, setVendorSubStep] = useState(false);
 
+  // Autosaved draft found on mount — offered via a resume banner rather than
+  // applied silently, so a user starting a genuinely new submission isn't
+  // dropped into a half-filled form they didn't ask for. Read lazily on the
+  // first render (not in an effect) so the banner is there immediately and the
+  // autosave effect below never runs before the stored draft has been read.
+  // localStorage is unavailable during SSR; loadDraft returns null there and
+  // the state initializer re-runs on the client during hydration.
+  const [pendingDraft, setPendingDraft] =
+    useState<BusinessDraft | null>(() => {
+      const draft = loadDraft();
+      if (!draft) return null;
+      if (isDraftMeaningful(draft)) return draft;
+      // Nothing worth resuming — drop it so it can't resurface later.
+      clearDraft();
+      return null;
+    });
+  // Set once the flow submits successfully: from then on the draft is gone and
+  // must not be rewritten by the autosave effect.
+  const submittedRef = useRef(false);
+
   const isEvent = formData.type === "event";
+
+  // Autosave on every change. localStorage writes are synchronous and this
+  // payload is small (photos and the logo data URL are excluded), so there's
+  // no need to debounce.
+  useEffect(() => {
+    if (submittedRef.current) return;
+    // Don't overwrite a draft the user hasn't answered the banner for yet —
+    // the form is still showing empty initial state behind it.
+    if (pendingDraft) return;
+    saveDraft(step, vendorSubStep, formData);
+  }, [step, vendorSubStep, formData, pendingDraft]);
+
+  const resumeDraft = () => {
+    if (!pendingDraft) return;
+    setFormData(pendingDraft.formData);
+    setStep(pendingDraft.step);
+    setVendorSubStep(pendingDraft.vendorSubStep);
+    setPendingDraft(null);
+  };
+
+  const discardDraft = () => {
+    clearDraft();
+    setPendingDraft(null);
+  };
 
   // Events skip the Step-2 type screen (the kind is derived from the date mode
   // in Step 5), so the internal step sequence is 1 → 3 → 4 → 5(+vendor) → 6 → 7.
@@ -210,6 +261,12 @@ export default function AddBusinessPage() {
         addPendingSubmission(result.businessId);
       }
 
+      // The submission landed, so the draft has served its purpose. Cleared
+      // before the confirmation screen renders so a resumed-draft banner can't
+      // reappear if the user starts another submission from here.
+      submittedRef.current = true;
+      clearDraft();
+
       setSubmittedName(formData.name);
       // Track the real brand id (minted server-side for chain locations) so
       // "add another location" links the next location to the same brand.
@@ -249,6 +306,8 @@ export default function AddBusinessPage() {
       isChainLocation: true,
       brandId:         currentBrandId,
     });
+    // A new submission begins here, so autosave resumes for it.
+    submittedRef.current = false;
     setStep(3);
     setShowConfirmation(false);
   };
@@ -256,6 +315,8 @@ export default function AddBusinessPage() {
   const handleDifferentBusiness = () => {
     setFormData(INITIAL_FORM_DATA);
     setCurrentBrandId(null);
+    // A new submission begins here, so autosave resumes for it.
+    submittedRef.current = false;
     // Back to the ownership pre-step — a different business may have a
     // different owner.
     setStep(0);
@@ -263,6 +324,9 @@ export default function AddBusinessPage() {
   };
 
   const handleDone = () => {
+    // The re-seeded "add another" form is abandoned by leaving — don't keep it
+    // around to offer as a draft on the next visit.
+    clearDraft();
     router.push("/");
   };
 
@@ -336,6 +400,51 @@ export default function AddBusinessPage() {
               width: `${(getDisplayStep() / totalSteps) * 100}%`
             }}
           />
+        </div>
+      )}
+
+      {/* Resume banner — shown when an autosaved draft was found on mount */}
+      {pendingDraft && (
+        <div className="max-w-lg mx-auto px-4 pt-6">
+          <div
+            className="rounded-2xl p-4"
+            style={{
+              background: "#FFF4EC",
+              border: "2px solid var(--primary)",
+            }}
+          >
+            <p className="font-semibold text-black mb-1">
+              Pick up where you left off?
+            </p>
+            <p className="text-sm text-gray-500 mb-4">
+              We saved your progress
+              {pendingDraft.formData.name
+                ? ` on "${pendingDraft.formData.name}"`
+                : ""}
+              . Photos and your logo aren&apos;t saved, so you&apos;ll
+              need to add those again.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={resumeDraft}
+                className="flex-1 rounded-xl py-2.5 text-sm
+                  font-semibold text-white transition
+                  active:scale-95"
+                style={{ background: "var(--primary)" }}
+              >
+                Continue
+              </button>
+              <button
+                onClick={discardDraft}
+                className="flex-1 rounded-xl py-2.5 text-sm
+                  font-semibold text-gray-600 bg-white
+                  border border-gray-200 transition
+                  active:scale-95"
+              >
+                Start over
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
