@@ -3,6 +3,7 @@ import sql, { isPgError } from "@/lib/db";
 import { uploadImage } from "@/lib/utils/uploadImage";
 import { buildSocialUrls } from "@/lib/utils/buildSocialUrls";
 import { generateSlug } from "@/lib/utils/generateSlug";
+import { validateScheduleAnchor } from "@/lib/utils/validateSchedule";
 import { auth } from "@/lib/auth";
 import { sendSubmissionReceivedEmail, sendAdminSubmissionAlert } from "@/lib/email";
 import { headers } from "next/headers";
@@ -426,6 +427,14 @@ export async function POST(req: NextRequest) {
       data.marketSchedules?.length > 0
     ) {
       for (const schedule of data.marketSchedules) {
+        const scheduleError = validateScheduleAnchor(schedule);
+        if (scheduleError) {
+          return NextResponse.json(
+            { error: scheduleError },
+            { status: 400 }
+          );
+        }
+
         await sql`
           INSERT INTO market_schedules (
             business_id,

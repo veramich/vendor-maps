@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
-import { parseFilters, buildFilterClause } from "@/lib/businessFilterSql";
+import {
+  parseFilters,
+  buildFilterClause,
+  notExpiredEvent,
+} from "@/lib/businessFilterSql";
 
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim() || "";
@@ -55,6 +59,7 @@ export async function GET(req: NextRequest) {
         'permanent_location',
         'event'
       )
+      ${notExpiredEvent}
       ${searchFrag}
       ${categoryFrag}
       ${typeFrag}

@@ -234,7 +234,7 @@ function BusinessCard({ business }: { business: Business }) {
       {/* Cover image */}
       <div className="relative w-full aspect-[16/10]">
         {business.image_url ? (
-          <a href={businessHref} className="block w-full h-full active:scale-99">
+          <a href={businessHref} className="relative block w-full h-full active:scale-99">
             <Image
               src={CLD.card(business.image_url)}
               alt={business.name}

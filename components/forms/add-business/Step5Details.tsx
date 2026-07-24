@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { validateScheduleAnchor } from "@/lib/utils/validateSchedule";
 import {
   BusinessFormData,
   PRICE_TIERS,
@@ -216,7 +217,12 @@ export default function Step5Details({
             s.recurrenceType.startsWith("monthly")
               ? "Pick the first date this happens"
               : "Pick the next date this happens";
+          return;
         }
+        // The date must agree with the chosen weekday/ordinal, or the listing
+        // projects onto wrong dates forever. Server re-checks this.
+        const mismatch = validateScheduleAnchor(s);
+        if (mismatch) newErrors[`anchorDate_${i}`] = mismatch;
       });
     }
 

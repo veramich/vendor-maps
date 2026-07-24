@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
-import { parseFilters, buildFilterClause } from "@/lib/businessFilterSql";
+import {
+  parseFilters,
+  buildFilterClause,
+  notExpiredEvent,
+} from "@/lib/businessFilterSql";
 
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim() || "";
@@ -68,8 +72,16 @@ export async function GET(req: NextRequest) {
             ms.end_time,
             NULL::text AS event_start,
             CASE
-              -- With an anchor, step by the real cadence (14d biweekly, else 7d)
-              -- to the next occurrence on/after today.
+              -- Monthly cadences repeat on the nth weekday of the month, NOT on
+              -- a fixed day-step from the anchor. Must mirror nextMarketDate()
+              -- in app/directory/EventList.tsx — if these two disagree, a card
+              -- sorts by one date and displays another.
+              WHEN ms.recurrence_type LIKE 'monthly%' THEN
+                (nth_weekday_of_month(
+                   CURRENT_DATE, ms.day_of_week, ms.recurrence_type
+                 ) - CURRENT_DATE)
+              -- Weekly/biweekly with an anchor: step by the real cadence
+              -- (14d biweekly, else 7d) to the next occurrence on/after today.
               WHEN ms.anchor_date IS NOT NULL THEN
                 (CASE WHEN ms.recurrence_type = 'biweekly' THEN 14 ELSE 7 END)
                   * GREATEST(0, CEIL(
@@ -106,12 +118,16 @@ export async function GET(req: NextRequest) {
             END AS sort_key
           FROM popup_events pe
           WHERE pe.business_id = b.id
+          -- Skip dates that have already finished, so a business with a mix of
+          -- past and future dates shows its next one (not a stale one).
+          AND upper(pe.event_range) > NOW()::timestamp
         ) occs
         ORDER BY sort_key ASC
         LIMIT 1
       ) occ ON true
       WHERE b.status = 'listed'
       AND b.sub_type IN ('market', 'pop_up')
+      ${notExpiredEvent}
       ${searchFrag}
       ${filterFrag}
       ORDER BY b.created_at DESC

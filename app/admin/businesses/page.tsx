@@ -1,6 +1,7 @@
 import { requireAdmin } from "@/lib/adminAuth";
 import sql from "@/lib/db";
 import Link from "next/link";
+import DeleteEventButton from "./DeleteEventButton";
 
 interface BusinessRow {
   id: string;
@@ -106,14 +107,22 @@ export default async function AdminBusinesses() {
                   }
                 </td>
                 <td className="px-4 py-3">
-                  <Link
-                    href={`/${b.slug || b.id}`}
-                    target="_blank"
-                    className="text-xs text-black
-                      underline"
-                  >
-                    View
-                  </Link>
+                  <div className="flex items-center gap-3">
+                    <Link
+                      href={`/${b.slug || b.id}`}
+                      target="_blank"
+                      className="text-xs text-black
+                        underline"
+                    >
+                      View
+                    </Link>
+                    {b.type === "event" && (
+                      <DeleteEventButton
+                        businessId={b.id}
+                        name={b.name}
+                      />
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

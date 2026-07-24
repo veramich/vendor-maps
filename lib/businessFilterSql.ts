@@ -154,6 +154,25 @@ export function openNowPredicate(
   )`;
 }
 
+// Auto-expiry for specific-date events. A pop_up exists only for the dates it
+// listed, so once the last one ends it drops out of every listing surface.
+// Enforced at query time rather than by deleting rows (the codebase-wide
+// convention): the popup_events rows survive, so an owner can add new dates and
+// the listing comes back. Recurring markets have no end date and never expire.
+//
+// Applied where events are listed (/api/businesses/events, the map's
+// /api/businesses/locations); the detail page filters its own date list.
+export const notExpiredEvent = sql`
+  AND (
+    b.sub_type IS DISTINCT FROM 'pop_up'
+    OR EXISTS (
+      SELECT 1 FROM popup_events pe
+      WHERE pe.business_id = b.id
+      AND upper(pe.event_range) > NOW()::timestamp
+    )
+  )
+`;
+
 // Time-of-day bands as [lo, hi) windows. An event matches a band when its
 // open interval overlaps the band, so an 11:00–17:00 event hits both morning
 // and afternoon. Evening runs to 24:00.

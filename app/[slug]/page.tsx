@@ -147,7 +147,7 @@ async function getBusinessBySlug(slug: string) {
         upper(event_range) as end_time
       FROM popup_events
       WHERE business_id = ${business.id}
-      AND upper(event_range) > NOW()
+      AND upper(event_range) > NOW()::timestamp
       ORDER BY lower(event_range) ASC
     `;
 

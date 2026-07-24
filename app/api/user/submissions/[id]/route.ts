@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { buildSocialUrls } from
   "@/lib/utils/buildSocialUrls";
 import { uploadImage } from "@/lib/utils/uploadImage";
+import { validateScheduleAnchor } from "@/lib/utils/validateSchedule";
 import cloudinary from "@/lib/cloudinary";
 import { BusinessFormData } from "@/lib/types/business";
 
@@ -704,6 +705,24 @@ export async function PATCH(
       await sql`
         UPDATE businesses SET sub_type = ${newSubType} WHERE id = ${id}
       `;
+
+      // Validate BEFORE the delete below — bailing out mid-loop would leave the
+      // listing with its schedules wiped and nothing written back.
+      if (
+        data.eventDateMode === "recurring" &&
+        Array.isArray(data.marketSchedules)
+      ) {
+        for (const s of data.marketSchedules) {
+          if (!s.dayOfWeek || !s.recurrenceType) continue;
+          const scheduleError = validateScheduleAnchor(s);
+          if (scheduleError) {
+            return NextResponse.json(
+              { error: scheduleError },
+              { status: 400 }
+            );
+          }
+        }
+      }
 
       await sql`DELETE FROM market_schedules WHERE business_id = ${id}`;
       await sql`DELETE FROM popup_events WHERE business_id = ${id}`;
