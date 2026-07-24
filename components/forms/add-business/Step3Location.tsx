@@ -9,6 +9,10 @@ interface Step3LocationProps {
   formData: BusinessFormData;
   updateForm: (data: Partial<BusinessFormData>) => void;
   nextStep: () => void;
+  // Verified owners may publish their exact address instead of just cross
+  // streets — including home based and street based vendors, who otherwise
+  // have no address on the listing at all. Mirrors Step4Info's allowLogo.
+  allowExactAddress?: boolean;
 }
 
 const US_STATES = [
@@ -81,6 +85,7 @@ export default function Step3Location({
   formData,
   updateForm,
   nextStep,
+  allowExactAddress = false,
 }: Step3LocationProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [searching, setSearching] = useState(false);
@@ -115,6 +120,18 @@ export default function Step3Location({
     );
   const [notOnMap, setNotOnMap] =
     useState(formData.noFixedLocation);
+
+  // Verified owners choose how their location appears, rather than being
+  // limited to cross streets. Derived from saved data on load: an exact
+  // address wins, then the directory-only flag, else intersections.
+  type OwnerLocationMode = "none" | "cross" | "exact";
+  const [ownerMode, setOwnerMode] = useState<OwnerLocationMode>(
+    formData.showExactAddress
+      ? "exact"
+      : formData.noFixedLocation
+      ? "none"
+      : "cross"
+  );
   // Open straight to the summary/results view when a saved location exists.
   const [showResults, setShowResults] = useState(hasSavedLocation);
   const mapRef = useRef<HTMLDivElement>(null);
@@ -136,6 +153,11 @@ export default function Step3Location({
       : "full"
   );
 
+  // The owner picked "exact address" — that replaces the intersection inputs
+  // and drives both the listing address and the map pin.
+  const ownerExactMode =
+    allowExactAddress && !isEvent && ownerMode === "exact";
+
   // Whether the cross-streets fields are the active address inputs.
   const useCrossStreets = isEvent
     ? eventAddressMode === "cross"
@@ -150,6 +172,58 @@ export default function Step3Location({
       updateForm({ street1: "", street2: "" });
     } else {
       updateForm({ streetAddress: "" });
+    }
+  };
+
+  // Switch the owner's location mode. Each mode owns a different set of
+  // fields, so clear the ones it doesn't use — otherwise a stale value from a
+  // hidden input gets saved alongside (same reasoning as the event switcher).
+  const switchOwnerMode = (mode: OwnerLocationMode) => {
+    setOwnerMode(mode);
+    setErrors({});
+    setSearchError("");
+
+    if (mode === "none") {
+      setNotOnMap(true);
+      setSelectedResult(null);
+      setResults([]);
+      setShowResults(false);
+      if (mapInstance.current) {
+        mapInstance.current.dispose();
+        mapInstance.current = null;
+      }
+      updateForm({
+        noFixedLocation:  true,
+        showExactAddress: false,
+        exactAddress:     "",
+        street1:          "",
+        street2:          "",
+        lat:              null,
+        lng:              null,
+      });
+      return;
+    }
+
+    setNotOnMap(false);
+
+    if (mode === "cross") {
+      updateForm({
+        noFixedLocation:  false,
+        showExactAddress: false,
+        exactAddress:     "",
+      });
+    } else {
+      // Exact address: the pin comes from the address itself, so the
+      // intersection fields are cleared and re-derived server-side.
+      setSelectedResult(null);
+      setResults([]);
+      setShowResults(false);
+      updateForm({
+        noFixedLocation:  false,
+        showExactAddress: true,
+        street1:          "",
+        street2:          "",
+      });
     }
   };
 
@@ -271,7 +345,11 @@ export default function Step3Location({
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
-    if (useCrossStreets) {
+    if (ownerExactMode) {
+      if (!formData.exactAddress.trim()) {
+        newErrors.exactAddress = "Street address is required";
+      }
+    } else if (useCrossStreets) {
       if (!formData.street1.trim()) {
         newErrors.street1 = "Street 1 is required";
       }
@@ -312,9 +390,15 @@ export default function Step3Location({
       mapInstance.current = null;
     }
 
-    const query = useCrossStreets
-      ? `${formData.street1} & ${formData.street2}, ${formData.city}, ${formData.stateCode}${formData.zip ? ` ${formData.zip}` : ""}`
-      : `${formData.streetAddress}, ${formData.city}, ${formData.stateCode}${formData.zip ? ` ${formData.zip}` : ""}`;
+    const streetPart = ownerExactMode
+      ? formData.exactAddress
+      : useCrossStreets
+      ? `${formData.street1} & ${formData.street2}`
+      : formData.streetAddress;
+
+    const query =
+      `${streetPart}, ${formData.city}, ${formData.stateCode}` +
+      `${formData.zip ? ` ${formData.zip}` : ""}`;
 
     try {
       const res = await fetch(
@@ -530,6 +614,11 @@ export default function Step3Location({
       <p className="text-gray-500 text-sm mb-8">
         {isEvent
           ? "Enter the venue's full address or its cross streets."
+          : allowExactAddress
+          ? <>
+              As a verified owner you choose how much of your
+              location is public.
+            </>
           : <>
               We will not ask for the address, just the cross streets.
               <br />
@@ -543,10 +632,77 @@ export default function Step3Location({
         {/* Address fields */}
         {!showResults && (
           <>
+            {/* Verified owners pick how their location appears. Everyone else
+                gets the plain directory-only opt-out below. */}
+            {allowExactAddress && !isEvent && (
+              <div className="space-y-2 mb-2">
+                <p className="text-sm font-medium text-black">
+                  How should your location appear?
+                </p>
+                {([
+                  {
+                    value: "none" as const,
+                    title: "No location",
+                    desc:  "Directory only, no pin on the map. " +
+                           "You can list the zip codes you serve.",
+                  },
+                  {
+                    value: "cross" as const,
+                    title: "Cross streets",
+                    desc:  "Show the nearest intersection instead " +
+                           "of your address.",
+                  },
+                  {
+                    value: "exact" as const,
+                    title: "Exact address",
+                    desc:  "Show your full street address and place " +
+                           "your pin there.",
+                  },
+                ]).map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => switchOwnerMode(opt.value)}
+                    className={`w-full border-2 rounded-xl p-4
+                      text-left transition
+                      ${ownerMode === opt.value
+                        ? "border-black bg-gray-50"
+                        : "border-gray-200 hover:border-gray-300"
+                      }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-5 h-5 rounded-full
+                        border-2 flex-shrink-0 mt-0.5 flex
+                        items-center justify-center transition
+                        ${ownerMode === opt.value
+                          ? "border-black bg-black"
+                          : "border-gray-300"
+                        }`}>
+                        {ownerMode === opt.value && (
+                          <div className="w-2 h-2 rounded-full
+                            bg-white"/>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium
+                          text-black">
+                          {opt.title}
+                        </p>
+                        <p className="text-xs text-gray-500
+                          mt-0.5">
+                          {opt.desc}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Directory-only opt-out — placed first so vendors without a
                 fixed spot can skip the address entirely. Checking it
                 collapses the rest of this section. */}
-            {!isEvent && (
+            {!isEvent && !allowExactAddress && (
               <label className="flex items-center gap-2
                 cursor-pointer mb-2">
                 <input
@@ -628,8 +784,42 @@ export default function Step3Location({
               </div>
             )}
 
+            {/* Exact address — verified owners only, replaces the
+                intersection inputs and drives the map pin. */}
+            {!notOnMap && ownerExactMode && (
+              <div>
+                <label className="block text-sm
+                  font-medium text-black mb-1">
+                  Street Address
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.exactAddress}
+                  onChange={(e) => {
+                    updateForm({
+                      exactAddress: e.target.value,
+                    });
+                    if (errors.exactAddress) setErrors(
+                      prev => ({ ...prev, exactAddress: "" })
+                    );
+                  }}
+                  placeholder="e.g. 456 Spring St"
+                  className={inputClass("exactAddress")}
+                />
+                {errors.exactAddress && (
+                  <p className="text-red-500 text-xs mt-1">
+                    {errors.exactAddress}
+                  </p>
+                )}
+                <p className="text-xs text-gray-400 mt-1">
+                  Shown publicly on your listing.
+                </p>
+              </div>
+            )}
+
             {/* Cross streets */}
-            {!notOnMap && useCrossStreets && (
+            {!notOnMap && !ownerExactMode && useCrossStreets && (
               <>
                 <div>
                   <label className="block text-sm
@@ -857,7 +1047,9 @@ export default function Step3Location({
               justify-between">
               <p className="text-sm font-medium
                 text-black">
-                {useCrossStreets
+                {ownerExactMode
+                  ? formData.exactAddress
+                  : useCrossStreets
                   ? `${formData.street1} & ${formData.street2}`
                   : formData.streetAddress
                 }
@@ -942,8 +1134,9 @@ export default function Step3Location({
             )}
 
             {/* Directory-only checkbox — small business only; events must
-                have a location. */}
-            {!isEvent && (
+                have a location. Verified owners use the mode selector
+                instead, so this would duplicate "No location" for them. */}
+            {!isEvent && !allowExactAddress && (
             <label className={`flex items-start gap-3
               cursor-pointer p-4 border-2 rounded-xl
               transition
@@ -1008,6 +1201,19 @@ export default function Step3Location({
                     width: "100%",
                   }}
                 />
+              </div>
+            )}
+
+            {/* Exact-address mode publishes the street address publicly and
+                pins the map there — worth restating before they commit. */}
+            {ownerExactMode && selectedResult && (
+              <div className="bg-amber-50 border
+                border-amber-200 rounded-xl px-4 py-3">
+                <p className="text-xs text-amber-700">
+                  ⚠ This address will be visible to everyone
+                  on your listing, and your business will
+                  appear as a pin on the map here.
+                </p>
               </div>
             )}
 

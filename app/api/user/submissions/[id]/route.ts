@@ -98,6 +98,7 @@ export async function GET(
         street_1, street_2, street_address,
         city, state, state_code, zip, neighborhood,
         location_amenities,
+        show_exact_address, exact_address,
         ST_X(coordinates) AS lng,
         ST_Y(coordinates) AS lat
       FROM locations
@@ -116,6 +117,12 @@ export async function GET(
       zip:           locRow?.zip || "",
       neighborhood:  locRow?.neighborhood || "",
       locationAmenities: locRow?.location_amenities || [],
+      showExactAddress: locRow?.show_exact_address || false,
+      // exact_address is the joined "street, city, state, zip" display
+      // string; the form edits the street portion only, so send that back.
+      exactAddress:  locRow?.exact_address
+        ? String(locRow.exact_address).split(",")[0].trim()
+        : "",
       lat:           locRow?.lat ?? null,
       lng:           locRow?.lng ?? null,
       // Directory-only when the business has no map coordinates.
@@ -442,18 +449,82 @@ export async function PATCH(
           data.lat == null ||
           data.lng == null);
 
-      // Realign the business type for small business when the map/no-map
-      // choice changed (events stay 'event').
-      if (!isEventRow) {
-        await sql`
-          UPDATE businesses
-          SET type = ${directoryOnly ? "no_location" : "permanent_location"}
-          WHERE id = ${id}
-        `;
+      // Exact address is a verified-owner capability: only a claimed listing's
+      // owner may set it. Anyone else's value is ignored rather than rejected,
+      // so a stale form can't fail an otherwise valid save.
+      const isVerifiedOwner =
+        existing[0].claim_status === "claimed" &&
+        existing[0].claimed_by === session.user.id;
+
+      const wantsExactAddress =
+        isVerifiedOwner &&
+        data.showExactAddress === true &&
+        typeof data.exactAddress === "string" &&
+        data.exactAddress.trim() !== "";
+
+      const fullExactAddress = wantsExactAddress
+        ? [
+            data.exactAddress.trim(),
+            data.city,
+            data.stateCode,
+            data.zip,
+          ]
+            .filter(Boolean)
+            .join(", ")
+        : null;
+
+      // Publishing an exact address also drops the map pin — vendors with no
+      // fixed location (home based, street based) have no coords otherwise, so
+      // geocode what the owner just gave us.
+      let exactCoords: { lat: number; lng: number } | null = null;
+
+      if (fullExactAddress) {
+        try {
+          const geoRes = await fetch(
+            "https://geocode.search.hereapi.com/v1/geocode" +
+            `?q=${encodeURIComponent(fullExactAddress)}` +
+            "&in=countryCode:USA&limit=1" +
+            `&apiKey=${process.env.HERE_API_KEY}`
+          );
+          const geoData = await geoRes.json();
+          const position = geoData.items?.[0]?.position;
+          if (position?.lat && position?.lng) {
+            exactCoords = {
+              lat: position.lat,
+              lng: position.lng,
+            };
+          }
+        } catch (error) {
+          // Never block the save on a geocode failure; the address still
+          // publishes, the listing just keeps whatever pin it had.
+          console.error("Exact-address geocode error:", error);
+        }
       }
 
       const hasCoords =
-        !directoryOnly && data.lat != null && data.lng != null;
+        (!directoryOnly && data.lat != null && data.lng != null) ||
+        exactCoords !== null;
+
+      // The exact address wins the pin when set, so a directory-only vendor
+      // who opts in still lands on the map at their own address.
+      const pinLng = exactCoords ? exactCoords.lng : data.lng;
+      const pinLat = exactCoords ? exactCoords.lat : data.lat;
+
+      // Realign the business type for small business when the map/no-map
+      // choice changed (events stay 'event'). Runs after the exact-address
+      // geocode: a vendor with no fixed location who publishes their address
+      // does get a pin, so they are no longer directory-only.
+      if (!isEventRow) {
+        await sql`
+          UPDATE businesses
+          SET type = ${
+            directoryOnly && !exactCoords
+              ? "no_location"
+              : "permanent_location"
+          }
+          WHERE id = ${id}
+        `;
+      }
 
       const existingLoc = await sql`
         SELECT id FROM locations WHERE business_id = ${id} LIMIT 1
@@ -472,22 +543,25 @@ export async function PATCH(
             zip            = ${data.zip || null},
             neighborhood   = ${data.neighborhood || null},
             location_amenities = ${data.locationAmenities || []},
+            show_exact_address = ${wantsExactAddress},
+            exact_address  = ${fullExactAddress},
             coordinates    = ${
               hasCoords
-                ? sql`ST_MakePoint(${data.lng}, ${data.lat})`
+                ? sql`ST_MakePoint(${pinLng}, ${pinLat})`
                 : sql`NULL`
             },
             updated_at     = NOW()
           WHERE business_id = ${id}
         `;
-      } else if (hasCoords || data.city) {
+      } else if (hasCoords || data.city || fullExactAddress) {
         // No row yet (e.g. a previously directory-only business gaining an
         // address) — insert one.
         await sql`
           INSERT INTO locations (
             business_id, street_1, street_2, street_address,
             city, state, state_code, zip, country, neighborhood,
-            location_amenities, coordinates, is_active_area
+            location_amenities, show_exact_address, exact_address,
+            coordinates, is_active_area
           ) VALUES (
             ${id},
             ${data.street1 || null},
@@ -500,7 +574,9 @@ export async function PATCH(
             'USA',
             ${data.neighborhood || null},
             ${data.locationAmenities || []},
-            ${hasCoords ? sql`ST_MakePoint(${data.lng}, ${data.lat})` : sql`NULL`},
+            ${wantsExactAddress},
+            ${fullExactAddress},
+            ${hasCoords ? sql`ST_MakePoint(${pinLng}, ${pinLat})` : sql`NULL`},
             true
           )
         `;

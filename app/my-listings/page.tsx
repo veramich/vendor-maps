@@ -234,7 +234,7 @@ export default function MyListingsPage() {
                   </Link>
                   <Link
                     href={
-                      `/my-listings/${listing.id}/edit`
+                      `/my-submissions/${listing.id}/edit`
                     }
                     className="flex-1 text-center
                       bg-black text-white text-xs

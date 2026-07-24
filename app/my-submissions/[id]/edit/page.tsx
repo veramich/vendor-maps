@@ -269,6 +269,9 @@ export default function EditSubmissionPage() {
             formData={formData}
             updateForm={updateForm}
             nextStep={() => setStep(4)}
+            allowExactAddress={
+              formData.claim_status === "claimed"
+            }
           />
         )}
         {step === 4 && (

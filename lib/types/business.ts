@@ -120,6 +120,12 @@ export type BusinessFormData = {
   // directory-only businesses can list up to 5 zip codes they serve; ignored
   // for located businesses and events
   servedZips:     string[];
+  // Verified owners only: publish the exact street address on the listing
+  // instead of cross streets (or instead of nothing, for vendors with no
+  // fixed location). Ignored on submit — set from the edit flow once the
+  // claim is approved.
+  showExactAddress: boolean;
+  exactAddress:     string;
   // cross streets (all except market and pop_up)
   street1:        string;
   street2:        string;
@@ -210,6 +216,8 @@ export const INITIAL_FORM_DATA: BusinessFormData = {
   detailedSubType: null,
   noFixedLocation:  false,
   servedZips:       [],
+  showExactAddress: false,
+  exactAddress:     "",
   street1:          "",
   street2:          "",
   streetAddress:    "",

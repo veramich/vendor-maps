@@ -319,7 +319,7 @@ export default function MySubmissionsPage() {
                     {sub.status === "listed" &&
                       sub.claim_status === "claimed" && (
                       <Link
-                        href={`/my-listings/${sub.id}/edit`}
+                        href={`/my-submissions/${sub.id}/edit`}
                         className="text-xs border border-gray-200
                           text-black px-3 py-1.5 rounded-lg
                           hover:bg-gray-50 transition"
@@ -440,7 +440,7 @@ export default function MySubmissionsPage() {
                       </Link>
                       <Link
                         href={
-                          `/my-listings/${claim.business_id}/edit`
+                          `/my-submissions/${claim.business_id}/edit`
                         }
                         className="text-xs border
                           border-gray-200 text-black
