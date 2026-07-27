@@ -6,6 +6,11 @@ import { redirect } from "next/navigation";
 import sql from "@/lib/db";
 import { generateSlug } from "@/lib/utils/generateSlug";
 import { createNotification } from "@/lib/notifications";
+import {
+  restoreListingSnapshot,
+  purgeRemovedSnapshotImages,
+  type ListingSnapshot,
+} from "@/lib/listingSnapshot";
 
 async function requireAdmin() {
   const session = await auth.api.getSession({
@@ -26,11 +31,21 @@ export async function approveSubmission(formData: FormData) {
   const businessId = formData.get("businessId") as string;
 
   const [business] = await sql`
-    SELECT b.name, b.slug, b.submitted_by, l.city, l.neighborhood
+    SELECT b.name, b.slug, b.submitted_by, b.edit_snapshot, l.city, l.neighborhood
     FROM businesses b
     LEFT JOIN locations l ON l.business_id = b.id
     WHERE b.id = ${businessId}
   `;
+
+  // Approving an edit accepts the new photo set: the pre-edit assets the edit
+  // route deferred deleting are now truly orphaned, so purge them from
+  // Cloudinary. (No-op for a new submission, which has no snapshot.)
+  if (business.edit_snapshot) {
+    await purgeRemovedSnapshotImages(
+      businessId,
+      business.edit_snapshot as ListingSnapshot
+    );
+  }
 
   let slug = business.slug;
 
@@ -43,14 +58,18 @@ export async function approveSubmission(formData: FormData) {
 
     await sql`
       UPDATE businesses SET
-        status = 'listed',
-        slug   = ${slug}
+        status        = 'listed',
+        slug          = ${slug},
+        edit_snapshot = NULL,
+        edited_at     = NULL
       WHERE id = ${businessId}
     `;
   } else {
     await sql`
       UPDATE businesses SET
-        status = 'listed'
+        status        = 'listed',
+        edit_snapshot = NULL,
+        edited_at     = NULL
       WHERE id = ${businessId}
     `;
   }
@@ -76,14 +95,49 @@ export async function rejectSubmission(formData: FormData) {
   const message = (formData.get("message") as string | null)?.trim() || null;
 
   const [business] = await sql`
-    SELECT name, submitted_by
+    SELECT name, slug, submitted_by, edit_snapshot
     FROM businesses
     WHERE id = ${businessId}
   `;
 
+  // An edit of a previously-live listing carries a snapshot of the values that
+  // were live before the edit. Rejecting such an edit rolls the listing back to
+  // that snapshot and keeps it listed, rather than taking a live business
+  // offline. A brand-new submission (no snapshot) is rejected outright.
+  if (business?.edit_snapshot) {
+    await restoreListingSnapshot(
+      businessId,
+      business.edit_snapshot as ListingSnapshot
+    );
+    await sql`
+      UPDATE businesses SET
+        status        = 'listed',
+        edit_snapshot = NULL,
+        edited_at     = NULL
+      WHERE id = ${businessId}
+    `;
+
+    if (business.submitted_by) {
+      await createNotification({
+        userId: business.submitted_by,
+        type: "submission_rejected",
+        title: `Your edits to ${business.name} weren't approved`,
+        body:
+          message ??
+          "Your changes didn't meet our listing guidelines, so the listing was kept as it was. Contact us if you have questions.",
+        link: business.slug ? `/${business.slug}` : "/contact",
+        data: { businessId },
+      });
+    }
+
+    redirect("/admin/submissions");
+  }
+
   await sql`
     UPDATE businesses SET
-      status = 'rejected'
+      status        = 'rejected',
+      edit_snapshot = NULL,
+      edited_at     = NULL
     WHERE id = ${businessId}
   `;
 
@@ -109,14 +163,26 @@ export async function markDuplicate(formData: FormData) {
   const businessId = formData.get("businessId") as string;
 
   const [business] = await sql`
-    SELECT name, submitted_by
+    SELECT name, submitted_by, edit_snapshot
     FROM businesses
     WHERE id = ${businessId}
   `;
 
+  // If a snapshot is present (an edit), the deferred pre-edit assets are no
+  // longer reachable once this becomes a duplicate — purge them so they don't
+  // leak on Cloudinary.
+  if (business?.edit_snapshot) {
+    await purgeRemovedSnapshotImages(
+      businessId,
+      business.edit_snapshot as ListingSnapshot
+    );
+  }
+
   await sql`
     UPDATE businesses SET
-      status = 'duplicate'
+      status        = 'duplicate',
+      edit_snapshot = NULL,
+      edited_at     = NULL
     WHERE id = ${businessId}
   `;
 

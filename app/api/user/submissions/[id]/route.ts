@@ -8,6 +8,7 @@ import { uploadImage } from "@/lib/utils/uploadImage";
 import { validateScheduleAnchor } from "@/lib/utils/validateSchedule";
 import cloudinary from "@/lib/cloudinary";
 import { BusinessFormData } from "@/lib/types/business";
+import { buildListingSnapshot } from "@/lib/listingSnapshot";
 
 // Add one day to a YYYY-MM-DD string (UTC noon, so it never drifts across a
 // timezone boundary). Mirrors the helper in the submit route.
@@ -341,6 +342,26 @@ export async function PATCH(
     }
 
     const wasListed = existing[0].status === 'listed';
+
+    // Editing a live listing overwrites its row in place and flips it back to
+    // pending, destroying the previously-live values. Capture a full snapshot
+    // first so the admin queue can show a field-by-field old→new comparison.
+    // Only real edits of a listed business are snapshotted; re-editing an
+    // already-pending item keeps whatever snapshot it already had (its "before"
+    // is still the last live version, not the intermediate pending state).
+    if (wasListed) {
+      const snapshot = await buildListingSnapshot(id);
+      if (snapshot) {
+        await sql`
+          UPDATE businesses
+          SET edit_snapshot = ${sql.json(
+            snapshot as unknown as Record<string, never>
+          )},
+              edited_at      = NOW()
+          WHERE id = ${id}
+        `;
+      }
+    }
 
     // The edit form submits multipart (text fields as a JSON "data" blob,
     // kept image ids as JSON, plus new image files). Older callers may still
@@ -794,19 +815,27 @@ export async function PATCH(
         img => !keptImageIds!.includes(img.id)
       );
 
-      for (const img of removed) {
-        try {
-          await cloudinary.uploader.destroy(
-            img.cloudinary_public_id
-          );
-        } catch (err) {
-          // Don't fail the whole save if Cloudinary cleanup hiccups;
-          // the DB row is still removed below.
-          console.error(
-            "Cloudinary destroy failed:",
-            img.cloudinary_public_id,
-            err
-          );
+      // When this edit is an under-review change to a live listing (wasListed),
+      // defer destroying the removed assets: an admin may reject the edit, in
+      // which case restoreListingSnapshot rebuilds these rows and the files must
+      // still exist. approveSubmission calls purgeRemovedSnapshotImages to clean
+      // them up once the edit is accepted. For a still-pending (never-listed)
+      // submission there's nothing to revert to, so delete immediately.
+      if (!wasListed) {
+        for (const img of removed) {
+          try {
+            await cloudinary.uploader.destroy(
+              img.cloudinary_public_id
+            );
+          } catch (err) {
+            // Don't fail the whole save if Cloudinary cleanup hiccups;
+            // the DB row is still removed below.
+            console.error(
+              "Cloudinary destroy failed:",
+              img.cloudinary_public_id,
+              err
+            );
+          }
         }
       }
 

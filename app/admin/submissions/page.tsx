@@ -1,187 +1,138 @@
 import { requireAdmin } from "@/lib/adminAuth";
 import sql from "@/lib/db";
-import Link from "next/link";
-import { approveSubmission, rejectSubmission, markDuplicate } from "./actions";
+import {
+  buildListingSnapshot,
+  type ListingSnapshot,
+} from "@/lib/listingSnapshot";
+import SubmissionCard, {
+  type SubmissionCardData,
+} from "./SubmissionCard";
 
-interface SubmissionRow {
+interface PendingRow {
   id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  category: string | null;
-  sub_type: string | null;
+  slug: string | null;
   status: string;
+  created_at: string;
+  edited_at: string | null;
+  edit_snapshot: ListingSnapshot | null;
   city: string | null;
   state_code: string | null;
+  neighborhood: string | null;
   street_1: string | null;
   street_2: string | null;
   street_address: string | null;
-  created_at: string;
+}
+
+function cityLine(r: PendingRow): string {
+  const addr =
+    r.street_1 && r.street_2
+      ? `${r.street_1} & ${r.street_2}`
+      : r.street_address || "";
+  return (
+    [addr, r.neighborhood, r.city, r.state_code].filter(Boolean).join(", ") ||
+    "No location"
+  );
 }
 
 export default async function AdminSubmissions() {
   await requireAdmin();
 
-  const submissions = await sql<SubmissionRow[]>`
+  const rows = await sql<PendingRow[]>`
     SELECT
-      b.*,
+      b.id,
+      b.slug,
+      b.status,
+      b.created_at,
+      b.edited_at,
+      b.edit_snapshot,
       l.city,
       l.state_code,
+      l.neighborhood,
       l.street_1,
       l.street_2,
       l.street_address
     FROM businesses b
-    LEFT JOIN locations l
-      ON l.business_id = b.id
+    LEFT JOIN locations l ON l.business_id = b.id
     WHERE b.status = 'pending'
-    ORDER BY b.created_at ASC
+    ORDER BY b.edited_at DESC NULLS LAST, b.created_at ASC
   `;
+
+  // Build the current (post-edit / as-submitted) snapshot and primary image for
+  // each pending item. The stored edit_snapshot, when present, is the "before"
+  // side of the comparison; a null snapshot means a brand-new submission.
+  const cards: SubmissionCardData[] = await Promise.all(
+    rows.map(async (r) => {
+      const current = await buildListingSnapshot(r.id);
+      return {
+        id: r.id,
+        slug: r.slug,
+        status: r.status,
+        createdAt: String(r.created_at),
+        editedAt: r.edited_at ? String(r.edited_at) : null,
+        primaryImage: current?.images[0]?.url ?? null,
+        cityLine: cityLine(r),
+        // buildListingSnapshot only returns null if the row vanished mid-request;
+        // fall back to an empty-ish snapshot so the card still renders.
+        current: current ?? EMPTY_SNAPSHOT,
+        before: r.edit_snapshot ?? null,
+      };
+    })
+  );
+
+  const editCount = cards.filter((c) => c.before !== null).length;
+  const newCount = cards.length - editCount;
 
   return (
     <div className="space-y-6">
-
-      <div className="flex items-center
-        justify-between">
-        <h1 className="text-2xl font-semibold
-          text-black">
-          Submissions
-        </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold text-black">Submissions</h1>
         <span className="text-sm text-gray-400">
-          {submissions.length} pending
+          {newCount} new · {editCount} edited
         </span>
       </div>
 
-      {submissions.length === 0 ? (
-        <div className="bg-white rounded-2xl p-8
-          border-2 border-gray-100 text-center">
-          <p className="text-gray-400">
-            No pending submissions
-          </p>
+      {cards.length === 0 ? (
+        <div className="bg-white rounded-2xl p-8 border-2 border-gray-100 text-center">
+          <p className="text-gray-400">No pending submissions</p>
         </div>
       ) : (
         <div className="space-y-4">
-          {submissions.map((b) => (
-            <div key={b.id}
-              className="bg-white rounded-2xl p-5
-                border-2 border-gray-100">
-
-              {/* Business info */}
-              <div className="flex items-start
-                justify-between mb-4">
-                <div>
-                  <p className="font-semibold
-                    text-black">
-                    {b.name}
-                  </p>
-                  <p className="text-xs text-gray-500
-                    mt-0.5">
-                    {b.category} ·{" "}
-                    {b.sub_type?.replace(/_/g, " ")}
-                  </p>
-                  <p className="text-xs text-gray-400
-                    mt-0.5">
-                    {b.street_1 && b.street_2
-                      ? `${b.street_1} & ${b.street_2}`
-                      : b.street_address || ""
-                    }
-                    {b.city ? `, ${b.city}` : ""}
-                    {b.state_code
-                      ? `, ${b.state_code}`
-                      : ""
-                    }
-                  </p>
-                  <p className="text-xs text-gray-300
-                    mt-1">
-                    Submitted{" "}
-                    {new Date(b.created_at)
-                      .toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                  </p>
-                </div>
-                <Link
-                  href={`/${b.slug || b.id}`}
-                  target="_blank"
-                  className="text-xs text-gray-400
-                    underline"
-                >
-                  Preview
-                </Link>
-              </div>
-
-              {/* Description preview */}
-              {b.description && (
-                <p className="text-xs text-gray-500
-                  mb-4 line-clamp-2">
-                  {b.description}
-                </p>
-              )}
-
-              {/* Actions */}
-              <div className="flex flex-col gap-3">
-                <div className="flex gap-2">
-                  <form action={approveSubmission}>
-                    <input type="hidden"
-                      name="businessId" value={b.id}/>
-                    <button
-                      type="submit"
-                      className="px-4 py-2 bg-green-500
-                        text-white text-xs font-medium
-                        rounded-xl hover:bg-green-600
-                        transition"
-                    >
-                      Approve
-                    </button>
-                  </form>
-
-                  <form action={markDuplicate}>
-                    <input type="hidden"
-                      name="businessId" value={b.id}/>
-                    <button
-                      type="submit"
-                      className="px-4 py-2 bg-gray-200
-                        text-gray-700 text-xs font-medium
-                        rounded-xl hover:bg-gray-300
-                        transition"
-                    >
-                      Duplicate
-                    </button>
-                  </form>
-                </div>
-
-                {/* Reject, with an optional message shown to
-                    the submitter in their notification */}
-                <form action={rejectSubmission}
-                  className="flex flex-col gap-2">
-                  <input type="hidden"
-                    name="businessId" value={b.id}/>
-                  <textarea
-                    name="message"
-                    rows={2}
-                    placeholder="Optional message to the submitter (shown in their notification)"
-                    className="w-full border-2 border-gray-100
-                      rounded-xl px-3 py-2 text-xs
-                      text-black placeholder:text-gray-400
-                      focus:outline-none focus:border-gray-300
-                      resize-none"
-                  />
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-red-500
-                      text-white text-xs font-medium
-                      rounded-xl hover:bg-red-600
-                      transition self-start"
-                  >
-                    Reject
-                  </button>
-                </form>
-              </div>
-            </div>
+          {cards.map((c) => (
+            <SubmissionCard key={c.id} data={c} />
           ))}
         </div>
       )}
     </div>
   );
 }
+
+const EMPTY_SNAPSHOT: ListingSnapshot = {
+  name: null,
+  description: null,
+  category: null,
+  type: null,
+  subType: null,
+  priceTier: null,
+  priceContext: null,
+  website: null,
+  instagram: null,
+  facebook: null,
+  tiktok: null,
+  twitter: null,
+  youtube: null,
+  phone: null,
+  email: null,
+  paymentOptions: [],
+  orderingMethods: [],
+  dietaryOptions: [],
+  businessAmenities: [],
+  servedZips: [],
+  location: null,
+  hours: [],
+  images: [],
+  vendorSpace: null,
+  vendorFees: [],
+  marketSchedules: [],
+  eventName: null,
+  eventDates: [],
+};

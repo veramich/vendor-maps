@@ -14,6 +14,10 @@ interface BusinessRow {
   city: string | null;
   state_code: string | null;
   created_at: string;
+  // True for a pop_up event whose dates have all passed. Such a listing stays
+  // status='listed' but is auto-hidden from the map/events surfaces by
+  // notExpiredEvent, so the admin table flags it to explain the discrepancy.
+  event_expired: boolean;
 }
 
 export default async function AdminBusinesses() {
@@ -30,7 +34,18 @@ export default async function AdminBusinesses() {
       b.claim_status,
       b.created_at,
       l.city,
-      l.state_code
+      l.state_code,
+      -- Mirrors notExpiredEvent: a pop_up with no future date has expired out
+      -- of the public listings even while status stays 'listed'. Recurring
+      -- markets never expire, so they are never flagged.
+      (
+        b.sub_type = 'pop_up'
+        AND NOT EXISTS (
+          SELECT 1 FROM popup_events pe
+          WHERE pe.business_id = b.id
+          AND upper(pe.event_range) > NOW()::timestamp
+        )
+      ) AS event_expired
     FROM businesses b
     LEFT JOIN locations l ON l.business_id = b.id
     ORDER BY b.created_at DESC
@@ -76,16 +91,32 @@ export default async function AdminBusinesses() {
                   {b.sub_type?.replace(/_/g, " ")}
                 </td>
                 <td className="px-4 py-3">
-                  <span className={`text-xs px-2 py-1
-                    rounded-full font-medium
-                    ${b.status === "listed"
-                      ? "bg-green-100 text-green-600"
-                      : b.status === "pending"
-                      ? "bg-orange-100 text-orange-600"
-                      : "bg-gray-100 text-gray-500"
-                    }`}>
-                    {b.status}
-                  </span>
+                  <div className="flex flex-wrap
+                    items-center gap-1.5">
+                    <span className={`text-xs px-2 py-1
+                      rounded-full font-medium
+                      ${b.status === "listed"
+                        ? "bg-green-100 text-green-600"
+                        : b.status === "pending"
+                        ? "bg-orange-100 text-orange-600"
+                        : "bg-gray-100 text-gray-500"
+                      }`}>
+                      {b.status}
+                    </span>
+                    {b.event_expired && (
+                      <span
+                        title="All dates for this pop-up have
+                          passed, so it is hidden from the map
+                          and events list. Add a future date to
+                          relist it."
+                        className="text-xs px-2 py-1
+                          rounded-full font-medium
+                          bg-red-100 text-red-600"
+                      >
+                        expired
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3">
                   <span className={`text-xs px-2 py-1
