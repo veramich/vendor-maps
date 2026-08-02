@@ -133,12 +133,30 @@ export async function rejectSubmission(formData: FormData) {
     redirect("/admin/submissions");
   }
 
+  // Taking the listing down also retires any claim on it. A claim only grants
+  // ownership of a live listing, so leaving claim_status='claimed' on a
+  // rejected business strands the owner: "My Listings" filters on
+  // status='listed' and the edit route on status IN ('pending','listed'), so
+  // the listing silently vanishes from both while still looking claimed.
   await sql`
     UPDATE businesses SET
       status        = 'rejected',
+      claim_status  = 'unclaimed',
+      claimed_by    = NULL,
       edit_snapshot = NULL,
       edited_at     = NULL
     WHERE id = ${businessId}
+  `;
+
+  // Retire the live claims. This is a DELETE rather than a flip to 'rejected'
+  // because claims carries UNIQUE(business_id, status): a business that already
+  // has a rejected claim from an earlier round would hit a 23505 duplicate-key
+  // error on the update. The claim is moot once the listing is gone, and the
+  // claimant is told via the notification below.
+  await sql`
+    DELETE FROM claims
+    WHERE business_id = ${businessId}
+    AND status IN ('pending', 'approved')
   `;
 
   if (business?.submitted_by) {
@@ -178,12 +196,27 @@ export async function markDuplicate(formData: FormData) {
     );
   }
 
+  // Same reasoning as rejectSubmission: a duplicate is no longer a live
+  // listing, so it must not stay claimed by anyone.
   await sql`
     UPDATE businesses SET
       status        = 'duplicate',
+      claim_status  = 'unclaimed',
+      claimed_by    = NULL,
       edit_snapshot = NULL,
       edited_at     = NULL
     WHERE id = ${businessId}
+  `;
+
+  // Retire the live claims. This is a DELETE rather than a flip to 'rejected'
+  // because claims carries UNIQUE(business_id, status): a business that already
+  // has a rejected claim from an earlier round would hit a 23505 duplicate-key
+  // error on the update. The claim is moot once the listing is gone, and the
+  // claimant is told via the notification below.
+  await sql`
+    DELETE FROM claims
+    WHERE business_id = ${businessId}
+    AND status IN ('pending', 'approved')
   `;
 
   if (business?.submitted_by) {

@@ -13,8 +13,14 @@ interface ClaimRow {
   requested_at: string;
 }
 
-export default async function AdminClaims() {
+export default async function AdminClaims({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   await requireAdmin();
+
+  const { error } = await searchParams;
 
   const claims = await sql<ClaimRow[]>`
     SELECT
@@ -43,6 +49,17 @@ export default async function AdminClaims() {
           {claims.length} pending
         </span>
       </div>
+
+      {error === "not-listed" && (
+        <div className="bg-red-50 border-2
+          border-red-100 rounded-2xl p-4">
+          <p className="text-sm text-red-700">
+            That claim couldn&apos;t be approved because the
+            business isn&apos;t listed. Approve the
+            submission first, then approve the claim.
+          </p>
+        </div>
+      )}
 
       {claims.length === 0 ? (
         <div className="bg-white rounded-2xl p-8

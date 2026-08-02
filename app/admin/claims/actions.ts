@@ -26,6 +26,18 @@ export async function approveClaim(formData: FormData) {
   const businessId = formData.get("businessId") as string;
   const userId     = formData.get("userId") as string;
 
+  // A claim only makes sense against a live listing. Approving one on a
+  // rejected/duplicate business would mark it claimed while every owner-facing
+  // query (My Listings, the edit route) filters it out by status, leaving the
+  // claimant with an invisible, uneditable listing. Bail out instead.
+  const [target] = await sql<{ status: string }[]>`
+    SELECT status FROM businesses WHERE id = ${businessId}
+  `;
+
+  if (target?.status !== "listed") {
+    redirect("/admin/claims?error=not-listed");
+  }
+
   await sql`
     UPDATE claims SET
       status      = 'approved',

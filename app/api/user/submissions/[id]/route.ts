@@ -10,6 +10,32 @@ import cloudinary from "@/lib/cloudinary";
 import { BusinessFormData } from "@/lib/types/business";
 import { buildListingSnapshot } from "@/lib/listingSnapshot";
 
+// A listing can only be edited while it is live or awaiting review. Anything
+// else is a terminal/administrative state whose edit form would have nothing
+// meaningful to save back.
+const EDITABLE_STATUSES = ["pending", "listed"];
+
+// Why an edit was refused, in the owner's terms. The status alone ("rejected")
+// is not actionable, and a bare "not found" actively misleads — it reads as a
+// broken link when the listing exists and the user really does own it.
+function notEditableMessage(status: string): string {
+  switch (status) {
+    case "rejected":
+      return "This listing was rejected, so it can't be edited. " +
+        "Contact us if you think that was a mistake.";
+    case "duplicate":
+      return "This listing was marked as a duplicate of an existing " +
+        "business, so it can't be edited.";
+    case "unlisted":
+      return "This listing has been unlisted and can't be edited. " +
+        "Contact us to put it back online.";
+    case "expired":
+      return "This listing has expired, so it can't be edited.";
+    default:
+      return "This listing isn't in an editable state right now.";
+  }
+}
+
 // Add one day to a YYYY-MM-DD string (UTC noon, so it never drifts across a
 // timezone boundary). Mirrors the helper in the submit route.
 function nextDay(date: string): string {
@@ -37,17 +63,27 @@ export async function GET(
       );
     }
 
+    // Fetch by id alone, then check the status separately. Filtering on status
+    // in the WHERE clause collapses "no such listing" and "listing isn't in an
+    // editable state" into one indistinguishable 404, which hides the real
+    // reason (e.g. a rejected listing that still looks claimed to its owner).
     const result = await sql`
       SELECT b.*
       FROM businesses b
       WHERE b.id = ${id}
-      AND b.status IN ('pending', 'listed')
     `;
 
     if (!result || result.length === 0) {
       return NextResponse.json(
-        { error: "Submission not found or not editable" },
+        { error: "Submission not found" },
         { status: 404 }
+      );
+    }
+
+    if (!EDITABLE_STATUSES.includes(result[0].status)) {
+      return NextResponse.json(
+        { error: notEditableMessage(result[0].status) },
+        { status: 409 }
       );
     }
 
@@ -312,18 +348,25 @@ export async function PATCH(
       );
     }
 
-    // Allow editing pending and listed submissions
+    // Fetch by id, then gate on status separately — same reasoning as GET, so a
+    // save that lands on a no-longer-editable listing says why.
     const existing = await sql`
-      SELECT id, status, claim_status, claimed_by
+      SELECT id, type, status, claim_status, claimed_by
       FROM businesses
       WHERE id = ${id}
-      AND status IN ('pending', 'listed')
     `;
 
     if (!existing || existing.length === 0) {
       return NextResponse.json(
-        { error: "Submission not found or not editable" },
+        { error: "Submission not found" },
         { status: 404 }
+      );
+    }
+
+    if (!EDITABLE_STATUSES.includes(existing[0].status)) {
+      return NextResponse.json(
+        { error: notEditableMessage(existing[0].status) },
+        { status: 409 }
       );
     }
 
