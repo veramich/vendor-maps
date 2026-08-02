@@ -20,6 +20,8 @@ type Listing = {
   city:         string | null;
   state_code:   string | null;
   logo_url:     string | null;
+  claim_status:       string;
+  is_verified_owner:  boolean;
 };
 
 const SUB_TYPE_LABELS: Record<string, string> = {
@@ -92,7 +94,7 @@ export default function MyListingsPage() {
             My Listings
           </h1>
           <p className="text-sm text-gray-400 mt-0.5">
-            Businesses you own and manage
+            Live businesses you submitted or manage
           </p>
         </div>
       </div>
@@ -101,10 +103,11 @@ export default function MyListingsPage() {
         {listings.length === 0 ? (
           <div className="text-center py-16 space-y-3">
             <p className="text-gray-400 text-sm">
-              You have no verified listings yet
+              You have no live listings yet
             </p>
             <p className="text-xs text-gray-300">
-              Claim a business listing to manage it
+              Submissions still under review appear in
+              My Submissions
             </p>
             <Link
               href="/directory"
@@ -163,25 +166,35 @@ export default function MyListingsPage() {
                         text-black text-sm">
                         {listing.name}
                       </p>
-                      {/* Verified badge */}
-                      <div className="flex items-center
-                        gap-1 flex-shrink-0">
-                        <svg width="12" height="12"
-                          viewBox="0 0 24 24" fill="none"
-                          stroke="#22c55e"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round">
-                          <path d="M22 11.08V12a10 10
-                            0 1 1-5.93-9.14"/>
-                          <polyline points="22 4
-                            12 14.01 9 11.01"/>
-                        </svg>
+                      {/* Verified badge — only for listings whose
+                          ownership was actually confirmed via a claim.
+                          A listing the user merely submitted isn't
+                          verified, so it shows a claim prompt instead. */}
+                      {listing.is_verified_owner ? (
+                        <div className="flex items-center
+                          gap-1 flex-shrink-0">
+                          <svg width="12" height="12"
+                            viewBox="0 0 24 24" fill="none"
+                            stroke="#22c55e"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round">
+                            <path d="M22 11.08V12a10 10
+                              0 1 1-5.93-9.14"/>
+                            <polyline points="22 4
+                              12 14.01 9 11.01"/>
+                          </svg>
+                          <span className="text-xs
+                            text-green-600">
+                            Verified
+                          </span>
+                        </div>
+                      ) : (
                         <span className="text-xs
-                          text-green-600">
-                          Verified
+                          text-gray-400 flex-shrink-0">
+                          Submitted
                         </span>
-                      </div>
+                      )}
                     </div>
 
                     <p className="text-xs text-gray-500

@@ -124,3 +124,27 @@ test("only offers to resume drafts with real progress", () => {
   );
   assert.equal(isDraftMeaningful({ ...bare, step: 4 }), true);
 });
+
+test("resumes a step-0 draft that only picked 'my business'", () => {
+  // A signed-out user who picks "this is my business" is sent to sign-up by
+  // the claim prompt before choosing a type. That draft has no type and sits
+  // on step 0, so it must be kept on the strength of submittedAsOwner alone —
+  // otherwise they return to a blank form and lose the ownership answer.
+  const owner = {
+    step: 0,
+    vendorSubStep: false,
+    formData: { ...INITIAL_FORM_DATA, submittedAsOwner: true },
+    savedAt: Date.now(),
+  };
+  assert.equal(isDraftMeaningful(owner), true);
+
+  // "Someone else's business" involves no sign-up detour, so on its own it
+  // still isn't worth resuming.
+  assert.equal(
+    isDraftMeaningful({
+      ...owner,
+      formData: { ...INITIAL_FORM_DATA, submittedAsOwner: false },
+    }),
+    false
+  );
+});

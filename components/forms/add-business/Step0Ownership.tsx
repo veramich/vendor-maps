@@ -1,4 +1,10 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "@/lib/auth-client";
 import { BusinessFormData } from "@/lib/types/business";
+import ClaimSignInPrompt from "./ClaimSignInPrompt";
 
 interface Step0OwnershipProps {
   formData: BusinessFormData;
@@ -11,8 +17,31 @@ export default function Step0Ownership({
   nextStep,
 }: Step0OwnershipProps) {
 
+  const { data: session, isPending } = useSession();
+  const router = useRouter();
+  const [showClaimPrompt, setShowClaimPrompt] =
+    useState(false);
+
   const handleSelect = (isOwner: boolean) => {
+    // A guest claiming their own business can't actually be claimed: the
+    // submit route files a claim only when there's a session, so warn first.
+    // Still waiting on the session check? Fall through — the prompt would be
+    // wrong for a signed-in user, and they can claim from the listing later.
+    if (isOwner && !isPending && !session) {
+      updateForm({ submittedAsOwner: true });
+      setShowClaimPrompt(true);
+      return;
+    }
     updateForm({ submittedAsOwner: isOwner });
+    nextStep();
+  };
+
+  // The in-progress form is autosaved to localStorage on every change, so
+  // leaving for sign-up and coming back resumes via the draft banner.
+  const goSignUp = () => router.push("/sign-up");
+
+  const continueAsGuest = () => {
+    setShowClaimPrompt(false);
     nextStep();
   };
 
@@ -125,6 +154,14 @@ export default function Step0Ownership({
         </button>
 
       </div>
+
+      {showClaimPrompt && (
+        <ClaimSignInPrompt
+          onSignUp={goSignUp}
+          onGuest={continueAsGuest}
+          onDismiss={() => setShowClaimPrompt(false)}
+        />
+      )}
     </div>
   );
 }

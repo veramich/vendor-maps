@@ -109,7 +109,16 @@ export function clearDraft(): void {
 }
 
 // True when a draft holds enough progress to be worth offering to restore.
-// A user who only tapped "this is my business" and bounced gets no prompt.
+//
+// `submittedAsOwner === true` counts on its own: a signed-out user who picks
+// "this is my business" is sent to sign-up from the claim prompt, and that
+// choice is the entire reason they left. Without it the step-0 draft looks
+// empty (no `type` yet) and would be discarded, dropping them back into a
+// blank form and silently losing the ownership answer they just gave.
 export function isDraftMeaningful(draft: BusinessDraft): boolean {
-  return draft.step > 1 || Boolean(draft.formData.type);
+  return (
+    draft.step > 1 ||
+    Boolean(draft.formData.type) ||
+    draft.formData.submittedAsOwner === true
+  );
 }

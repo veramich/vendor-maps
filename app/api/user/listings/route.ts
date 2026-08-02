@@ -25,16 +25,23 @@ export async function GET() {
         b.sub_type,
         b.category,
         b.status,
+        b.claim_status,
         b.avg_rating,
         b.review_count,
         b.logo_url,
+        (b.claimed_by = ${session.user.id}) AS is_verified_owner,
         l.city,
         l.state_code
       FROM businesses b
       LEFT JOIN locations l
         ON l.business_id = b.id
-      WHERE b.claimed_by = ${session.user.id}
-      AND b.claim_status = 'claimed'
+      WHERE (
+        b.submitted_by = ${session.user.id}
+        OR (
+          b.claimed_by = ${session.user.id}
+          AND b.claim_status = 'claimed'
+        )
+      )
       AND b.status = 'listed'
       ORDER BY b.created_at DESC
     `;
