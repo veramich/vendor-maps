@@ -39,15 +39,16 @@ export default function ConfirmationScreen({
         {/* Title */}
         <h2 className="text-2xl font-semibold
           text-black mb-3">
-          Submitted successfully
+          Thank you! We got your request
         </h2>
 
         {/* Business name */}
         <p className="text-gray-500 mb-2">
+          Your request to add{" "}
           <span className="font-medium text-black">
             {businessName}
           </span>{" "}
-          has been submitted and is under review.
+          is being checked by our team.
         </p>
 
         {/* Tracking message */}
@@ -56,18 +57,42 @@ export default function ConfirmationScreen({
             href="/my-submissions"
             className="text-sm text-black underline mb-12"
           >
-            Track your submission in My Submissions →
+            See how your request is doing →
           </Link>
         ) : (
-          <p className="text-sm text-gray-400 mb-12">
-            <Link
-              href="/sign-up"
-              className="text-black underline"
-            >
-              Create an account
-            </Link>
-            {" "}to track the status of your submission
-          </p>
+          /* Signed-out: offer notification on approval. The submitted id is
+             already stashed in localStorage by the add-business page, and
+             SubmissionAdopter (root layout) attaches it to whichever account
+             they end up in — so either link below links this submission. */
+          <div className="w-full max-w-sm mb-12 rounded-2xl
+            border-2 border-gray-200 p-4 text-left">
+            <p className="text-sm font-medium text-black mb-1">
+              Make an account to stay updated
+            </p>
+            <p className="text-xs text-gray-400 mb-4">
+              We will save this request to your account. You you can check on it any time.
+            </p>
+            <div className="flex gap-3">
+              <Link
+                href="/sign-up"
+                className="flex-1 text-white text-sm
+                  font-medium py-3 rounded-xl text-center
+                  transition active:scale-95"
+                style={{ background: "var(--primary)" }}
+              >
+                Sign up
+              </Link>
+              <Link
+                href="/sign-in"
+                className="flex-1 border-2 border-gray-200
+                  text-black text-sm font-medium py-3
+                  rounded-xl text-center transition
+                  active:scale-95 hover:bg-gray-50"
+              >
+                Sign in
+              </Link>
+            </div>
+          </div>
         )}
 
         {/* Options */}
@@ -82,10 +107,10 @@ export default function ConfirmationScreen({
           >
             <p className="font-medium text-sm
               text-black mb-1">
-              Add another location of this business
+              Add another place for this business
             </p>
             <p className="text-xs text-gray-400">
-              Same brand, different address
+              Same business, different address
             </p>
           </button>
 
@@ -98,10 +123,10 @@ export default function ConfirmationScreen({
           >
             <p className="font-medium text-sm
               text-black mb-1">
-              Add a completely different business
+              Add a different business
             </p>
             <p className="text-xs text-gray-400">
-              Start fresh from the beginning
+              Start a new form for a different business.
             </p>
           </button>
 
