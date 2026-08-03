@@ -160,10 +160,10 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
   // Google-Maps-style blue location dot: a soft accuracy halo behind a solid
   // blue dot with a white ring. Used for the visitor's own position.
   const createUserMarker = (H: HNamespace, lat: number, lng: number) => {
-    const svgMarkup = `<svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg"><circle cx="18" cy="18" r="16" fill="#4285F4" fill-opacity="0.18"/><circle cx="18" cy="18" r="7" fill="#4285F4" stroke="white" stroke-width="2.5"/></svg>`;
+    const svgMarkup = `<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><circle cx="20" cy="20" r="18" fill="#4285F4" fill-opacity="0.18"/><circle cx="20" cy="20" r="7.75" fill="#4285F4" stroke="white" stroke-width="2.5"/></svg>`;
     const icon = new H.map.Icon(
       `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`,
-      { size: { w: 36, h: 36 }, anchor: { x: 18, y: 18 } }
+      { size: { w: 40, h: 40 }, anchor: { x: 20, y: 20 } }
     );
     // High z-index keeps the dot above business/cluster markers.
     return new H.map.Marker({ lat, lng }, { icon, zIndex: 1000 });
@@ -176,19 +176,19 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
     count: number
   ) => {
     const svgMarkup = `
-      <svg width="50" height="50"
-        viewBox="0 0 50 50"
+      <svg width="40" height="40"
+        viewBox="0 0 40 40"
         xmlns="http://www.w3.org/2000/svg">
-        <circle cx="25" cy="25" r="22"
+        <circle cx="20" cy="20" r="17"
           fill="${PRIMARY}" fill-opacity="0.35"
-          stroke="${PRIMARY}" stroke-width="2"
+          stroke="${PRIMARY}" stroke-width="1.5"
           stroke-opacity="0.6"/>
-        <circle cx="25" cy="25" r="15"
+        <circle cx="20" cy="20" r="12"
           fill="${PRIMARY}" fill-opacity="0.7"/>
-        <text x="25" y="30"
+        <text x="20" y="24"
           text-anchor="middle"
           font-family="sans-serif"
-          font-size="13"
+          font-size="12"
           font-weight="bold"
           fill="white">
           ${count}
@@ -197,7 +197,7 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
     `;
     const icon = new H.map.Icon(
       `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`,
-      { size: { w: 50, h: 50 }, anchor: { x: 25, y: 25 } }
+      { size: { w: 40, h: 40 }, anchor: { x: 20, y: 20 } }
     );
     return new H.map.Marker({ lat, lng }, { icon });
   };
@@ -237,7 +237,13 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
   // Builds fanned-out markers for locations that share the exact same point,
   // plus a small center dot. Returns the array of objects (off-map).
   const buildOffsetMarkers = async (H: HNamespace, locations: MapLocation[]) => {
-    const offsetDistance = 0.0002;
+    // Markers sit on a ring around the shared point. A fixed radius packs
+    // neighbours tighter as the group grows, so scale it with the count:
+    // keep roughly one marker-width of arc between adjacent pins.
+    const offsetDistance = Math.max(
+      0.0002,
+      (0.00014 * locations.length) / (2 * Math.PI)
+    );
 
     const built = await Promise.all(
       locations.map((location, i) => {
@@ -252,10 +258,10 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
       (m): m is HMapObject => m !== null
     );
 
-    const dotSvg = `<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg"><circle cx="6" cy="6" r="5" fill="white" stroke="#ccc" stroke-width="1.5"/></svg>`;
+    const dotSvg = `<svg width="8" height="8" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg"><circle cx="4" cy="4" r="3.25" fill="white" stroke="#ccc" stroke-width="1.25"/></svg>`;
     const dotIcon = new H.map.Icon(
       `data:image/svg+xml;charset=utf-8,${encodeURIComponent(dotSvg)}`,
-      { size: { w: 12, h: 12 }, anchor: { x: 6, y: 6 } }
+      { size: { w: 8, h: 8 }, anchor: { x: 4, y: 4 } }
     );
     objects.push(
       new H.map.Marker(

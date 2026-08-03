@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 
-export type RemoveMode = "delete" | "archive";
+export type RemoveMode = "delete" | "archive" | "dismiss";
 
 interface Props {
   businessName: string;
@@ -10,6 +10,9 @@ interface Props {
    * "delete" is permanent and asks the user to type the listing name.
    * "archive" takes the listing offline and is reversible, so a plain
    * confirmation is enough.
+   * "dismiss" clears a dead record (a rejected claim) out of the user's own
+   * history. Nothing public changes and no one else's content is touched, so
+   * it is confirmed but not gated behind typing the name.
    */
   mode: RemoveMode;
   open: boolean;
@@ -52,7 +55,8 @@ function RemoveListingDialogInner({
     return () => window.removeEventListener("keydown", onKey);
   }, [submitting, onClose]);
 
-  const isDelete = mode === "delete";
+  const isDelete  = mode === "delete";
+  const isDismiss = mode === "dismiss";
   // Case- and whitespace-insensitive: the point is deliberate confirmation,
   // not an exact-transcription test.
   const nameMatches =
@@ -95,7 +99,9 @@ function RemoveListingDialogInner({
         >
           {isDelete
             ? "Delete this listing?"
-            : "Archive this listing?"}
+            : isDismiss
+              ? "Remove this claim?"
+              : "Archive this listing?"}
         </h2>
 
         <div className="text-sm text-gray-500 mt-2 space-y-2">
@@ -107,6 +113,21 @@ function RemoveListingDialogInner({
               and its photos will be permanently deleted.
               This can&apos;t be undone.
             </p>
+          ) : isDismiss ? (
+            <>
+              <p>
+                Your rejected claim for{" "}
+                <span className="font-medium text-black">
+                  {businessName}
+                </span>{" "}
+                will be removed from your submissions.
+              </p>
+              <p>
+                The listing itself isn&apos;t affected — only
+                your claim record is cleared. You can claim it
+                again later if you need to.
+              </p>
+            </>
           ) : (
             <>
               <p>
@@ -187,7 +208,9 @@ function RemoveListingDialogInner({
               ? "Working…"
               : isDelete
                 ? "Delete permanently"
-                : "Take down"}
+                : isDismiss
+                  ? "Remove claim"
+                  : "Take down"}
           </button>
         </div>
       </div>

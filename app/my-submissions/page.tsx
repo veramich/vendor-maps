@@ -83,11 +83,17 @@ export default function MySubmissionsPage() {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>("all");
-  // The listing awaiting removal confirmation, if any. Every card feeds this:
-  // a claim card removes the business it points at, so only the business id,
-  // display name and archive-vs-delete mode matter here.
+  // The row awaiting removal confirmation, if any. Every card feeds this, but
+  // two different things can be removed, so `kind` picks the endpoint:
+  // "listing" archives/deletes the business at `id`, while "claim" dismisses a
+  // rejected claim record whose own id is `id` — the business is untouched.
   const [removing, setRemoving] = useState<
-    { id: string; name: string; mode: RemoveMode } | null
+    {
+      id:   string;
+      name: string;
+      mode: RemoveMode;
+      kind: "listing" | "claim";
+    } | null
   >(null);
 
   const fetchData = useCallback(async () => {
@@ -124,16 +130,25 @@ export default function MySubmissionsPage() {
       ? "archive"
       : "delete";
 
-  const handleRemove = async (target: { id: string }) => {
+  const handleRemove = async (
+    target: { id: string; kind: "listing" | "claim" }
+  ) => {
+    // A claim dismissal clears the claim row itself and leaves the business
+    // alone, so it goes to its own endpoint rather than the submissions one.
     const res = await fetch(
-      `/api/user/submissions/${target.id}`,
+      target.kind === "claim"
+        ? `/api/user/claims/${target.id}`
+        : `/api/user/submissions/${target.id}`,
       { method: "DELETE" }
     );
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(
-        data.error || "Could not remove this submission."
+        data.error ||
+        (target.kind === "claim"
+          ? "Could not remove this claim."
+          : "Could not remove this submission.")
       );
     }
 
@@ -497,7 +512,7 @@ export default function MySubmissionsPage() {
                     className="text-xs bg-black text-white
                       px-3 py-1.5 rounded-lg"
                   >
-                    View Listing
+                    View
                   </Link>
                 )}
 
@@ -553,6 +568,7 @@ export default function MySubmissionsPage() {
                       id:   sub.id,
                       name: sub.name,
                       mode: removeMode(sub),
+                      kind: "listing",
                     })}
                     className="text-xs border border-gray-200
                       text-gray-500 px-3 py-1.5 rounded-lg
@@ -643,7 +659,7 @@ export default function MySubmissionsPage() {
                       text-white px-3 py-1.5
                       rounded-lg"
                   >
-                    View Listing
+                    View
                   </Link>
                 )}
 
@@ -693,6 +709,7 @@ export default function MySubmissionsPage() {
                       id:   claim.business_id,
                       name: claim.business_name,
                       mode: "archive",
+                      kind: "listing",
                     })}
                     className="text-xs border border-gray-200
                       text-gray-500 px-3 py-1.5 rounded-lg
@@ -744,10 +761,45 @@ export default function MySubmissionsPage() {
                 {claim.status === "pending" &&
                   "Your claim is under review. We will verify your ownership within 1-3 business days."
                 }
-                {claim.status === "rejected" &&
-                  "Your claim was not approved. Please contact support for more information."
-                }
+                {claim.status === "rejected" && (
+                  <>
+                    Your claim was not approved. Please{" "}
+                    <Link
+                      href="/contact"
+                      className="underline
+                        hover:text-gray-600
+                        transition"
+                    >
+                      contact
+                    </Link>
+                    {" "}us for more information.
+                  </>
+                )}
               </p>
+
+              {/* A rejected claim is a dead record — the listing was already
+                  released back to unclaimed when it was rejected — so the only
+                  thing left to do with it is stop looking at it. A pending
+                  claim is still live and has no action here. */}
+              {claim.status === "rejected" && (
+                <div className="flex mt-3">
+                  <button
+                    type="button"
+                    onClick={() => setRemoving({
+                      id:   claim.id,
+                      name: claim.business_name,
+                      mode: "dismiss",
+                      kind: "claim",
+                    })}
+                    className="text-xs border border-gray-200
+                      text-gray-500 px-3 py-1.5 rounded-lg
+                      hover:border-red-200 hover:text-red-600
+                      transition ml-auto"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
             </div>
           ))}
 
