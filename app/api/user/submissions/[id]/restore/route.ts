@@ -13,13 +13,16 @@ import { headers } from "next/headers";
  *
  * Two deliberate restrictions:
  *
- *   * Submitter only — the same person who was allowed to archive it. A
- *     claimant who did not submit the listing cannot resurrect it.
+ *   * The submitter or the verified owner of a claimed listing — the same two
+ *     people the archive action is open to, so whoever took a listing down can
+ *     put it back.
  *
  *   * Only a listing the OWNER archived (unlisted_by = this user). An admin
  *     takedown also lands on status='unlisted', and letting an owner undo a
  *     moderation decision with one click would defeat it entirely. Those come
- *     back through support instead.
+ *     back through support instead. This check does the real work here: it
+ *     already limits restoring to the person who archived it, which is why the
+ *     broader eligibility above is safe.
  *
  * The listing returns to 'listed' rather than 'pending': it was already
  * approved, and nothing about it changed while archived, so there is nothing
@@ -45,7 +48,9 @@ export async function POST(
     }
 
     const existing = await sql`
-      SELECT id, name, slug, status, submitted_by, unlisted_by
+      SELECT
+        id, name, slug, status,
+        submitted_by, claim_status, claimed_by, unlisted_by
       FROM businesses
       WHERE id = ${id}
     `;
@@ -59,14 +64,21 @@ export async function POST(
 
     const business = existing[0];
 
-    if (
-      business.submitted_by == null ||
-      business.submitted_by !== session.user.id
-    ) {
+    const isSubmitter =
+      business.submitted_by != null &&
+      business.submitted_by === session.user.id;
+
+    const isVerifiedOwner =
+      business.claim_status === "claimed" &&
+      business.claimed_by != null &&
+      business.claimed_by === session.user.id;
+
+    if (!isSubmitter && !isVerifiedOwner) {
       return NextResponse.json(
         {
           error:
-            "Only the person who originally submitted this listing can restore it.",
+            "Only the person who submitted this listing or its verified owner " +
+            "can restore it.",
         },
         { status: 403 }
       );

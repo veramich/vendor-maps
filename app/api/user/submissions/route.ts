@@ -42,6 +42,15 @@ export async function GET() {
           b.status = 'unlisted'
           AND b.unlisted_by = ${userId}
         ) AS can_restore,
+        -- claim_status is part of the test, not just claimed_by: a claim that
+        -- was revoked or reset can leave claimed_by populated, and the DELETE
+        -- handler checks both. Drives the "Verified" badge and the Claimed
+        -- tab, so a stale value here would misfile the listing.
+        (
+          b.claim_status = 'claimed'
+          AND b.claimed_by = ${userId}
+        ) AS is_verified_owner,
+        TRUE AS is_submitter,
         l.city,
         l.state_code
       FROM businesses b
@@ -51,7 +60,13 @@ export async function GET() {
       ORDER BY b.created_at DESC
     `;
 
-    // Get claims by this user
+    // Get claims by this user. The business's own status comes along so an
+    // approved claim can offer the same archive/restore actions a submission
+    // gets — a verified owner may take their own listing down (see the DELETE
+    // handler). is_submitter distinguishes the case where this user also
+    // created the row, in which case the listing already appears in the
+    // submissions list above and the claim card should not duplicate its
+    // actions.
     const claims = await sql`
       SELECT
         c.id,
@@ -60,7 +75,14 @@ export async function GET() {
         c.requested_at,
         c.resolved_at,
         b.name as business_name,
-        b.slug as business_slug
+        b.slug as business_slug,
+        b.status as business_status,
+        b.claim_status,
+        (b.submitted_by = ${userId}) AS is_submitter,
+        (
+          b.status = 'unlisted'
+          AND b.unlisted_by = ${userId}
+        ) AS can_restore
       FROM claims c
       JOIN businesses b ON b.id = c.business_id
       WHERE c.user_id = ${userId}

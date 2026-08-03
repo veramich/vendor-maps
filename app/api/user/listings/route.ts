@@ -29,11 +29,19 @@ export async function GET() {
         b.avg_rating,
         b.review_count,
         b.logo_url,
-        (b.claimed_by = ${session.user.id}) AS is_verified_owner,
-        -- Removal is submitter-only (see the DELETE handler in
-        -- app/api/user/submissions/[id]/route.ts), which is narrower than the
-        -- edit rights this list already grants. The page needs the distinction
-        -- to avoid offering an archive button that would 403.
+        -- claim_status is part of the test, not just claimed_by: a claim that
+        -- was revoked or reset can leave claimed_by populated, and the DELETE
+        -- handler checks both. Without the status the page would offer an
+        -- archive button that 403s.
+        (
+          b.claim_status = 'claimed'
+          AND b.claimed_by = ${session.user.id}
+        ) AS is_verified_owner,
+        -- Archiving is open to the submitter and the verified owner; hard
+        -- delete stays with the submitter (see the DELETE handler in
+        -- app/api/user/submissions/[id]/route.ts). Nothing on this page can be
+        -- hard-deleted anyway — it is all live — but the flag still drives the
+        -- "Submitted" vs "Verified" label.
         (b.submitted_by = ${session.user.id}) AS is_submitter,
         l.city,
         l.state_code

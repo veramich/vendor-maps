@@ -18,7 +18,6 @@ export default function robots(): MetadataRoute.Robots {
         "/verify-email",
         "/profile",
         "/saved",
-        "/my-listings",
         "/my-resources",
         "/my-submissions",
         "/claim/",

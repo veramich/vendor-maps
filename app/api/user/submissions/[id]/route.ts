@@ -408,29 +408,35 @@ export async function DELETE(
 
     const business = existing[0];
 
-    // Removal is ORIGINAL SUBMITTER ONLY — deliberately narrower than the edit
-    // route's scoping.
+    // Removal is open to two people, with different powers:
     //
-    // Editing is a shared, additive capability: a verified owner who claimed a
-    // listing someone else added should be able to correct it. Removal is
-    // neither. Taking a listing off the site is destructive and unilateral, so
-    // it stays with the person who put it there. A claimant who wants a listing
-    // they didn't create taken down goes through the report flow, which routes
-    // to an admin rather than acting directly.
+    //   * The original submitter — the person who put the listing on the site.
     //
-    // Note this is checked against submitted_by regardless of claim_status: a
-    // claim by someone else does not transfer removal rights away from the
-    // submitter, and does not grant them to the claimant either.
+    //   * The VERIFIED OWNER of a claimed listing. Ownership was confirmed by an
+    //     admin through the claim flow, so this is the actual business deciding
+    //     whether its own entry appears. Making them file a report to get their
+    //     own business taken down treats the submitter as more authoritative
+    //     about the business than the business itself.
+    //
+    // The two are NOT equivalent in what they may do. A claimant did not create
+    // the row and may be managing a listing someone else researched and wrote,
+    // so their removal is always the reversible archive branch — see the
+    // canHardDelete gate below. Hard delete stays with the submitter.
     const isSubmitter =
       business.submitted_by != null &&
       business.submitted_by === session.user.id;
 
-    if (!isSubmitter) {
+    const isVerifiedOwner =
+      business.claim_status === "claimed" &&
+      business.claimed_by != null &&
+      business.claimed_by === session.user.id;
+
+    if (!isSubmitter && !isVerifiedOwner) {
       return NextResponse.json(
         {
           error:
-            "Only the person who originally submitted this listing can remove it. " +
-            "If it's no longer in service, you can report it instead.",
+            "Only the person who submitted this listing or its verified owner " +
+            "can remove it. If it's no longer in service, you can report it instead.",
         },
         { status: 403 }
       );
@@ -453,7 +459,16 @@ export async function DELETE(
     const forceArchive =
       req.nextUrl.searchParams.get("mode") === "archive";
 
-    if (wasEverLive || forceArchive) {
+    // Hard delete is the submitter's alone. A verified owner who claimed a
+    // listing someone else created may take it offline, but must not be able to
+    // destroy another user's row and its photos outright — archiving gives them
+    // the same practical outcome (gone from every public surface) while leaving
+    // the work recoverable. In practice a claimed listing is live anyway, so
+    // wasEverLive already forces archive; this makes the rule explicit rather
+    // than leaving it as a side effect of the status.
+    const canHardDelete = isSubmitter;
+
+    if (wasEverLive || forceArchive || !canHardDelete) {
       // Archiving destroys NOTHING. It is the owner's own reversible choice, so
       // every row the listing depends on is left exactly as it was: photos,
       // reviews, saves, hours, location — and, critically, the ownership itself.
