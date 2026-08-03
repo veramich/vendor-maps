@@ -8,15 +8,7 @@ export const metadata: Metadata = {
 };
 
 // Last substantive update to this policy. Update when the content changes.
-const LAST_UPDATED = "June 12, 2026";
-
-// ---------------------------------------------------------------------------
-// NOTE: This is a plain-English baseline tailored to the services VendorMaps
-// actually uses (Better Auth + Google sign-in, Neon/Postgres, Cloudinary,
-// Resend, and Microsoft Clarity). It is NOT legal advice. Before launch — and
-// especially before the app-store release — have a lawyer or a reputable
-// privacy generator review it.
-// ---------------------------------------------------------------------------
+const LAST_UPDATED = "August 3, 2026";
 
 function Section({
   id,
@@ -45,11 +37,12 @@ export default function PrivacyPage() {
 
       <p className="mt-6 leading-relaxed text-gray-600">
         This Privacy Policy explains how VendorMaps, a property of Patita
-        Creative LLC (&ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;),
+        Creative (&ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;),
         collects, uses, and shares information when you use the VendorMaps
         website and mobile app (the
-        &ldquo;Service&rdquo;). By using the Service, you agree to the practices
-        described here. Your use of the Service is also governed by our{" "}
+        &ldquo;Service&rdquo;). The Service is intended for use in the United
+        States. By using the Service, you agree to the practices described here.
+        Your use of the Service is also governed by our{" "}
         <Link href="/terms" className="text-orange-600 underline">
           Terms &amp; Conditions
         </Link>
@@ -104,10 +97,8 @@ export default function PrivacyPage() {
           <li>comply with legal obligations and enforce our Terms.</li>
         </ul>
         <p>
-          Where required by law (for example, in the EU/UK), we rely on a lawful
-          basis for each use — typically performing our contract with you, your
-          consent (for example, for analytics cookies), or our legitimate interests
-          in operating and improving the Service.
+          We use your information only for the purposes described above, and we do
+          not sell it or use it for unrelated purposes without telling you first.
         </p>
       </Section>
 
@@ -160,10 +151,9 @@ export default function PrivacyPage() {
           Service to work. Analytics cookies (see section 5) help us improve it.
         </p>
         <p>
-          Where required by law, we ask for your consent before setting non-essential
-          cookies, and you can withdraw consent or manage cookies through your
-          browser settings at any time. Disabling some cookies may affect how the
-          Service works.
+          We ask for your consent before setting non-essential cookies, and you can
+          withdraw consent or manage cookies through your browser settings at any
+          time. Disabling some cookies may affect how the Service works.
         </p>
       </Section>
 
@@ -193,8 +183,7 @@ export default function PrivacyPage() {
           .
         </p>
         <p>
-          Where required by law, we load Clarity only after you consent to analytics
-          cookies.
+          We load Clarity only after you consent to analytics cookies.
         </p>
       </Section>
 
@@ -223,12 +212,12 @@ export default function PrivacyPage() {
       {/* Your rights */}
       <Section id="your-rights" title="8. Your privacy rights">
         <p>
-          Depending on where you live, you may have rights to access, correct,
-          delete, or export your personal information, to object to or restrict
-          certain processing, and to withdraw consent. If you are in the EU/UK
-          (GDPR/UK GDPR) or in a US state with privacy laws (such as California under
-          the CCPA/CPRA), these rights may apply to you, and we will not discriminate
-          against you for exercising them.
+          Depending on the US state you live in, you may have rights to access,
+          correct, delete, or export your personal information, to opt out of certain
+          processing, and to withdraw consent. If you are in a state with a
+          comprehensive privacy law (such as California under the CCPA/CPRA), these
+          rights may apply to you, and we will not discriminate against you for
+          exercising them. We honor these requests for all users regardless of state.
         </p>
         <p>
           You can delete your account at any time from your account settings, or
@@ -240,24 +229,23 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
-      {/* International */}
-      <Section id="international" title="9. International data transfers">
+      {/* Where data is processed */}
+      <Section id="where-processed" title="9. Where your information is processed">
         <p>
-          We and our service providers may store and process your information in the
-          United States and other countries. If you access the Service from outside
-          these countries, your information may be transferred to and processed in
-          locations with different data-protection laws, and we take steps to protect
-          it consistent with this policy and applicable law.
+          The Service is intended for users in the United States, and your information
+          is stored and processed here. Some of our service providers operate global
+          infrastructure and may process limited technical data outside the United
+          States on our behalf; we take steps to protect it consistent with this
+          policy and applicable law.
         </p>
       </Section>
 
       {/* Children */}
       <Section id="children" title="10. Children's privacy">
         <p>
-          The Service is not directed to children under 13 (or the minimum age
-          required in your country), and we do not knowingly collect personal
-          information from them. If you believe a child has provided us information,
-          please contact us and we will delete it.
+          The Service is not directed to children under 13, and we do not knowingly
+          collect personal information from them. If you believe a child has provided
+          us information, please contact us and we will delete it.
         </p>
       </Section>
 
@@ -290,11 +278,6 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
-      <p className="mt-12 text-xs leading-relaxed text-gray-400">
-        This Privacy Policy is a general template and does not constitute legal
-        advice. VendorMaps recommends reviewing it with a qualified attorney before
-        relying on it.
-      </p>
     </div>
   );
 }

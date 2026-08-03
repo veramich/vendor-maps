@@ -65,9 +65,13 @@ async function addDate(businessId: string, startDayOffset: number, hours = 4) {
 }
 
 async function addSchedule(businessId: string) {
+  // recurrence_type is NOT NULL (db/schema/006) — 'weekly' is the plain
+  // every-Saturday case this test needs.
   await sql`
-    INSERT INTO market_schedules (business_id, day_of_week, start_time, end_time)
-    VALUES (${businessId}, 'saturday', '09:00', '14:00')
+    INSERT INTO market_schedules (
+      business_id, day_of_week, recurrence_type, start_time, end_time
+    )
+    VALUES (${businessId}, 'saturday', 'weekly', '09:00', '14:00')
   `;
 }
 

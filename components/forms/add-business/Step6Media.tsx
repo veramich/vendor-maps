@@ -15,6 +15,11 @@ interface Step6MediaProps {
   formData: BusinessFormData;
   updateForm: (data: Partial<BusinessFormData>) => void;
   nextStep: () => void;
+  // Community editors may add photos to a listing they don't own, but not
+  // remove or reorder the ones already there (the API enforces this; hiding the
+  // controls stops them doing the work before finding out). Defaults to true so
+  // the add-business flow, where every photo is the user's own, is unaffected.
+  canRemovePhotos?: boolean;
 }
 
 // A single photo in the gallery — either already uploaded (edit flow) or a
@@ -27,6 +32,7 @@ export default function Step6Media({
   formData,
   updateForm,
   nextStep,
+  canRemovePhotos = true,
 }: Step6MediaProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [compressing, setCompressing] = useState(false);
@@ -417,7 +423,7 @@ export default function Step6Media({
                       </svg>
                       Cover
                     </span>
-                  ) : (
+                  ) : canRemovePhotos && (
                     <button
                       type="button"
                       onClick={() => setAsCover(item)}
@@ -438,20 +444,25 @@ export default function Step6Media({
                       </svg>
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      item.kind === "existing"
-                        ? removeExistingImage(item.id)
-                        : removeNewImage(item)
-                    }
-                    className="absolute top-1 right-1
-                      bg-black bg-opacity-60 text-white
-                      w-6 h-6 rounded-full flex items-center
-                      justify-center text-xs"
-                  >
-                    ×
-                  </button>
+                  {/* A photo the current editor just added is always theirs to
+                      remove; an already-uploaded one belongs to the listing and
+                      is owner-only. */}
+                  {(canRemovePhotos || item.kind === "new") && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        item.kind === "existing"
+                          ? removeExistingImage(item.id)
+                          : removeNewImage(item)
+                      }
+                      className="absolute top-1 right-1
+                        bg-black bg-opacity-60 text-white
+                        w-6 h-6 rounded-full flex items-center
+                        justify-center text-xs"
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

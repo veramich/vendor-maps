@@ -43,6 +43,12 @@ export default function EditSubmissionPage() {
   // True once the user edits something, so Cancel only warns when there are
   // changes to lose. Set from updateForm, never from the initial hydration.
   const [dirty, setDirty] = useState(false);
+  // What this user may do to THIS listing. Unclaimed listings are
+  // community-editable, so the person editing may not be the submitter: they
+  // can amend fields and add photos, but not remove existing ones. Defaults to
+  // false so the destructive controls stay hidden until the API confirms
+  // otherwise, rather than flashing available and then 403-ing.
+  const [canRemovePhotos, setCanRemovePhotos] = useState(false);
 
   const fetchSubmission = useCallback(async () => {
     try {
@@ -64,6 +70,8 @@ export default function EditSubmissionPage() {
         ...prev,
         ...extractSocialHandles(data.business),
       }));
+
+      setCanRemovePhotos(data.permissions?.canRemovePhotos ?? false);
 
     } catch {
       setError("Failed to load submission");
@@ -315,11 +323,22 @@ export default function EditSubmissionPage() {
           />
         )}
         {step === 6 && (
-          <Step6Media
-            formData={formData}
-            updateForm={updateForm}
-            nextStep={handleSave}
-          />
+          <>
+            {!canRemovePhotos && (
+              <p className="mb-3 text-xs text-gray-500
+                bg-gray-50 border border-gray-200
+                rounded-xl px-3 py-2">
+                You can add photos to this listing, but only the person who
+                submitted it can remove or reorder the existing ones.
+              </p>
+            )}
+            <Step6Media
+              formData={formData}
+              updateForm={updateForm}
+              nextStep={handleSave}
+              canRemovePhotos={canRemovePhotos}
+            />
+          </>
         )}
       </div>
 

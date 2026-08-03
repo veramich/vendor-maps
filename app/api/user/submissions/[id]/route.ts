@@ -36,6 +36,41 @@ function notEditableMessage(status: string): string {
   }
 }
 
+// Who the caller is relative to this listing. VendorMaps is a community
+// directory: any signed-in user may EDIT an unclaimed listing (the README's
+// "any signed-in user can add or edit listings"), but only the submitter or the
+// verified owner may DESTROY anything — remove photos, reorder the gallery, or
+// take the listing down.
+//
+// The rule is "a non-owner may add and amend, never destroy". Editing is open
+// because a wrong phone number should be fixable by whoever noticed it;
+// deletion is not, because it is unrecoverable and the person who did the work
+// (or the business itself) should decide.
+//
+// Kept as one helper because all three handlers need the same answer and the
+// DELETE branch previously computed it inline — two copies of an authorization
+// rule is one too many.
+function resolveEditRole(
+  business: { submitted_by?: string | null; claim_status?: string | null; claimed_by?: string | null },
+  userId: string
+) {
+  const isSubmitter =
+    business.submitted_by != null && business.submitted_by === userId;
+
+  const isVerifiedOwner =
+    business.claim_status === "claimed" &&
+    business.claimed_by != null &&
+    business.claimed_by === userId;
+
+  return { isSubmitter, isVerifiedOwner, isOwner: isSubmitter || isVerifiedOwner };
+}
+
+// Fields on the businesses row that must never reach a non-owner. submitter_ip
+// is the submitter's IP address (PII), and edit_snapshot is moderation
+// internals. The edit form needs neither. Contact details are handled
+// separately below — they're editable, so a non-owner sees them.
+const OWNER_ONLY_FIELDS = ["submitter_ip", "edit_snapshot"] as const;
+
 // Add one day to a YYYY-MM-DD string (UTC noon, so it never drifts across a
 // timezone boundary). Mirrors the helper in the submit route.
 function nextDay(date: string): string {
@@ -117,6 +152,16 @@ export async function GET(
         },
         { status: 403 }
       );
+    }
+
+    // An UNCLAIMED listing is editable by any signed-in user, so this row now
+    // reaches people who have no relationship to it. Strip the fields they have
+    // no business seeing before it goes out: submitter_ip is the original
+    // submitter's IP address, and edit_snapshot is moderation internals. The
+    // submitter and verified owner still get the full row.
+    const { isOwner } = resolveEditRole(business, session.user.id);
+    if (!isOwner) {
+      for (const field of OWNER_ONLY_FIELDS) delete business[field];
     }
 
     // Return already-uploaded photos so the edit form can show and manage
@@ -319,6 +364,16 @@ export async function GET(
         eventDates,
         eventName,
       },
+      // What this caller may do, so the edit form can hide destructive controls
+      // instead of letting a community editor discover the limit by hitting a
+      // 403 after they've already done the work. The API enforces these
+      // independently — this block is for the UI, not the guard.
+      permissions: {
+        canEdit:         true, // implied by reaching here at all
+        canRemovePhotos: isOwner,
+        canReorderPhotos: isOwner,
+        canRemoveListing: isOwner,
+      },
     });
 
   } catch (error) {
@@ -422,14 +477,10 @@ export async function DELETE(
     // the row and may be managing a listing someone else researched and wrote,
     // so their removal is always the reversible archive branch — see the
     // canHardDelete gate below. Hard delete stays with the submitter.
-    const isSubmitter =
-      business.submitted_by != null &&
-      business.submitted_by === session.user.id;
-
-    const isVerifiedOwner =
-      business.claim_status === "claimed" &&
-      business.claimed_by != null &&
-      business.claimed_by === session.user.id;
+    const { isSubmitter, isVerifiedOwner } = resolveEditRole(
+      business,
+      session.user.id
+    );
 
     if (!isSubmitter && !isVerifiedOwner) {
       return NextResponse.json(
@@ -562,7 +613,7 @@ export async function PATCH(
     // Fetch by id, then gate on status separately — same reasoning as GET, so a
     // save that lands on a no-longer-editable listing says why.
     const existing = await sql`
-      SELECT id, type, status, claim_status, claimed_by
+      SELECT id, type, status, claim_status, claimed_by, submitted_by
       FROM businesses
       WHERE id = ${id}
     `;
@@ -597,25 +648,10 @@ export async function PATCH(
 
     const wasListed = existing[0].status === 'listed';
 
-    // Editing a live listing overwrites its row in place and flips it back to
-    // pending, destroying the previously-live values. Capture a full snapshot
-    // first so the admin queue can show a field-by-field old→new comparison.
-    // Only real edits of a listed business are snapshotted; re-editing an
-    // already-pending item keeps whatever snapshot it already had (its "before"
-    // is still the last live version, not the intermediate pending state).
-    if (wasListed) {
-      const snapshot = await buildListingSnapshot(id);
-      if (snapshot) {
-        await sql`
-          UPDATE businesses
-          SET edit_snapshot = ${sql.json(
-            snapshot as unknown as Record<string, never>
-          )},
-              edited_at      = NOW()
-          WHERE id = ${id}
-        `;
-      }
-    }
+    // Unclaimed listings are community-editable, so this caller may be someone
+    // with no relationship to the listing. They may amend anything, but must not
+    // destroy the submitter's work — see resolveEditRole.
+    const { isOwner } = resolveEditRole(existing[0], session.user.id);
 
     // The edit form submits multipart (text fields as a JSON "data" blob,
     // kept image ids as JSON, plus new image files). Older callers may still
@@ -657,6 +693,61 @@ export async function PATCH(
       }
     } else {
       data = await req.json();
+    }
+
+    // A non-owner may ADD photos but not destroy or rearrange existing ones.
+    // Both checks run before any write below, so a refused edit leaves the row
+    // exactly as it was rather than half-applied.
+    if (!isOwner && keptImageIds !== null) {
+      const current = await sql`
+        SELECT id FROM business_images WHERE business_id = ${id}
+      `;
+      const wouldRemove = current.some(
+        img => !keptImageIds!.includes(img.id)
+      );
+
+      if (wouldRemove) {
+        return NextResponse.json(
+          {
+            error:
+              "Only the person who submitted this listing or its verified " +
+              "owner can remove its photos. You can still add new ones.",
+          },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Reordering rewrites display_order and is_primary — it changes the cover
+    // photo, which is destructive in effect even though nothing is deleted.
+    // Drop the requested order for non-owners rather than 403-ing: the rest of
+    // their edit is legitimate and the existing order simply stands.
+    if (!isOwner) {
+      imageOrder = null;
+    }
+
+    // Editing a live listing overwrites its row in place and flips it back to
+    // pending, destroying the previously-live values. Capture a full snapshot
+    // first so the admin queue can show a field-by-field old→new comparison.
+    // Only real edits of a listed business are snapshotted; re-editing an
+    // already-pending item keeps whatever snapshot it already had (its "before"
+    // is still the last live version, not the intermediate pending state).
+    //
+    // Deliberately placed AFTER the permission checks above: snapshotting first
+    // would leave an edit_snapshot behind on a listing whose edit was then
+    // refused, making a live listing look like it had a pending edit.
+    if (wasListed) {
+      const snapshot = await buildListingSnapshot(id);
+      if (snapshot) {
+        await sql`
+          UPDATE businesses
+          SET edit_snapshot = ${sql.json(
+            snapshot as unknown as Record<string, never>
+          )},
+              edited_at      = NOW()
+          WHERE id = ${id}
+        `;
+      }
     }
 
     const socialUrls = buildSocialUrls(data);

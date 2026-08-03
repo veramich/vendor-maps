@@ -8,14 +8,7 @@ export const metadata: Metadata = {
 };
 
 // Last substantive update to these terms. Update when the content changes.
-const LAST_UPDATED = "June 12, 2026";
-
-// ---------------------------------------------------------------------------
-// NOTE: This is a plain-English baseline tailored to how VendorMaps works
-// (community-submitted listings, user reviews, a resources page, and business
-// claims). It is NOT legal advice. Before launch — and especially before the
-// app-store release — have a lawyer or a reputable terms generator review it.
-// ---------------------------------------------------------------------------
+const LAST_UPDATED = "August 3, 2026";
 
 function Section({
   id,
@@ -45,10 +38,11 @@ export default function TermsPage() {
       <p className="mt-6 leading-relaxed text-gray-600">
         Welcome to VendorMaps. These Terms &amp; Conditions (&ldquo;Terms&rdquo;)
         govern your use of the VendorMaps website and mobile app (together, the
-        &ldquo;Service&rdquo;), operated by Patita Creative LLC (&ldquo;we,&rdquo;
-        &ldquo;us,&rdquo; or &ldquo;our&rdquo;). By accessing or using the Service,
-        you agree to these Terms. If you do not agree, please do not use the
-        Service. Your privacy is covered separately in our{" "}
+        &ldquo;Service&rdquo;), operated by Patita Creative (&ldquo;we,&rdquo;
+        &ldquo;us,&rdquo; or &ldquo;our&rdquo;). The Service is intended for use in
+        the United States. By accessing or using the Service, you agree to these
+        Terms. If you do not agree, please do not use the Service. Your privacy is
+        covered separately in our{" "}
         <Link href="/privacy" className="text-orange-600 underline">
           Privacy Policy
         </Link>
@@ -336,20 +330,18 @@ export default function TermsPage() {
       {/* Limitation of liability */}
       <Section id="liability" title="15. Limitation of liability">
         <p>
-          To the maximum extent permitted by law, VendorMaps and Patita Creative LLC
+          To the maximum extent permitted by law, VendorMaps and Patita Creative
           will not be liable for any indirect, incidental, special, consequential, or
           punitive damages, or for any loss arising out of your use of (or inability
           to use) the Service, your reliance on any listing, review, or resource, or
-          your dealings with any business or other user. To the extent we are found
-          liable, our total liability will not exceed [USD 100] or the amount you
-          paid us in the past twelve months, whichever is greater.
+          your dealings with any business or other user.
         </p>
       </Section>
 
       {/* Indemnification */}
       <Section id="indemnification" title="16. Indemnification">
         <p>
-          You agree to indemnify and hold harmless VendorMaps and Patita Creative LLC
+          You agree to indemnify and hold harmless VendorMaps and Patita Creative
           from any claims, damages, losses, liabilities, and expenses (including
           reasonable legal fees) arising out of your User Content, your use of the
           Service, your violation of these Terms, or your violation of any law or the
@@ -388,11 +380,6 @@ export default function TermsPage() {
         </p>
       </Section>
 
-      <p className="mt-12 text-xs leading-relaxed text-gray-400">
-        These Terms are a general template and do not constitute legal advice.
-        VendorMaps recommends reviewing them with a qualified attorney before
-        relying on them.
-      </p>
     </div>
   );
 }

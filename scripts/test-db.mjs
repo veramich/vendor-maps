@@ -25,9 +25,32 @@ const PROJECT_ID = "broad-bonus-07016490";
 const PARENT_BRANCH = "production"; // empty (0 tables); we load schema ourselves
 const BRANCH_NAME = `test-${Date.now()}`;
 
-// psql isn't on PATH in this environment; Postgres.app ships it here.
-const PSQL = process.env.PSQL_BIN ||
-  "/Applications/Postgres.app/Contents/Versions/latest/bin/psql";
+// psql usually isn't on PATH on macOS. Check the usual install locations rather
+// than hardcoding one — Postgres.app and Homebrew's keg-only libpq put it in
+// different places, and a missing binary otherwise surfaces as a confusing
+// "schema load failed at 001_extensions.sql".
+const PSQL_CANDIDATES = [
+  process.env.PSQL_BIN,
+  "/Applications/Postgres.app/Contents/Versions/latest/bin/psql",
+  "/opt/homebrew/opt/libpq/bin/psql",   // Homebrew (Apple silicon), keg-only
+  "/usr/local/opt/libpq/bin/psql",      // Homebrew (Intel), keg-only
+  "/opt/homebrew/bin/psql",
+  "/usr/local/bin/psql",
+  "psql",                               // already on PATH
+].filter(Boolean);
+
+function resolvePsql() {
+  for (const candidate of PSQL_CANDIDATES) {
+    const probe = spawnSync(candidate, ["--version"], { stdio: "ignore" });
+    if (probe.status === 0) return candidate;
+  }
+  throw new Error(
+    "psql not found. Install it (`brew install libpq`) or set PSQL_BIN to its path.\n" +
+    `  looked in: ${PSQL_CANDIDATES.join(", ")}`
+  );
+}
+
+const PSQL = resolvePsql();
 
 // 018_better_auth_tables.sql is a verbatim duplicate of 008 (re-added by
 // accident). Applying both to a fresh DB fails with "relation user already
