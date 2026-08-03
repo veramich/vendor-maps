@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import RemoveListingDialog from
+  "@/components/ui/RemoveListingDialog";
 
 type Submission = {
   id:           string;
@@ -15,6 +17,8 @@ type Submission = {
   status:       string;
   claim_status: string;
   created_at:   string;
+  is_live_edit: boolean;
+  can_restore:  boolean;
   city:         string | null;
   state_code:   string | null;
 };
@@ -37,6 +41,8 @@ export default function MySubmissionsPage() {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"submissions" | "claims">("submissions");
+  // The submission awaiting removal confirmation, if any.
+  const [removing, setRemoving] = useState<Submission | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -62,6 +68,59 @@ export default function MySubmissionsPage() {
     }
   }, [session, isPending, router, fetchData]);
 
+  // A submission that has been live — or is a pending edit of a live listing —
+  // carries other users' reviews and saves, so it is archived rather than
+  // deleted. Anything else was never public and is safe to delete outright.
+  // Mirrors the branch the DELETE route takes server-side; the server decides
+  // for itself, so a stale value here only mislabels the dialog.
+  const removeMode = (sub: Submission) =>
+    sub.status === "listed" || sub.is_live_edit
+      ? "archive"
+      : "delete";
+
+  const handleRemove = async (sub: Submission) => {
+    const res = await fetch(
+      `/api/user/submissions/${sub.id}`,
+      { method: "DELETE" }
+    );
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(
+        data.error || "Could not remove this submission."
+      );
+    }
+
+    // An archived listing leaves the public site but stays in the user's
+    // history; a deleted one is gone. Refetching keeps both in step with
+    // whichever branch the server actually took.
+    setRemoving(null);
+    await fetchData();
+  };
+
+  // Restoring is a plain status flip with nothing destroyed either way, so it
+  // needs no confirmation dialog — unlike archiving, a misclick here is
+  // undone by archiving again.
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+
+  const handleRestore = async (sub: Submission) => {
+    setRestoringId(sub.id);
+    try {
+      const res = await fetch(
+        `/api/user/submissions/${sub.id}/restore`,
+        { method: "POST" }
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "Could not restore this listing.");
+        return;
+      }
+      await fetchData();
+    } finally {
+      setRestoringId(null);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "listed":
@@ -83,7 +142,10 @@ export default function MySubmissionsPage() {
       case "listed":   return "Live";
       case "pending":  return "Under Review";
       case "rejected": return "Rejected";
-      case "duplicate": return "Duplicate";      default:         return status;
+      case "duplicate": return "Duplicate";
+      case "unlisted": return "Archived";
+      case "expired":  return "Expired";
+      default:         return status;
     }
   };
 
@@ -276,6 +338,14 @@ export default function MySubmissionsPage() {
                         already exists on VendorMaps.
                       </p>
                     )}
+                    {sub.status === "unlisted" && (
+                      <p>
+                        {sub.can_restore
+                          ? "You archived this listing. It is hidden from the map and search, but nothing was deleted — restore it whenever you're ready."
+                          : "This listing was taken down by our team. Contact us if you think that was a mistake."
+                        }
+                      </p>
+                    )}
                   </div>
 
 
@@ -337,6 +407,41 @@ export default function MySubmissionsPage() {
                       >
                         Submit Again
                       </Link>
+                    )}
+
+                    {sub.status === "unlisted" &&
+                      sub.can_restore && (
+                      <button
+                        type="button"
+                        onClick={() => handleRestore(sub)}
+                        disabled={restoringId === sub.id}
+                        className="text-xs bg-black text-white
+                          px-3 py-1.5 rounded-lg
+                          hover:bg-gray-800 transition
+                          disabled:opacity-50"
+                      >
+                        {restoringId === sub.id
+                          ? "Restoring…"
+                          : "Restore"}
+                      </button>
+                    )}
+
+                    {/* An already-unlisted or expired listing has nothing
+                        left to remove, so the action is hidden there. */}
+                    {sub.status !== "unlisted" &&
+                      sub.status !== "expired" && (
+                      <button
+                        type="button"
+                        onClick={() => setRemoving(sub)}
+                        className="text-xs border border-gray-200
+                          text-gray-500 px-3 py-1.5 rounded-lg
+                          hover:border-red-200 hover:text-red-600
+                          transition ml-auto"
+                      >
+                        {removeMode(sub) === "archive"
+                          ? "Archive"
+                          : "Delete"}
+                      </button>
                     )}
                   </div>
                 </div>
@@ -458,6 +563,14 @@ export default function MySubmissionsPage() {
         )}
 
       </div>
+
+      <RemoveListingDialog
+        businessName={removing?.name || ""}
+        mode={removing ? removeMode(removing) : "archive"}
+        open={removing !== null}
+        onClose={() => setRemoving(null)}
+        onConfirm={() => handleRemove(removing!)}
+      />
     </div>
   );
 }

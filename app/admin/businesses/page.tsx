@@ -2,6 +2,7 @@ import { requireAdmin } from "@/lib/adminAuth";
 import sql from "@/lib/db";
 import Link from "next/link";
 import DeleteEventButton from "./DeleteEventButton";
+import ArchiveBusinessButton from "./ArchiveBusinessButton";
 
 interface BusinessRow {
   id: string;
@@ -11,6 +12,7 @@ interface BusinessRow {
   sub_type: string | null;
   status: string;
   claim_status: string | null;
+  unlisted_reason: string | null;
   city: string | null;
   state_code: string | null;
   created_at: string;
@@ -20,9 +22,33 @@ interface BusinessRow {
   event_expired: boolean;
 }
 
-export default async function AdminBusinesses() {
+const STATUS_FILTERS = [
+  "all",
+  "listed",
+  "pending",
+  "unlisted",
+  "rejected",
+] as const;
+
+export default async function AdminBusinesses({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
   await requireAdmin();
 
+  const { status: statusParam } = await searchParams;
+
+  // Whitelisted rather than interpolated: the value reaches a SQL comparison
+  // below, and only these five are meaningful anyway.
+  const status =
+    STATUS_FILTERS.includes(statusParam as typeof STATUS_FILTERS[number])
+      ? statusParam!
+      : "all";
+
+  // Without this filter an archived listing is effectively unreachable — the
+  // table is capped at 50 rows by created_at, so anything taken down months
+  // after it was added falls off the end and can never be restored from here.
   const businesses = await sql<BusinessRow[]>`
     SELECT
       b.id,
@@ -32,6 +58,7 @@ export default async function AdminBusinesses() {
       b.sub_type,
       b.status,
       b.claim_status,
+      b.unlisted_reason,
       b.created_at,
       l.city,
       l.state_code,
@@ -48,6 +75,11 @@ export default async function AdminBusinesses() {
       ) AS event_expired
     FROM businesses b
     LEFT JOIN locations l ON l.business_id = b.id
+    ${
+      status === "all"
+        ? sql``
+        : sql`WHERE b.status = ${status}`
+    }
     ORDER BY b.created_at DESC
     LIMIT 50
   `;
@@ -55,9 +87,37 @@ export default async function AdminBusinesses() {
   return (
     <div className="space-y-6">
 
-      <h1 className="text-2xl font-semibold text-black">
-        All Businesses
-      </h1>
+      <div className="flex items-center justify-between
+        gap-4 flex-wrap">
+        <h1 className="text-2xl font-semibold text-black">
+          All Businesses
+        </h1>
+        <span className="text-sm text-gray-400">
+          {businesses.length}
+          {businesses.length === 50 ? "+" : ""} shown
+        </span>
+      </div>
+
+      <div className="flex gap-2 flex-wrap">
+        {STATUS_FILTERS.map((f) => (
+          <Link
+            key={f}
+            href={
+              f === "all"
+                ? "/admin/businesses"
+                : `/admin/businesses?status=${f}`
+            }
+            className={`text-xs px-3 py-1.5 rounded-full
+              border-2 capitalize transition
+              ${status === f
+                ? "border-black bg-black text-white"
+                : "border-gray-200 text-gray-600 hover:bg-gray-50"
+              }`}
+          >
+            {f === "unlisted" ? "archived" : f}
+          </Link>
+        ))}
+      </div>
 
       <div className="bg-white rounded-2xl border-2
         border-gray-100 overflow-hidden">
@@ -93,15 +153,26 @@ export default async function AdminBusinesses() {
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap
                     items-center gap-1.5">
-                    <span className={`text-xs px-2 py-1
+                    <span
+                      title={
+                        b.status === "unlisted" &&
+                        b.unlisted_reason
+                          ? b.unlisted_reason
+                          : undefined
+                      }
+                      className={`text-xs px-2 py-1
                       rounded-full font-medium
                       ${b.status === "listed"
                         ? "bg-green-100 text-green-600"
                         : b.status === "pending"
                         ? "bg-orange-100 text-orange-600"
+                        : b.status === "unlisted"
+                        ? "bg-amber-100 text-amber-700"
                         : "bg-gray-100 text-gray-500"
                       }`}>
-                      {b.status}
+                      {b.status === "unlisted"
+                        ? "archived"
+                        : b.status}
                     </span>
                     {b.event_expired && (
                       <span
@@ -147,6 +218,12 @@ export default async function AdminBusinesses() {
                     >
                       View
                     </Link>
+                    <ArchiveBusinessButton
+                      businessId={b.id}
+                      name={b.name}
+                      status={b.status}
+                      unlistedReason={b.unlisted_reason}
+                    />
                     {b.type === "event" && (
                       <DeleteEventButton
                         businessId={b.id}

@@ -30,6 +30,18 @@ export async function GET() {
         b.status,
         b.claim_status,
         b.created_at,
+        -- A pending row carrying a snapshot is an edit of an already-live
+        -- listing (migration 040), so removing it must archive rather than
+        -- delete. The UI needs the flag to label the action correctly; the
+        -- snapshot itself is large, so only its presence is sent.
+        (b.edit_snapshot IS NOT NULL) AS is_live_edit,
+        -- Only an archive the user performed themselves is theirs to undo; an
+        -- admin takedown also lands on 'unlisted' but must not be reversible
+        -- from here. Mirrors the check in the restore route.
+        (
+          b.status = 'unlisted'
+          AND b.unlisted_by = ${userId}
+        ) AS can_restore,
         l.city,
         l.state_code
       FROM businesses b

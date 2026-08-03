@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import RemoveListingDialog from
+  "@/components/ui/RemoveListingDialog";
 
 type Listing = {
   id:           string;
@@ -20,6 +22,7 @@ type Listing = {
   logo_url:     string | null;
   claim_status:       string;
   is_verified_owner:  boolean;
+  is_submitter:       boolean;
 };
 
 const SUB_TYPE_LABELS: Record<string, string> = {
@@ -47,6 +50,8 @@ export default function MyListingsPage() {
   const router = useRouter();
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
+  // The listing awaiting removal confirmation, if any.
+  const [removing, setRemoving] = useState<Listing | null>(null);
 
   const fetchListings = useCallback(async () => {
     try {
@@ -68,6 +73,29 @@ export default function MyListingsPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (session) fetchListings();
   }, [session, isPending, router, fetchListings]);
+
+  // Everything on this page is already live, so removal always archives
+  // rather than deletes — reviews and saves from other users hang off these
+  // listings. Errors are thrown so the dialog can surface them inline and
+  // keep itself open instead of closing on a failure.
+  const handleRemove = async (listing: Listing) => {
+    const res = await fetch(
+      `/api/user/submissions/${listing.id}`,
+      { method: "DELETE" }
+    );
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(
+        data.error || "Could not take this listing down."
+      );
+    }
+
+    setListings(prev =>
+      prev.filter(l => l.id !== listing.id)
+    );
+    setRemoving(null);
+  };
 
   if (isPending || loading) {
     return (
@@ -223,12 +251,47 @@ export default function MyListingsPage() {
                   >
                     Edit Listing
                   </Link>
+                  {/* Archiving is submitter-only. A verified owner who claimed
+                      a listing someone else added can edit it but not pull it
+                      down; they use the report flow on the listing page. */}
+                  {listing.is_submitter && (
+                  <button
+                    type="button"
+                    onClick={() => setRemoving(listing)}
+                    aria-label={`Archive ${listing.name}`}
+                    title="Archive"
+                    className="px-3 border-2
+                      border-gray-200 text-gray-400
+                      rounded-xl hover:border-red-200
+                      hover:text-red-600 transition"
+                  >
+                    <svg width="14" height="14"
+                      viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round">
+                      <polyline points="21 8 21 21 3 21 3 8"/>
+                      <rect x="1" y="3" width="22"
+                        height="5"/>
+                      <line x1="10" y1="12"
+                        x2="14" y2="12"/>
+                    </svg>
+                  </button>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      <RemoveListingDialog
+        businessName={removing?.name || ""}
+        mode="archive"
+        open={removing !== null}
+        onClose={() => setRemoving(null)}
+        onConfirm={() => handleRemove(removing!)}
+      />
     </div>
   );
 }

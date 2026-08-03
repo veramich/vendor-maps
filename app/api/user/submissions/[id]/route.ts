@@ -330,6 +330,202 @@ export async function GET(
   }
 }
 
+// Statuses an owner may remove themselves. 'rejected' and 'duplicate' are
+// included so a user can clear dead entries out of My Submissions; both are
+// already invisible to the public, so removing them destroys nothing.
+const REMOVABLE_STATUSES = [
+  "pending",
+  "listed",
+  "rejected",
+  "duplicate",
+];
+
+// Why a removal was refused, in the owner's terms — same reasoning as
+// notEditableMessage: a bare 404 reads as a broken link.
+function notRemovableMessage(status: string): string {
+  switch (status) {
+    case "unlisted":
+      return "This listing has already been taken down.";
+    case "expired":
+      return "This listing has already expired and is no longer public.";
+    default:
+      return "This listing can't be removed right now.";
+  }
+}
+
+/**
+ * Remove a listing the user owns.
+ *
+ * Two distinct outcomes, chosen by whether the listing was ever public — see
+ * db/schema/041_owner_archive.sql for the full rationale:
+ *
+ *   * Never live (pending with no edit_snapshot, rejected, duplicate) → the row
+ *     is DELETEd. It is the submitter's own draft or a dead entry; no other
+ *     user has interacted with it. Child tables all cascade, and the Cloudinary
+ *     assets are purged here since nothing will ever reference them again.
+ *
+ *   * Live, or a pending edit OF a live listing → the row flips to 'unlisted'.
+ *     Reviews written by other users and saves in their lists hang off this
+ *     business; deleting would erase other people's content. Every public
+ *     surface filters status='listed', so the listing leaves the site while
+ *     that content survives and support can put it back.
+ *
+ * `?mode=archive` forces the archive branch for a listing that would otherwise
+ * be deleted, so the UI can offer "take down" as a non-destructive choice.
+ */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    const existing = await sql`
+      SELECT
+        id, name, slug, status, claim_status,
+        claimed_by, submitted_by, edit_snapshot
+      FROM businesses
+      WHERE id = ${id}
+    `;
+
+    if (!existing || existing.length === 0) {
+      return NextResponse.json(
+        { error: "Listing not found" },
+        { status: 404 }
+      );
+    }
+
+    const business = existing[0];
+
+    // Removal is ORIGINAL SUBMITTER ONLY — deliberately narrower than the edit
+    // route's scoping.
+    //
+    // Editing is a shared, additive capability: a verified owner who claimed a
+    // listing someone else added should be able to correct it. Removal is
+    // neither. Taking a listing off the site is destructive and unilateral, so
+    // it stays with the person who put it there. A claimant who wants a listing
+    // they didn't create taken down goes through the report flow, which routes
+    // to an admin rather than acting directly.
+    //
+    // Note this is checked against submitted_by regardless of claim_status: a
+    // claim by someone else does not transfer removal rights away from the
+    // submitter, and does not grant them to the claimant either.
+    const isSubmitter =
+      business.submitted_by != null &&
+      business.submitted_by === session.user.id;
+
+    if (!isSubmitter) {
+      return NextResponse.json(
+        {
+          error:
+            "Only the person who originally submitted this listing can remove it. " +
+            "If it's no longer in service, you can report it instead.",
+        },
+        { status: 403 }
+      );
+    }
+
+    if (!REMOVABLE_STATUSES.includes(business.status)) {
+      return NextResponse.json(
+        { error: notRemovableMessage(business.status) },
+        { status: 409 }
+      );
+    }
+
+    // A pending item carrying an edit_snapshot is an edit of a listing that IS
+    // already live (see migration 040). Deleting it would take the live listing
+    // down with it, so it archives like any other live listing.
+    const wasEverLive =
+      business.status === "listed" ||
+      (business.status === "pending" && business.edit_snapshot != null);
+
+    const forceArchive =
+      req.nextUrl.searchParams.get("mode") === "archive";
+
+    if (wasEverLive || forceArchive) {
+      // Archiving destroys NOTHING. It is the owner's own reversible choice, so
+      // every row the listing depends on is left exactly as it was: photos,
+      // reviews, saves, hours, location — and, critically, the ownership itself.
+      //
+      // Note this deliberately does NOT clear claim_status/claimed_by or retire
+      // the claims rows, even though rejectSubmission does. That reasoning is
+      // specific to moderation: a rejected listing is being taken away from its
+      // owner, so the claim must not survive. Here the owner is the one acting,
+      // and wiping their verified ownership would force them through the whole
+      // claim-and-verify process again just to undo a takedown. Preserving it
+      // means restoring is a single status flip.
+      //
+      // edit_snapshot is likewise preserved: if a pending edit of a live listing
+      // is archived, the snapshot is the only copy of the last-live values.
+      await sql`
+        UPDATE businesses SET
+          status          = 'unlisted',
+          unlisted_reason = 'Archived by owner',
+          unlisted_at     = NOW(),
+          unlisted_by     = ${session.user.id},
+          updated_at      = NOW()
+        WHERE id = ${id}
+      `;
+
+      return NextResponse.json({
+        success: true,
+        action: "archived",
+      });
+    }
+
+    // Hard delete. Purge the Cloudinary assets first: once the row is gone the
+    // public_ids are unrecoverable, which would orphan the files permanently.
+    // A failed destroy must not block the delete — an orphaned image is a far
+    // smaller problem than a listing the user cannot remove.
+    const images = await sql`
+      SELECT cloudinary_public_id
+      FROM business_images
+      WHERE business_id = ${id}
+    `;
+
+    for (const img of images) {
+      if (!img.cloudinary_public_id) continue;
+      try {
+        await cloudinary.uploader.destroy(img.cloudinary_public_id);
+      } catch (err) {
+        console.error(
+          "Cloudinary destroy failed:",
+          img.cloudinary_public_id,
+          err
+        );
+      }
+    }
+
+    // Every business_id child table is ON DELETE CASCADE, so this one
+    // statement clears locations, hours, images, schedules, vendor spaces
+    // and fees, claims, saves and reviews along with the row.
+    await sql`DELETE FROM businesses WHERE id = ${id}`;
+
+    return NextResponse.json({
+      success: true,
+      action: "deleted",
+    });
+
+  } catch (error) {
+    console.error("Submission DELETE error:", error);
+    return NextResponse.json(
+      { error: "Failed to remove listing" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

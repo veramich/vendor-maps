@@ -5,6 +5,8 @@ import SaveButton from "@/components/ui/SaveButton";
 import OwnerResponse from "@/components/ui/OwnerResponse";
 import PhotoLightbox from "@/components/ui/PhotoLightbox";
 import BannerImage from "@/components/ui/BannerImage";
+import ReportListingButton from
+  "@/components/ui/ReportListingButton";
 import { headers } from "next/dist/server/request/headers";
 import { auth } from "@/lib/auth";
 import { buildBusinessJsonLd, type BusinessRow } from "./jsonLd";
@@ -1193,6 +1195,17 @@ export default async function BusinessProfilePage({
               ))}
             </div>
           )}
+        </div>
+
+        {/* Report — open to every visitor, signed in or not. Submitting only
+            queues the listing for admin review; it never changes the listing
+            itself, so a stranger can't take a vendor off the map. */}
+        <div className="px-4 py-8 mt-4 border-t
+          border-gray-100 text-center">
+          <ReportListingButton
+            businessId={business.id}
+            businessName={business.name}
+          />
         </div>
 
       </div>
