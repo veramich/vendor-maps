@@ -4,8 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import { useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
-import { CLD } from "@/lib/utils/cldUrl";
 
 type Listing = {
   id:           string;
@@ -127,37 +125,6 @@ export default function MyListingsPage() {
               >
                 <div className="flex items-start
                   gap-3 mb-4">
-
-                  {/* Logo */}
-                  {listing.logo_url ? (
-                    <Image
-                      src={CLD.thumb(listing.logo_url)}
-                      alt={listing.name}
-                      width={56}
-                      height={56}
-                      unoptimized
-                      className="w-14 h-14 rounded-xl
-                        object-cover border
-                        border-gray-100 flex-shrink-0"
-                    />
-                  ) : (
-                    <div className="w-14 h-14 rounded-xl
-                      bg-gray-100 flex-shrink-0 flex
-                      items-center justify-center">
-                      <svg width="20" height="20"
-                        viewBox="0 0 24 24" fill="none"
-                        stroke="#d1d5db" strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round">
-                        <rect x="3" y="3" width="18"
-                          height="18" rx="2"/>
-                        <circle cx="8.5" cy="8.5"
-                          r="1.5"/>
-                        <polyline
-                          points="21 15 16 10 5 21"/>
-                      </svg>
-                    </div>
-                  )}
 
                   <div className="flex-1">
                     <div className="flex items-start
