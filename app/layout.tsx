@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import BottomNavWrapper from "@/components/navigation/BottomNavWrapper";
@@ -27,8 +27,22 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
   },
+  // An explicit `icons` object opts out of the app/apple-icon.png file
+  // convention's auto-detection, so the apple-touch-icon is listed by hand.
   icons: {
-    icon: "/favicon.png",
+    icon: [
+      { url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+  // Launches fullscreen (no Safari chrome) when opened from the iOS home
+  // screen. The home-screen icon itself comes from app/apple-icon.png via
+  // the file convention.
+  appleWebApp: {
+    capable: true,
+    title: "VendorMaps",
+    statusBarStyle: "default",
   },
   openGraph: {
     title: "VendorMaps",
@@ -42,6 +56,12 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     images: ["/og-image.png"],
   },
+};
+
+// Tints the browser/status bar chrome to match the brand orange. Must live in
+// the `viewport` export — `metadata.themeColor` is deprecated.
+export const viewport: Viewport = {
+  themeColor: "#FF7300",
 };
 
 export default function RootLayout({
