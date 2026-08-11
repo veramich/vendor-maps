@@ -23,7 +23,7 @@ interface Step5DetailsProps {
 const generateTimeOptions = () => {
   const options = [];
   for (let hour = 0; hour < 24; hour++) {
-    for (const minute of [0, 15, 30, 45]) {
+    for (const minute of [0, 30]) {
       const h12 = hour % 12 === 0 ? 12 : hour % 12;
       const ampm = hour < 12 ? "AM" : "PM";
       const label = `${h12}:${minute
