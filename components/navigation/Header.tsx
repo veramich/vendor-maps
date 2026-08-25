@@ -64,16 +64,17 @@ export default function Header() {
         </div>
       </header>
 
-      {/* Overlay */}
+      {/* Invisible click-catcher — lets a tap outside close the menu without
+          dimming the page behind it. */}
       {menuOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-40 z-50"
+          className="fixed inset-0 z-50"
           onClick={() => setMenuOpen(false)}
         />
       )}
 
       {/* Slide Out Menu */}
-      <div className={`fixed top-0 right-0 h-full w-72 bg-white z-50 shadow-xl transform transition-transform duration-300 ${menuOpen ? "translate-x-0" : "translate-x-full"}`}>
+      <div className={`fixed top-0 right-0 h-full w-72 bg-white z-[60] shadow-2xl transform transition-transform duration-300 ${menuOpen ? "translate-x-0" : "translate-x-full"}`}>
 
         {/* Menu Header */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100 font-medium text-gray-700" >
