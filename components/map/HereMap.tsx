@@ -11,6 +11,7 @@ import { motion } from "framer-motion";
 
 const PRIMARY = "#FF7300";
 import { getIconBase64 } from "@/lib/getIconBase64";
+import { createBasemapLayer } from "@/lib/basemap";
 import { CATEGORY_ICONS } from "@/components/map/categoryIcons";
 import {
   BusinessFilters,
@@ -443,21 +444,12 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
           return;
         }
 
-        const positronLayer = new H.map.layer.TileLayer(
-          new H.map.provider.ImageTileProvider({
-            getURL: (col: number, row: number, zoom: number) =>
-              `https://a.basemaps.cartocdn.com/light_all/${zoom}/${col}/${row}@2x.png`,
-            min: 0,
-            max: 19,
-            opacity: 1.0,
-            tileSize: 512,
-          })
-        );
+        const baseLayer = createBasemapLayer(H);
 
         const container = mapRef.current;
         if (!container) return;
 
-        const map = new H.Map(container, positronLayer, {
+        const map = new H.Map(container, baseLayer, {
           zoom: 11,
           center: { lat: 34.0522, lng: -118.2437 },
           pixelRatio: window.devicePixelRatio || 1,

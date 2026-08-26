@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 
 const PRIMARY = "#FF7300";
 import { BusinessFormData } from "@/lib/types/business";
+import { createBasemapLayer } from "@/lib/basemap";
 
 interface Step3LocationProps {
   formData: BusinessFormData;
@@ -360,26 +361,14 @@ export default function Step3Location({
           mapInstance.current = null;
         }
 
-        const positronLayer = new H.map.layer.TileLayer(
-          new H.map.provider.ImageTileProvider({
-            getURL: (
-              col: number,
-              row: number,
-              zoom: number
-            ) =>
-              `https://a.basemaps.cartocdn.com/light_all/${zoom}/${col}/${row}@2x.png`,
-            min: 0,
-            max: 19,
-            tileSize: 512,
-          })
-        );
+        const baseLayer = createBasemapLayer(H);
 
         const container = mapRef.current;
         if (!container) return;
 
         const map = new H.Map(
           container,
-          positronLayer,
+          baseLayer,
           {
             zoom: 15,
             center: {
