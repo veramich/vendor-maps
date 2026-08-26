@@ -5,6 +5,7 @@ import SaveButton from "@/components/ui/SaveButton";
 import OwnerResponse from "@/components/ui/OwnerResponse";
 import PhotoLightbox from "@/components/ui/PhotoLightbox";
 import BannerImage from "@/components/ui/BannerImage";
+import AddressLink from "@/components/ui/AddressLink";
 import ReportListingButton from
   "@/components/ui/ReportListingButton";
 import { headers } from "next/dist/server/request/headers";
@@ -344,6 +345,17 @@ export default async function BusinessProfilePage({
       ? `${business.street_1} & ${business.street_2}`
       : business.street_address || "";
 
+  // What gets handed to the map app when the listing has no coordinates:
+  // the street line alone is ambiguous across cities, so append the city,
+  // state and zip that are displayed beneath it.
+  const fullAddress = [
+    address,
+    business.city,
+    [business.state_code, business.zip].filter(Boolean).join(" "),
+  ]
+    .filter(Boolean)
+    .join(", ");
+
   const coverImage =
     images.find((img) => img.is_primary) ||
     images[0];
@@ -558,19 +570,26 @@ export default async function BusinessProfilePage({
                 <circle cx="12" cy="10" r="3"/>
               </svg>
               <div>
-                <p className="text-sm text-black">
-                  {address}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {business.neighborhood
-                    ? `${business.neighborhood}, `
-                    : ""}
-                  {business.city},{" "}
-                  {business.state_code}
-                  {business.zip
-                    ? ` ${business.zip}`
-                    : ""}
-                </p>
+                <AddressLink
+                  address={fullAddress}
+                  lat={business.lat ?? null}
+                  lng={business.lng ?? null}
+                  businessName={business.name}
+                >
+                  <span className="text-sm text-black block">
+                    {address}
+                  </span>
+                  <span className="text-xs text-gray-500 block">
+                    {business.neighborhood
+                      ? `${business.neighborhood}, `
+                      : ""}
+                    {business.city},{" "}
+                    {business.state_code}
+                    {business.zip
+                      ? ` ${business.zip}`
+                      : ""}
+                  </span>
+                </AddressLink>
                 {!business.show_exact_address && (
                   <p className="text-xs text-gray-400
                     mt-1">
