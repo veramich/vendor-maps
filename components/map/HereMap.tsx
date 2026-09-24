@@ -4,10 +4,12 @@ import {
   forwardRef,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 
 const PRIMARY = "#FF7300";
 import { getIconBase64 } from "@/lib/getIconBase64";
@@ -39,6 +41,33 @@ export interface MapLocation {
 }
 
 const CLUSTER_ZOOM_THRESHOLD = 12;
+
+// Business markers are 40px circles centered on their point (outer edge ~19.5px
+// out), so the popup's tail tip sits this far above the point to just clear
+// the marker's top edge.
+const POPUP_GAP = 22;
+// Breathing room kept between an auto-panned popup and the viewport edges.
+const POPUP_MARGIN = 12;
+
+/** Screen area (px from each map edge) covered by UI the popup should avoid. */
+export interface PopupInsets {
+  top?: number;
+  right?: number;
+  bottom?: number;
+  left?: number;
+}
+
+// Markers carry their MapLocation as data. A business can have several
+// locations, so match on the point too, not just the business id.
+const isMarkerFor = (object: HMapObject, location: MapLocation) => {
+  const data = object.getData<MapLocation | undefined>();
+  return (
+    !!data &&
+    data.id === location.id &&
+    data.lat === location.lat &&
+    data.lng === location.lng
+  );
+};
 
 // Marker color per business sub_type — the single source of truth shared by the
 // map markers (getMarkerColor) and the map page's legend/filter chips. Order
@@ -89,6 +118,18 @@ interface HereMapProps {
   filters?: BusinessFilters;
   /** The visitor's current position, shown as a "you are here" dot. */
   userLocation?: { lat: number; lng: number } | null;
+  /** The location whose popup is open. The popup pops out of its marker and
+   *  follows it as the map pans and zooms. */
+  selected?: MapLocation | null;
+  /** Content of the popup bubble shown above the selected marker. */
+  renderPopup?: (location: MapLocation) => ReactNode;
+  /** Called when the popup should close: a tap on empty map, or the selected
+   *  marker leaving the map (e.g. folding into a cluster on zoom-out). The
+   *  parent should clear `selected`. */
+  onPopupClose?: () => void;
+  /** Read when a popup opens: map areas covered by overlays (search bar,
+   *  chips). The map pans so a freshly opened popup isn't hidden under them. */
+  getPopupInsets?: () => PopupInsets;
 }
 
 /** Imperative API exposed to parents via ref. */
@@ -104,10 +145,15 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
     categoryFilter = "",
     filters = EMPTY_FILTERS,
     userLocation = null,
+    selected = null,
+    renderPopup,
+    onPopupClose,
+    getPopupInsets,
   },
   ref
 ) {
   const [mapReady, setMapReady] = useState(false);
+  const reduceMotion = useReducedMotion();
 
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<HMap | null>(null);
@@ -131,11 +177,88 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
   // tracks whether the last render was in cluster mode so we only
   // re-render from the viewport listener when crossing the threshold
   const lastWasClusteredRef = useRef<boolean | null>(null);
-
+  // Popup anchoring. The popup is a DOM overlay (not a HERE object), so on
+  // every view change we project the selected marker's point to screen pixels
+  // and move the anchor element there directly, skipping React re-renders.
+  const selectedRef = useRef(selected);
+  const anchorGeoRef = useRef<HGeoPoint | null>(null);
+  const popupAnchorRef = useRef<HTMLDivElement>(null);
+  const popupBoxRef = useRef<HTMLDivElement>(null);
+  const onPopupCloseRef = useRef(onPopupClose);
+  const getPopupInsetsRef = useRef(getPopupInsets);
 
   useEffect(() => {
     onMarkerTapRef.current = onMarkerTap;
-  }, [onMarkerTap]);
+    onPopupCloseRef.current = onPopupClose;
+    getPopupInsetsRef.current = getPopupInsets;
+  }, [onMarkerTap, onPopupClose, getPopupInsets]);
+
+  // Moves the popup anchor to the selected marker's current screen position.
+  // Runs on every frame of a pan/zoom, so it writes the style directly.
+  const positionPopup = () => {
+    const map = mapInstance.current;
+    const anchor = popupAnchorRef.current;
+    const geo = anchorGeoRef.current;
+    if (!map || !anchor || !geo) return;
+    const point = map.geoToScreen(geo);
+    if (point) {
+      anchor.style.transform = `translate(${point.x}px, ${point.y}px)`;
+    }
+  };
+
+  // Points the popup at the marker currently drawn for the selected location.
+  // Fanned-out markers sit off their true point and markers are rebuilt on
+  // cluster changes, so this reads the live marker rather than location.lat/lng.
+  // Returns false when that marker isn't on the map.
+  const syncPopupAnchor = (map: HMap) => {
+    const location = selectedRef.current;
+    const marker = location
+      ? map.getObjects().find((o) => isMarkerFor(o, location))
+      : undefined;
+    anchorGeoRef.current = marker ? marker.getGeometry() : null;
+    positionPopup();
+    return !!marker;
+  };
+
+  // Pans just enough that a freshly opened popup isn't clipped by the map edge
+  // or hidden under the overlays reported by getPopupInsets.
+  const panPopupIntoView = (map: HMap) => {
+    const H = hRef.current;
+    const box = popupBoxRef.current;
+    const container = mapRef.current;
+    const geo = anchorGeoRef.current;
+    if (!H || !box || !container || !geo) return;
+    const point = map.geoToScreen(geo);
+    if (!point) return;
+
+    const insets = getPopupInsetsRef.current?.() ?? {};
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    // offsetWidth/Height ignore the pop-in scale transform, so this is the
+    // popup's settled size even mid-animation.
+    const top = point.y - POPUP_GAP - box.offsetHeight;
+    const left = point.x - box.offsetWidth / 2;
+    const right = point.x + box.offsetWidth / 2;
+    const minTop = (insets.top ?? 0) + POPUP_MARGIN;
+    const minLeft = (insets.left ?? 0) + POPUP_MARGIN;
+    const maxRight = width - (insets.right ?? 0) - POPUP_MARGIN;
+
+    // Shifting the view center by (dx, dy) moves the popup by (-dx, -dy).
+    let dx = 0;
+    let dy = 0;
+    if (left < minLeft) dx = left - minLeft;
+    else if (right > maxRight) dx = right - maxRight;
+    if (top < minTop) dy = top - minTop;
+    if (!dx && !dy) return;
+
+    const center = map.screenToGeo(width / 2 + dx, height / 2 + dy);
+    if (!center) return;
+    map.getViewModel().setLookAtData(
+      { position: center },
+      true,
+      { duration: 300, ease: H.util.animation.ease.EASE_OUT }
+    );
+  };
 
   useImperativeHandle(ref, () => ({
     recenter: () => {
@@ -371,6 +494,12 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
     if (objects.length) map.addObjects(objects);
     // The wipe above removes the user dot too; put it back on top.
     if (userMarkerRef.current) map.addObject(userMarkerRef.current);
+
+    // Re-point an open popup at the rebuilt marker. If its marker is gone
+    // (folded into a cluster), close the popup rather than leave it floating.
+    if (selectedRef.current && !syncPopupAnchor(map)) {
+      onPopupCloseRef.current?.();
+    }
   };
 
   const fetchLocations = async (
@@ -466,6 +595,19 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
 
         window.addEventListener("resize", () => {
           map.getViewPort().resize();
+          positionPopup();
+        });
+
+        // Fires on every frame of a pan/zoom, so an open popup tracks its
+        // marker smoothly instead of jumping at the end of the gesture.
+        map.addEventListener("mapviewchange", positionPopup);
+
+        // The popup has no close button: a tap on empty map dismisses it.
+        // Marker taps land on the marker, not the map, and switch the popup.
+        map.addEventListener("tap", (evt) => {
+          if (evt.target === map && selectedRef.current) {
+            onPopupCloseRef.current?.();
+          }
         });
 
         hRef.current = H;
@@ -535,6 +677,25 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, categoryFilter, filters]);
 
+  // Open / move / close the popup when the selection changes. A layout effect
+  // so the anchor is positioned before the browser paints the new popup;
+  // otherwise it would flash at the map's top-left corner for a frame.
+  useLayoutEffect(() => {
+    selectedRef.current = selected;
+    const map = mapInstance.current;
+    if (!map || !selected) {
+      anchorGeoRef.current = null;
+      return;
+    }
+    if (syncPopupAnchor(map)) {
+      panPopupIntoView(map);
+    } else {
+      onPopupCloseRef.current?.();
+    }
+    // Keyed on the selection only: the helpers read everything else from refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
+
   // Add / move / remove the "you are here" dot as the visitor's position
   // changes. The map may not be ready on the first fix (script still loading),
   // so we bail and re-run once mapInstance is set on a later change.
@@ -573,6 +734,71 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
   return (
     <div style={{ width: "100%", height: "100%", position: "relative" }}>
       <div ref={mapRef} style={{ width: "100%", height: "100%" }} />
+
+      {/* Popup bubble. The zero-size anchor is moved to the marker's point by
+          positionPopup; the bubble hangs above it with its tail tip just over
+          the marker. zIndex 40 lets it slide under the page's search/filter
+          overlays (50+) when the map is dragged. */}
+      {selected && renderPopup && (
+        <div
+          ref={popupAnchorRef}
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            width: 0,
+            height: 0,
+            zIndex: 40,
+          }}
+        >
+          <div
+            ref={popupBoxRef}
+            style={{
+              position: "absolute",
+              bottom: `${POPUP_GAP}px`,
+              left: 0,
+              // max-content: a zero-width anchor would otherwise squeeze the
+              // bubble down to its narrowest word.
+              width: "max-content",
+              transform: "translateX(-50%)",
+            }}
+          >
+            {/* Keyed per marker so switching markers replays the pop. Scales
+                from the tail tip, so it grows out of the marker itself. */}
+            <motion.div
+              key={`${selected.id}:${selected.lat},${selected.lng}`}
+              initial={
+                reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.2 }
+              }
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{
+                scale: { type: "spring", stiffness: 520, damping: 28, mass: 0.7 },
+                opacity: { duration: 0.12 },
+              }}
+              style={{
+                transformOrigin: "50% 100%",
+                // drop-shadow (not box-shadow) so the tail is shadowed too.
+                filter: "drop-shadow(0 4px 14px rgba(0,0,0,0.18))",
+              }}
+            >
+              <div style={{ background: "white", borderRadius: "12px" }}>
+                {renderPopup(selected)}
+              </div>
+              <div
+                aria-hidden
+                style={{
+                  width: 0,
+                  height: 0,
+                  margin: "0 auto",
+                  borderLeft: "9px solid transparent",
+                  borderRight: "9px solid transparent",
+                  borderTop: "10px solid white",
+                }}
+              />
+            </motion.div>
+          </div>
+        </div>
+      )}
 
       {!mapReady && (
         <div

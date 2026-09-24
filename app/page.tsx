@@ -1,11 +1,15 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import SearchBar from "@/components/ui/SearchBar";
 import FilterPanel from "@/components/ui/FilterPanel";
 import LocationBanner from "@/components/ui/LocationBanner";
-import type { HereMapHandle, MapLocation } from "@/components/map/HereMap";
+import type {
+  HereMapHandle,
+  MapLocation,
+  PopupInsets,
+} from "@/components/map/HereMap";
 import { SUB_TYPE_LEGEND } from "@/components/map/HereMap";
 import { BusinessFilters, EMPTY_FILTERS } from "@/lib/businessFilters";
 
@@ -23,6 +27,16 @@ export default function MapPage() {
     lng: number;
   } | null>(null);
   const mapHandleRef = useRef<HereMapHandle>(null);
+  const searchOverlayRef = useRef<HTMLDivElement>(null);
+
+  const closePopup = useCallback(() => setPopup(null), []);
+
+  // A popup opening near the top of the map would land under the search bar
+  // and chips; report their bottom edge so the map pans the popup clear.
+  const getPopupInsets = useCallback((): PopupInsets => {
+    const overlay = searchOverlayRef.current;
+    return { top: overlay ? overlay.offsetTop + overlay.offsetHeight : 0 };
+  }, []);
 
   // Location is requested via an in-app banner (LocationBanner) rather than
   // firing the native prompt on load — unsolicited prompts get auto-blocked by
@@ -67,6 +81,10 @@ export default function MapPage() {
         searchQuery={searchQuery}
         filters={filters}
         userLocation={userLocation}
+        selected={popup}
+        onPopupClose={closePopup}
+        getPopupInsets={getPopupInsets}
+        renderPopup={(location) => <BusinessPopup location={location} />}
       />
 
       {/* In-app location request — shows a banner instead of letting the
@@ -118,6 +136,7 @@ export default function MapPage() {
 
       {/* Search overlay */}
       <div
+        ref={searchOverlayRef}
         style={{
           position: "absolute",
           top: "12px",
@@ -224,101 +243,60 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* Business popup */}
-      {popup && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: "20px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 100,
-            width: "280px",
-          }}
-        >
-          <div
-            style={{
-              background: "white",
-              borderRadius: "12px",
-              padding: "16px",
-              boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
-              fontFamily: "sans-serif",
-              position: "relative" as const,
-            }}
-          >
-            <button
-              onClick={() => setPopup(null)}
-              style={{
-                position: "absolute" as const,
-                top: "8px",
-                right: "8px",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                fontSize: "18px",
-                color: "#999",
-                lineHeight: 1,
-              }}
-            >
-              ×
-            </button>
-
-            <p
-              style={{
-                fontSize: "14px",
-                fontWeight: 600,
-                margin: "0 0 4px",
-                paddingRight: "24px",
-                color: "#111",
-              }}
-            >
-              {popup.name}
-            </p>
-
-            <p style={{ fontSize: "12px", color: "#666", margin: "0 0 4px" }}>
-              {popup.category || ""}
-            </p>
-
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                marginBottom: "8px",
-              }}
-            >
-              <span style={{ fontSize: "12px", color: "#666" }}>
-                {"$".repeat(popup.price_tier || 1)}
-              </span>
-              {(popup.avg_rating ?? 0) > 0 && (
-                <span style={{ fontSize: "12px", color: "#666" }}>
-                  ★ {Number(popup.avg_rating).toFixed(1)} ({popup.review_count})
-                </span>
-              )}
-            </div>
-
-            <p style={{ fontSize: "12px", color: "#888", margin: "0 0 12px" }}>
-              {popup.neighborhood || popup.city}
-            </p>
-
-            <a
-              href={`/${popup.slug || popup.id}`}
-              style={{
-                display: "block",
-                background: "#111",
-                color: "white",
-                textAlign: "center" as const,
-                padding: "10px",
-                borderRadius: "8px",
-                fontSize: "13px",
-                textDecoration: "none",
-              }}
-            >
-              View Business
-            </a>
-          </div>
-        </div>
-      )}
     </div>
+  );
+}
+
+// Popup content: the business name is the whole button, with a brand-orange
+// arrow badge so it reads as tappable. HereMap supplies the white bubble, the
+// tail pointing at the marker, and the pop-out animation around it. There is
+// no close button; tapping empty map (or another marker) dismisses it.
+function BusinessPopup({ location }: { location: MapLocation }) {
+  return (
+    <a
+      href={`/${location.slug || location.id}`}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "10px",
+        maxWidth: "240px",
+        padding: "10px 10px 10px 14px",
+        color: "#111",
+        fontFamily: "sans-serif",
+        fontSize: "14px",
+        fontWeight: 600,
+        lineHeight: 1.3,
+        textDecoration: "none",
+      }}
+    >
+      <span style={{ minWidth: 0 }}>{location.name}</span>
+      <span
+        aria-hidden
+        style={{
+          flexShrink: 0,
+          width: "24px",
+          height: "24px",
+          borderRadius: "9999px",
+          background: "#FF7300",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="white"
+          strokeWidth="2.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <line x1="5" y1="12" x2="19" y2="12" />
+          <polyline points="12 5 19 12 12 19" />
+        </svg>
+      </span>
+    </a>
   );
 }

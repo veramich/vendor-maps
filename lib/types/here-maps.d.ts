@@ -26,6 +26,7 @@ interface HAnimationOptions {
 interface HMapObject {
   getData<T = unknown>(): T;
   setData(data: unknown): void;
+  getGeometry(): HGeoPoint;
   setGeometry(point: HGeoPoint): void;
   addEventListener(
     type: string,
@@ -50,11 +51,16 @@ interface HMap {
   getViewModel(): HViewModel;
   getViewPort(): HViewPort;
   getObjects(): HMapObject[];
+  /** Geo point → pixel position within the map viewport (null if off-map). */
+  geoToScreen(point: HGeoPoint): { x: number; y: number } | null;
+  /** Pixel position within the map viewport → geo point. */
+  screenToGeo(x: number, y: number): HGeoPoint | null;
   addObject(object: HMapObject): void;
   addObjects(objects: HMapObject[]): void;
   removeObject(object: HMapObject): void;
   removeObjects(objects: HMapObject[]): void;
-  addEventListener(type: string, handler: () => void): void;
+  /** evt.target is the map itself for taps on empty map, else the object hit. */
+  addEventListener(type: string, handler: (evt: { target: unknown }) => void): void;
   dispose(): void;
 }
 

@@ -19,8 +19,8 @@ interface ClaimSignInPromptProps {
  *
  * Copy note: most users here read English as a second language, so this avoids
  * product jargon ("claim", "link", "directory") and contractions in favour of
- * short literal sentences. The user-facing words are "account" and "manage";
- * "claim" survives only in the code, never on screen.
+ * short literal sentences. The user-facing words are "account", "updates" and
+ * "guest"; "claim" survives only in the code, never on screen.
  */
 export default function ClaimSignInPrompt({
   onSignUp,
@@ -37,9 +37,11 @@ export default function ClaimSignInPrompt({
     return () => window.removeEventListener("keydown", onKey);
   }, [onDismiss]);
 
+  // z-[60] sits above the z-50 BottomNav, which otherwise covers the guest
+  // button on phones.
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/50
+      className="fixed inset-0 z-[60] bg-black/50
         flex items-end sm:items-center justify-center
         px-4 pb-4 sm:pb-0"
       onClick={onDismiss}
@@ -72,25 +74,12 @@ export default function ClaimSignInPrompt({
           id="claim-signin-title"
           className="text-lg font-semibold text-black mb-2"
         >
-          You need an account to manage your business
+          Want to get updates?
         </h2>
 
-        <p className="text-sm text-gray-500 mb-4">
-          With an account, you can edit your business,
-          add a logo, and update it any time.
-        </p>
-
-        <div className="rounded-xl p-3 mb-4 bg-gray-50">
-          <p className="text-sm text-gray-500">
-            You can also continue without an account. Your
-            business will still be added. But you will not
-            be able to edit it until you make an account
-            and ask to manage it.
-          </p>
-        </div>
-
-        <p className="text-sm text-gray-400 mb-6">
-          Your answers are saved. You will not lose them.
+        <p className="text-sm text-gray-500 mb-6">
+          Make an account to get updates and edit your
+          business any time.
         </p>
 
         <div className="space-y-3">
@@ -100,7 +89,7 @@ export default function ClaimSignInPrompt({
               py-3 rounded-xl transition active:scale-95"
             style={{ background: "var(--primary)" }}
           >
-            Sign up
+            Create an account
           </button>
           <button
             onClick={onGuest}
@@ -109,7 +98,7 @@ export default function ClaimSignInPrompt({
               rounded-xl transition active:scale-95
               hover:bg-gray-50"
           >
-            Continue without an account
+            Continue as guest
           </button>
         </div>
 
