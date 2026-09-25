@@ -6,8 +6,12 @@ import { buildSocialUrls } from
   "@/lib/utils/buildSocialUrls";
 import { uploadImage } from "@/lib/utils/uploadImage";
 import { validateScheduleAnchor } from "@/lib/utils/validateSchedule";
+import {
+  admissionToPriceContext,
+  priceContextToAdmission,
+} from "@/lib/utils/eventAdmission";
 import cloudinary from "@/lib/cloudinary";
-import { BusinessFormData } from "@/lib/types/business";
+import { BusinessFormData, EventDate } from "@/lib/types/business";
 import { buildListingSnapshot } from "@/lib/listingSnapshot";
 
 // A listing can only be edited while it is live or awaiting review. Anything
@@ -80,6 +84,34 @@ function nextDay(date: string): string {
   return dt.toISOString().split("T")[0];
 }
 
+// Check a specific-dates event's rows, mirroring Step5Details' rules. Returns a
+// message the owner can act on, or null when every row is usable. The format
+// checks matter: a malformed value otherwise passes the truthiness guards and
+// only fails at the INSERT, after the old dates are already deleted.
+function validateEventDates(dates: EventDate[] | undefined): string | null {
+  if (!Array.isArray(dates) || dates.length === 0) {
+    return "Please add at least one event date.";
+  }
+  for (let i = 0; i < dates.length; i++) {
+    const d = dates[i];
+    const label = dates.length > 1 ? `Event date ${i + 1}` : "Your event date";
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d.date || "")) {
+      return `${label} is missing a date.`;
+    }
+    if (!/^\d{2}:\d{2}$/.test(d.startTime || "")) {
+      return `${label} is missing a start time.`;
+    }
+    if (!/^\d{2}:\d{2}$/.test(d.endTime || "")) {
+      return `${label} is missing an end time.`;
+    }
+    // Zero-padded HH:MM strings compare correctly as text.
+    if (!d.closesNextDay && d.endTime <= d.startTime) {
+      return `${label} must end after it starts.`;
+    }
+  }
+  return null;
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -138,6 +170,11 @@ export async function GET(
       businessAmenities: business.business_amenities || [],
       hoursSubjectToChange: business.hours_subject_to_change || false,
       servedZips:        business.served_zips || [],
+      // Events keep admission flattened in price_context; unpack it so the
+      // Free/Paid toggle shows what's saved instead of the form default.
+      ...(business.type === "event"
+        ? priceContextToAdmission(business.price_context)
+        : {}),
     };
 
     // Claimed listings can only be edited by their verified owner.
@@ -313,22 +350,26 @@ export async function GET(
         : "",
     }));
 
+    // The bounds are formatted as text in SQL. Selected raw, postgres.js turns
+    // a timestamp into a JS Date, and String(Date) is "Sun Sep 27 2026 ..." —
+    // which splitTs below reads as date "Sun", time "Sep". The form then shows
+    // the event's dates as blank and saving writes that garbage back.
     const dateRows =
       business.sub_type === "pop_up"
         ? await sql`
             SELECT
               id,
               event_name,
-              lower(event_range) AS start_ts,
-              upper(event_range) AS end_ts
+              to_char(lower(event_range), 'YYYY-MM-DD HH24:MI') AS start_ts,
+              to_char(upper(event_range), 'YYYY-MM-DD HH24:MI') AS end_ts
             FROM popup_events
             WHERE business_id = ${business.id}
             ORDER BY lower(event_range) ASC
           `
         : [];
 
-    // A timestamp string "YYYY-MM-DD HH:MM:SS" → date / HH:MM parts.
-    const splitTs = (ts: string | Date) => {
+    // A timestamp string "YYYY-MM-DD HH:MM" → date / HH:MM parts.
+    const splitTs = (ts: string) => {
       const [datePart, timePart] = String(ts).split(/[ T]/);
       return { date: datePart, time: (timePart || "").slice(0, 5) };
     };
@@ -726,6 +767,53 @@ export async function PATCH(
       imageOrder = null;
     }
 
+    // Validate event dates BEFORE any write below. The event-date block deletes
+    // the existing rows and re-inserts what the form sent, and by then the
+    // listing has been snapshotted and flipped to pending — so a bad value
+    // caught there would wipe the event's dates AND leave a half-applied edit in
+    // the admin queue behind an error message the owner can't act on.
+    if (data.eventDateMode === "recurring") {
+      const schedules = (data.marketSchedules || []).filter(
+        s => s.dayOfWeek && s.recurrenceType
+      );
+      if (schedules.length === 0) {
+        return NextResponse.json(
+          { error: "Please add at least one schedule for your event." },
+          { status: 400 }
+        );
+      }
+      for (const s of schedules) {
+        const scheduleError = validateScheduleAnchor(s);
+        if (scheduleError) {
+          return NextResponse.json(
+            { error: scheduleError },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
+    if (
+      existing[0].type === "event" &&
+      data.isFreeEntry === false &&
+      !data.admissionPrice?.trim()
+    ) {
+      return NextResponse.json(
+        { error: "Please enter an admission price, or choose Free Entry." },
+        { status: 400 }
+      );
+    }
+
+    if (data.eventDateMode === "specific") {
+      const datesError = validateEventDates(data.eventDates);
+      if (datesError) {
+        return NextResponse.json(
+          { error: datesError },
+          { status: 400 }
+        );
+      }
+    }
+
     // Editing a live listing overwrites its row in place and flips it back to
     // pending, destroying the previously-live values. Capture a full snapshot
     // first so the admin queue can show a field-by-field old→new comparison.
@@ -773,13 +861,21 @@ export async function PATCH(
           ).slice(0, 5)
         : [];
 
+    // Events edit admission through the Free/Paid toggle, not priceContext
+    // (mirrors the submit route). Fall back to the raw value for callers that
+    // don't send the toggle.
+    const priceContext =
+      existing[0].type === "event" && data.isFreeEntry !== undefined
+        ? admissionToPriceContext(data.isFreeEntry, data.admissionPrice)
+        : data.priceContext || null;
+
     await sql`
       UPDATE businesses SET
         name               = ${data.name?.trim() || null},
         description        = ${data.description?.trim() || null},
         category           = ${data.category || null},
         price_tier         = ${data.priceTier || null},
-        price_context      = ${data.priceContext || null},
+        price_context      = ${priceContext},
         website            = ${socialUrls.website || null},
         instagram          = ${socialUrls.instagram || null},
         facebook           = ${socialUrls.facebook || null},
@@ -1072,24 +1168,7 @@ export async function PATCH(
         UPDATE businesses SET sub_type = ${newSubType} WHERE id = ${id}
       `;
 
-      // Validate BEFORE the delete below — bailing out mid-loop would leave the
-      // listing with its schedules wiped and nothing written back.
-      if (
-        data.eventDateMode === "recurring" &&
-        Array.isArray(data.marketSchedules)
-      ) {
-        for (const s of data.marketSchedules) {
-          if (!s.dayOfWeek || !s.recurrenceType) continue;
-          const scheduleError = validateScheduleAnchor(s);
-          if (scheduleError) {
-            return NextResponse.json(
-              { error: scheduleError },
-              { status: 400 }
-            );
-          }
-        }
-      }
-
+      // Schedules and dates were validated before the first write above.
       await sql`DELETE FROM market_schedules WHERE business_id = ${id}`;
       await sql`DELETE FROM popup_events WHERE business_id = ${id}`;
 

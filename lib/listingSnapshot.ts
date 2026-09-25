@@ -195,10 +195,13 @@ export async function buildListingSnapshot(
     WHERE business_id = ${businessId}
   `;
 
+  // Formatted as text in SQL: a raw timestamp comes back from postgres.js as a
+  // JS Date, which splitTs would read as date "Sun" / time "Sep" — and a
+  // rejected edit would then fail to restore the event's dates.
   const dateRows = await sql`
     SELECT event_name,
-           lower(event_range) AS start_ts,
-           upper(event_range) AS end_ts
+           to_char(lower(event_range), 'YYYY-MM-DD HH24:MI') AS start_ts,
+           to_char(upper(event_range), 'YYYY-MM-DD HH24:MI') AS end_ts
     FROM popup_events
     WHERE business_id = ${businessId}
     ORDER BY lower(event_range) ASC

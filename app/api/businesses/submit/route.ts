@@ -4,6 +4,7 @@ import { uploadImage } from "@/lib/utils/uploadImage";
 import { buildSocialUrls } from "@/lib/utils/buildSocialUrls";
 import { generateSlug } from "@/lib/utils/generateSlug";
 import { validateScheduleAnchor } from "@/lib/utils/validateSchedule";
+import { admissionToPriceContext } from "@/lib/utils/eventAdmission";
 import { auth } from "@/lib/auth";
 import { sendSubmissionReceivedEmail, sendAdminSubmissionAlert } from "@/lib/email";
 import { headers } from "next/headers";
@@ -157,11 +158,7 @@ export async function POST(req: NextRequest) {
       : data.priceTier || null;
 
     const dbPriceContext = isEventType
-      ? data.isFreeEntry
-        ? "Free entry"
-        : data.admissionPrice
-        ? `$${data.admissionPrice} admission`
-        : null
+      ? admissionToPriceContext(data.isFreeEntry, data.admissionPrice)
       : data.priceContext || null;
 
     // Served zips only apply to directory-only businesses; prune blanks,
