@@ -293,37 +293,32 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
     return new H.map.Marker({ lat, lng }, { icon, zIndex: 1000 });
   };
 
+  // Cluster bubble: solid brand disc with a white ring, soft outer halo and
+  // drop shadow. Sized by count tier so even the smallest reads larger than
+  // the 40px business markers.
   const createClusterMarker = (
     H: HNamespace,
     lat: number,
     lng: number,
     count: number
   ) => {
-    const svgMarkup = `
-      <svg width="40" height="40"
-        viewBox="0 0 40 40"
-        xmlns="http://www.w3.org/2000/svg">
-        <circle cx="20" cy="20" r="17"
-          fill="${PRIMARY}" fill-opacity="0.35"
-          stroke="${PRIMARY}" stroke-width="1.5"
-          stroke-opacity="0.6"/>
-        <circle cx="20" cy="20" r="12"
-          fill="${PRIMARY}" fill-opacity="0.7"/>
-        <text x="20" y="24"
-          text-anchor="middle"
-          font-family="sans-serif"
-          font-size="12"
-          font-weight="bold"
-          fill="white">
-          ${count}
-        </text>
-      </svg>
-    `;
+    const r = count < 10 ? 18 : count < 50 ? 20 : count < 100 ? 22 : 25;
+    const halo = r + 6;
+    const size = (halo + 3) * 2;
+    const c = size / 2;
+    const label = count > 999 ? "999+" : String(count);
+    const fontSize = label.length > 2 ? 12 : 14;
+    const svgMarkup = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg"><defs><filter id="s" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.5"/></filter></defs><circle cx="${c}" cy="${c}" r="${halo}" fill="${PRIMARY}" fill-opacity="0.25"/><circle cx="${c}" cy="${c + 1.5}" r="${r}" fill="black" fill-opacity="0.25" filter="url(#s)"/><circle cx="${c}" cy="${c}" r="${r}" fill="${PRIMARY}" stroke="white" stroke-width="2.5"/><text x="${c}" y="${c}" dy="0.35em" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="${fontSize}" font-weight="700" fill="white">${label}</text></svg>`;
     const icon = new H.map.Icon(
       `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`,
-      { size: { w: 40, h: 40 }, anchor: { x: 20, y: 20 } }
+      { size: { w: size, h: size }, anchor: { x: c, y: c } }
     );
-    return new H.map.Marker({ lat, lng }, { icon });
+    // Above business markers (default z 0), bigger clusters over smaller
+    // ones, and below the user's location dot (z 1000).
+    return new H.map.Marker(
+      { lat, lng },
+      { icon, zIndex: 100 + Math.min(count, 899) }
+    );
   };
 
   // Builds a single business marker (off-map). Returns null if the location
