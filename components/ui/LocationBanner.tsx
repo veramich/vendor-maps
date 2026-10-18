@@ -2,10 +2,37 @@
 
 import { useState } from "react";
 import type { LocationStatus } from "@/components/map/useUserLocation";
+import { locationSettingsSteps } from "@/lib/utils/locationSettingsSteps";
 
 // Remembers that the user dismissed the banner so we don't nag them every
 // visit. (Their actual grant/deny lives in the browser's permission store.)
 const DISMISS_KEY = "vm-location-banner-dismissed";
+
+const PRIMARY_BUTTON: React.CSSProperties = {
+  background: "#ea580c",
+  color: "white",
+  border: "none",
+  cursor: "pointer",
+  fontSize: "13px",
+  fontWeight: 600,
+  padding: "8px 14px",
+  borderRadius: "8px",
+  whiteSpace: "nowrap",
+};
+
+// Plain blue text, like the system "Settings" action people know from
+// permission prompts.
+const LINK_BUTTON: React.CSSProperties = {
+  background: "none",
+  border: "none",
+  cursor: "pointer",
+  fontSize: "13px",
+  fontWeight: 600,
+  color: "#007AFF",
+  padding: "8px 10px",
+  borderRadius: "8px",
+  whiteSpace: "nowrap",
+};
 
 // Asks for location ("prompt") or explains that it's blocked ("blocked").
 // The location watch itself lives in useUserLocation; this only renders.
@@ -30,6 +57,9 @@ export default function LocationBanner({
       ? 0
       : null
   );
+
+  // Settings steps for this browser, once "Open settings" is tapped.
+  const [steps, setSteps] = useState<string | null>(null);
 
   const handleDismiss = () => {
     localStorage.setItem(DISMISS_KEY, "1");
@@ -64,8 +94,11 @@ export default function LocationBanner({
           boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
           padding: "14px 16px",
           display: "flex",
-          alignItems: "center",
-          gap: "12px",
+          // The blocked message is long, so its action wraps onto its own
+          // line under the text; × stays pinned to the top corner.
+          alignItems: state === "blocked" ? "flex-start" : "center",
+          flexWrap: state === "blocked" ? "wrap" : undefined,
+          gap: "4px 12px",
         }}
       >
         {/* Location pin icon */}
@@ -89,10 +122,14 @@ export default function LocationBanner({
             <p style={{ margin: 0, fontSize: "13px", lineHeight: 1.4, color: "#4b5563" }}>
               See vendors near you and center the map on your location.
             </p>
+          ) : steps ? (
+            <p style={{ margin: 0, fontSize: "13px", lineHeight: 1.4, color: "#4b5563" }}>
+              {steps} Then reload this page.
+            </p>
           ) : (
             <p style={{ margin: 0, fontSize: "13px", lineHeight: 1.4, color: "#4b5563" }}>
               Location is blocked. To use it, allow location for this site in your
-              browser&rsquo;s site settings, then reload.
+              browser&rsquo;s site settings.
             </p>
           )}
         </div>
@@ -114,39 +151,54 @@ export default function LocationBanner({
             >
               Not now
             </button>
-            <button
-              onClick={onEnable}
-              style={{
-                background: "#ea580c",
-                color: "white",
-                border: "none",
-                cursor: "pointer",
-                fontSize: "13px",
-                fontWeight: 600,
-                padding: "8px 14px",
-                borderRadius: "8px",
-                whiteSpace: "nowrap",
-              }}
-            >
+            <button onClick={onEnable} style={PRIMARY_BUTTON}>
               Enable
             </button>
           </>
         ) : (
-          <button
-            onClick={handleDismiss}
-            aria-label="Dismiss"
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              fontSize: "18px",
-              color: "#9ca3af",
-              lineHeight: 1,
-              padding: "4px 8px",
-            }}
-          >
-            ×
-          </button>
+          <>
+            <button
+              onClick={handleDismiss}
+              aria-label="Dismiss"
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontSize: "18px",
+                color: "#9ca3af",
+                lineHeight: 1,
+                padding: "4px 8px",
+                // Lines the × up with the first line of text.
+                marginTop: "-4px",
+              }}
+            >
+              ×
+            </button>
+            {/* Full-width row, so it wraps below the text. Reload matters for
+                home-screen installs, which have no browser reload button to
+                pick up the changed setting. */}
+            <div
+              style={{
+                flexBasis: "100%",
+                display: "flex",
+                justifyContent: "flex-end",
+                marginBottom: "-6px",
+              }}
+            >
+              {steps ? (
+                <button onClick={() => window.location.reload()} style={LINK_BUTTON}>
+                  Reload
+                </button>
+              ) : (
+                <button
+                  onClick={() => setSteps(locationSettingsSteps())}
+                  style={LINK_BUTTON}
+                >
+                  Open settings
+                </button>
+              )}
+            </div>
+          </>
         )}
       </div>
     </div>

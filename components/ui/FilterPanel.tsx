@@ -17,6 +17,7 @@ import {
   EVENT_TIME_OPTIONS,
   activeFilterCount,
 } from "@/lib/businessFilters";
+import { locationSettingsSteps } from "@/lib/utils/locationSettingsSteps";
 
 const FILTER_ICON =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAgElEQVR4nO2USw6AIAwFZyEeHT/xVHIV2Ogh6oaVIVqFqDFM0mX7IJ0U/o4BJmAFAtADbcmAEZBddXeHucQwSVRQ9LicAK/ombW/GhLNloI0cQ9LfLktveRXMJ9V1yktEoW6WZqKQl21pimqunxXwzNc5gWVnGvqLwYcalo1fJYNcB+WiL9w4H8AAAAASUVORK5CYII=";
@@ -62,6 +63,8 @@ export default function FilterPanel({
   const [geoStatus, setGeoStatus] = useState<GeoStatus>(
     value.lat != null ? "granted" : "idle"
   );
+  // Settings steps for this browser, once "open settings" is tapped.
+  const [geoSteps, setGeoSteps] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Sync the draft from the committed value each time the panel opens. This is
@@ -242,8 +245,22 @@ export default function FilterPanel({
                 )}
                 {draft.radiusMi != null && geoStatus === "blocked" && (
                   <p className="text-xs text-red-500 mt-2">
-                    Location access is blocked. Enable it for this site in your
-                    browser settings, then{" "}
+                    Location access is blocked.{" "}
+                    {geoSteps ? (
+                      <>{geoSteps} Then{" "}</>
+                    ) : (
+                      <>
+                        Enable it for this site in your browser settings (
+                        <button
+                          onClick={() => setGeoSteps(locationSettingsSteps())}
+                          className="underline"
+                          type="button"
+                        >
+                          open settings
+                        </button>
+                        ), then{" "}
+                      </>
+                    )}
                     <button
                       onClick={requestLocation}
                       className="underline"
