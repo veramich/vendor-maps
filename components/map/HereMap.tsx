@@ -131,6 +131,9 @@ interface HereMapProps {
   selected?: MapLocation | null;
   /** Content of the popup bubble shown above the selected marker. */
   renderPopup?: (location: MapLocation) => ReactNode;
+  /** Where tapping the popup goes. The link wraps the whole popup, tail
+   *  included, so renderPopup content shouldn't add a link of its own. */
+  getPopupHref?: (location: MapLocation) => string;
   /** Called when the popup should close: a tap on empty map, or the selected
    *  marker leaving the map (e.g. folding into a cluster on zoom-out). The
    *  parent should clear `selected`. */
@@ -156,6 +159,7 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
     userLocation = null,
     selected = null,
     renderPopup,
+    getPopupHref,
     onPopupClose,
     getPopupInsets,
   },
@@ -801,20 +805,31 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
                 filter: "drop-shadow(0 4px 14px rgba(0,0,0,0.18))",
               }}
             >
-              <div style={{ background: "white", borderRadius: "12px" }}>
-                {renderPopup(selected)}
-              </div>
-              <div
-                aria-hidden
+              {/* One link around the bubble and its tail, so the whole popup
+                  is a single tap target. */}
+              <a
+                href={getPopupHref?.(selected)}
                 style={{
-                  width: 0,
-                  height: 0,
-                  margin: "0 auto",
-                  borderLeft: "9px solid transparent",
-                  borderRight: "9px solid transparent",
-                  borderTop: "10px solid white",
+                  display: "block",
+                  color: "inherit",
+                  textDecoration: "none",
                 }}
-              />
+              >
+                <div style={{ background: "white", borderRadius: "12px" }}>
+                  {renderPopup(selected)}
+                </div>
+                <div
+                  aria-hidden
+                  style={{
+                    width: 0,
+                    height: 0,
+                    margin: "0 auto",
+                    borderLeft: "9px solid transparent",
+                    borderRight: "9px solid transparent",
+                    borderTop: "10px solid white",
+                  }}
+                />
+              </a>
             </motion.div>
           </div>
         </div>

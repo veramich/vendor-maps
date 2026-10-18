@@ -104,6 +104,7 @@ export default function MapPage() {
         onPopupClose={closePopup}
         getPopupInsets={getPopupInsets}
         renderPopup={(location) => <BusinessPopup location={location} />}
+        getPopupHref={(location) => `/${location.slug || location.id}`}
       />
 
       {/* In-app location request — shows a banner instead of letting the
@@ -277,16 +278,16 @@ export default function MapPage() {
 const POPUP_COVER_WIDTH = 240;
 const POPUP_COVER_HEIGHT = 135;
 
-// Popup content: the business name is the whole button, with a brand-orange
-// arrow badge so it reads as tappable. A listing with a cover photo shows it
-// above the name. HereMap supplies the white bubble, the tail pointing at the
-// marker, and the pop-out animation around it. There is no close button;
-// tapping empty map (or another marker) dismisses it.
+// Popup content: the business name with a brand-orange arrow badge so it reads
+// as tappable. A listing with a cover photo shows it above the name. HereMap
+// supplies the white bubble, the tail pointing at the marker, the pop-out
+// animation, and the link (getPopupHref) that makes the whole popup, tail
+// included, one tap target. There is no close button; tapping empty map (or
+// another marker) dismisses it.
 function BusinessPopup({ location }: { location: MapLocation }) {
   const cover = location.image_url;
   return (
-    <a
-      href={`/${location.slug || location.id}`}
+    <div
       style={{
         display: "block",
         // The bubble is max-content, so a cover needs a set width to fill;
@@ -298,7 +299,6 @@ function BusinessPopup({ location }: { location: MapLocation }) {
         fontSize: "14px",
         fontWeight: 600,
         lineHeight: 1.3,
-        textDecoration: "none",
       }}
     >
       {/* Fixed height, so the bubble's size is known before the photo loads
@@ -358,6 +358,6 @@ function BusinessPopup({ location }: { location: MapLocation }) {
           </svg>
         </span>
       </span>
-    </a>
+    </div>
   );
 }
