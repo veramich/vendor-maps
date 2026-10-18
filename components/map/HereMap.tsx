@@ -42,6 +42,12 @@ export interface MapLocation {
 
 const CLUSTER_ZOOM_THRESHOLD = 12;
 
+// Zoom used when centering on the visitor: the automatic pan on the first fix
+// keeps a neighborhood-wide view of nearby vendors, while the locate button
+// zooms in to street level. Neither zooms out if the map is already closer.
+const AUTO_RECENTER_ZOOM = 13;
+const LOCATE_ZOOM = 15;
+
 // Business markers are 40px circles centered on their point (outer edge ~19.5px
 // out), so the popup's tail tip sits this far above the point to just clear
 // the marker's top edge.
@@ -134,7 +140,8 @@ interface HereMapProps {
 
 /** Imperative API exposed to parents via ref. */
 export interface HereMapHandle {
-  /** Pan/zoom back to the visitor's current position. No-op if no fix yet. */
+  /** Pan and zoom in to the visitor's current position. Before the first fix
+   *  (location just enabled), does so as soon as the fix arrives. */
   recenter: () => void;
 }
 
@@ -166,9 +173,11 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
   // Latest known position, mirrored into a ref so initMap can place the dot
   // immediately if a fix arrived before the map finished loading.
   const userLocationRef = useRef(userLocation);
-  // True until we've recentered the map on the first geolocation fix, so we
-  // only auto-pan once and don't fight the user panning afterwards.
-  const pendingRecenterRef = useRef(true);
+  // Zoom to center on the visitor with once the next geolocation fix lands,
+  // or null when nothing is waiting. Starts armed so the first fix auto-pans
+  // the map (once — we don't fight the user panning afterwards); recenter()
+  // re-arms it when tapped before any fix has arrived.
+  const pendingRecenterZoomRef = useRef<number | null>(AUTO_RECENTER_ZOOM);
   const onMarkerTapRef = useRef(onMarkerTap);
   // Monotonic token: every render request bumps it. A render only touches the
   // map if it is still the latest request, so stale/overlapping renders abort
@@ -260,15 +269,38 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
     );
   };
 
+  // Flies the view to the visitor, zooming in to at least `zoom`.
+  const centerOnUser = (
+    map: HMap,
+    fix: { lat: number; lng: number },
+    zoom: number
+  ) => {
+    map.getViewModel().setLookAtData(
+      { position: fix, zoom: Math.max(map.getZoom(), zoom) },
+      true
+    );
+  };
+
+  // Runs a recenter that was waiting on a fix, if any.
+  const flushPendingRecenter = (
+    map: HMap,
+    fix: { lat: number; lng: number }
+  ) => {
+    const zoom = pendingRecenterZoomRef.current;
+    if (zoom == null) return;
+    pendingRecenterZoomRef.current = null;
+    centerOnUser(map, fix, zoom);
+  };
+
   useImperativeHandle(ref, () => ({
     recenter: () => {
       const map = mapInstance.current;
       const fix = userLocationRef.current;
-      if (!map || !fix) return;
-      map.getViewModel().setLookAtData(
-        { position: fix, zoom: Math.max(map.getZoom(), 13) },
-        true
-      );
+      if (!map || !fix) {
+        pendingRecenterZoomRef.current = LOCATE_ZOOM;
+        return;
+      }
+      centerOnUser(map, fix, LOCATE_ZOOM);
     },
   }), []);
 
@@ -615,13 +647,7 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
         if (fix) {
           userMarkerRef.current = createUserMarker(H, fix.lat, fix.lng);
           map.addObject(userMarkerRef.current);
-          if (pendingRecenterRef.current) {
-            pendingRecenterRef.current = false;
-            map.getViewModel().setLookAtData(
-              { position: fix, zoom: Math.max(map.getZoom(), 13) },
-              true
-            );
-          }
+          flushPendingRecenter(map, fix);
         }
 
         // Only re-render when crossing the cluster/individual threshold,
@@ -716,14 +742,11 @@ const HereMap = forwardRef<HereMapHandle, HereMapProps>(function HereMap(
       map.addObject(userMarkerRef.current);
     }
 
-    // Pan to the visitor once, on the first fix only.
-    if (pendingRecenterRef.current) {
-      pendingRecenterRef.current = false;
-      map.getViewModel().setLookAtData(
-        { position: { lat, lng }, zoom: Math.max(map.getZoom(), 13) },
-        true
-      );
-    }
+    // Pan to the visitor on the first fix, or after a locate tap that came
+    // before any fix.
+    flushPendingRecenter(map, { lat, lng });
+    // Keyed on the position only: the helpers read everything else from refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userLocation]);
 
   return (

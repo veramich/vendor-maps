@@ -2,9 +2,11 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import SearchBar from "@/components/ui/SearchBar";
 import FilterPanel from "@/components/ui/FilterPanel";
 import LocationBanner from "@/components/ui/LocationBanner";
+import { useUserLocation } from "@/components/map/useUserLocation";
 import type {
   HereMapHandle,
   MapLocation,
@@ -22,10 +24,16 @@ export default function MapPage() {
   const [inputValue, setInputValue] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState<BusinessFilters>(EMPTY_FILTERS);
-  const [userLocation, setUserLocation] = useState<{
-    lat: number;
-    lng: number;
-  } | null>(null);
+  // Location is requested via a tap (the in-app banner or the locate button)
+  // rather than firing the native prompt on load — unsolicited prompts get
+  // auto-blocked by browsers. Position fixes keep the "you are here" dot live.
+  const {
+    location: userLocation,
+    status: locationStatus,
+    start: startLocation,
+  } = useUserLocation();
+  // Bumped to re-show the "location is blocked" help from the locate button.
+  const [locationHelpSignal, setLocationHelpSignal] = useState(0);
   const mapHandleRef = useRef<HereMapHandle>(null);
   const searchOverlayRef = useRef<HTMLDivElement>(null);
 
@@ -38,10 +46,19 @@ export default function MapPage() {
     return { top: overlay ? overlay.offsetTop + overlay.offsetHeight : 0 };
   }, []);
 
-  // Location is requested via an in-app banner (LocationBanner) rather than
-  // firing the native prompt on load — unsolicited prompts get auto-blocked by
-  // browsers. The banner only calls geolocation after a user taps "Enable",
-  // then streams position fixes here to keep the "you are here" dot in sync.
+  // Locate button: zoom in to the visitor. Without a fix yet, this tap is the
+  // user gesture that lets us ask for location, and the map zooms in once the
+  // fix arrives. If the browser has blocked location, explain how to allow it.
+  const handleLocate = () => {
+    if (locationStatus === "denied") {
+      setLocationHelpSignal((n) => n + 1);
+      return;
+    }
+    startLocation();
+    mapHandleRef.current?.recenter();
+  };
+  // Watching but no fix yet — the button pulses so the tap reads as working.
+  const locating = locationStatus === "watching" && !userLocation;
 
   const handleSearch = (q: string) => {
     setSearchQuery(q.trim());
@@ -89,15 +106,21 @@ export default function MapPage() {
 
       {/* In-app location request — shows a banner instead of letting the
           browser auto-fire (and auto-block) the native permission prompt. */}
-      <LocationBanner onLocation={setUserLocation} />
+      <LocationBanner
+        status={locationStatus}
+        onEnable={startLocation}
+        reopenSignal={locationHelpSignal}
+      />
 
-      {/* Recenter-on-me control — only useful once we have a fix. */}
-      {userLocation && (
+      {/* Locate-me control, available any time the browser supports
+          geolocation (it requests permission itself when needed). */}
+      {locationStatus !== "unsupported" && (
         <button
           type="button"
-          onClick={() => mapHandleRef.current?.recenter()}
-          aria-label="Center map on my location"
-          title="Center on my location"
+          onClick={handleLocate}
+          aria-label="Zoom to my location"
+          aria-busy={locating}
+          title="Zoom to my location"
           style={{
             position: "absolute",
             right: "12px",
@@ -115,22 +138,24 @@ export default function MapPage() {
             boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
           }}
         >
-          <svg
-            width="22"
-            height="22"
+          {/* Navigation arrow, in the "you are here" dot's blue. */}
+          <motion.svg
+            width="20"
+            height="20"
             viewBox="0 0 24 24"
-            fill="none"
+            fill="#4285F4"
             stroke="#4285F4"
             strokeWidth="2"
-            strokeLinecap="round"
             strokeLinejoin="round"
+            animate={{ opacity: locating ? [1, 0.3, 1] : 1 }}
+            transition={
+              locating
+                ? { duration: 1.2, repeat: Infinity, ease: "easeInOut" }
+                : { duration: 0.15 }
+            }
           >
-            <circle cx="12" cy="12" r="3" />
-            <line x1="12" y1="2" x2="12" y2="5" />
-            <line x1="12" y1="19" x2="12" y2="22" />
-            <line x1="2" y1="12" x2="5" y2="12" />
-            <line x1="19" y1="12" x2="22" y2="12" />
-          </svg>
+            <polygon points="3 11 22 2 13 21 11 13 3 11" />
+          </motion.svg>
         </button>
       )}
 

@@ -1,101 +1,45 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import type { LocationStatus } from "@/components/map/useUserLocation";
 
 // Remembers that the user dismissed the banner so we don't nag them every
 // visit. (Their actual grant/deny lives in the browser's permission store.)
 const DISMISS_KEY = "vm-location-banner-dismissed";
 
-type Coords = { lat: number; lng: number };
-
-// "hidden" until we've decided whether to show it (avoids a flash);
-// "prompt" = show the banner; "blocked" = browser denied, show help.
-type BannerState = "hidden" | "prompt" | "blocked";
-
+// Asks for location ("prompt") or explains that it's blocked ("blocked").
+// The location watch itself lives in useUserLocation; this only renders.
 export default function LocationBanner({
-  onLocation,
+  status,
+  onEnable,
+  reopenSignal,
 }: {
-  // Called with each position fix once the user enables location.
-  onLocation: (c: Coords) => void;
+  status: LocationStatus;
+  // Starts the location watch. Called from the Enable tap — a genuine user
+  // gesture — so the native prompt is shown instead of auto-suppressed.
+  onEnable: () => void;
+  // Bumped when the user asks for location while it's blocked (the map's
+  // locate button), re-showing the banner even if it was dismissed.
+  reopenSignal: number;
 }) {
-  const [state, setState] = useState<BannerState>("hidden");
-  const watchIdRef = useRef<number | null>(null);
-
-  // Starts the live position watch. Called only after a user gesture (Enable)
-  // or when permission is already granted.
-  const startWatch = useCallback(() => {
-    if (watchIdRef.current != null) return;
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (pos) => onLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      (err) => {
-        // PERMISSION_DENIED === 1
-        if (err.code === 1) setState("blocked");
-      },
-      { enableHighAccuracy: true, maximumAge: 30000, timeout: 15000 }
-    );
-  }, [onLocation]);
-
-  // Decide whether to show the banner on mount. We do NOT call geolocation
-  // here — that's what auto-triggers (and gets auto-blocked) the native
-  // prompt. We only read the existing permission state, then update state in
-  // an async callback (never synchronously in the effect body).
-  useEffect(() => {
-    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
-      return;
-    }
-    if (localStorage.getItem(DISMISS_KEY) === "1") return;
-
-    let cancelled = false;
-
-    const decide = (permission?: PermissionState) => {
-      if (cancelled) return;
-      if (permission === "granted") {
-        startWatch(); // already allowed — watch silently, no banner
-      } else if (permission === "denied") {
-        setState("blocked"); // permanently blocked — "Enable" wouldn't help
-      } else {
-        setState("prompt"); // "prompt"/unknown — let the user opt in
-      }
-    };
-
-    if (navigator.permissions?.query) {
-      navigator.permissions
-        .query({ name: "geolocation" as PermissionName })
-        .then((res) => decide(res.state))
-        .catch(() => decide(undefined));
-    } else {
-      // No Permissions API: defer to a microtask so we don't setState
-      // synchronously inside the effect body.
-      Promise.resolve().then(() => decide(undefined));
-    }
-
-    return () => {
-      cancelled = true;
-    };
-  }, [startWatch]);
-
-  // Clear the watch on unmount.
-  useEffect(() => {
-    return () => {
-      if (watchIdRef.current != null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-      }
-    };
-  }, []);
-
-  const handleEnable = () => {
-    // This runs inside the click handler — a genuine user gesture — so the
-    // native prompt is shown reliably instead of being auto-suppressed.
-    setState("hidden");
-    startWatch();
-  };
+  // The reopenSignal the banner was dismissed at, or null if it hasn't been.
+  // A later signal no longer matches, so the banner shows again. A dismissal
+  // from a past visit counts as dismissed at the initial signal (0).
+  const [dismissedAt, setDismissedAt] = useState<number | null>(() =>
+    typeof window !== "undefined" && localStorage.getItem(DISMISS_KEY) === "1"
+      ? 0
+      : null
+  );
 
   const handleDismiss = () => {
     localStorage.setItem(DISMISS_KEY, "1");
-    setState("hidden");
+    setDismissedAt(reopenSignal);
   };
 
-  if (state === "hidden") return null;
+  // "prompt" = let the user opt in; "blocked" = browser denied, show help.
+  const state =
+    status === "prompt" ? "prompt" : status === "denied" ? "blocked" : null;
+  if (!state || dismissedAt === reopenSignal) return null;
 
   return (
     <div
@@ -171,7 +115,7 @@ export default function LocationBanner({
               Not now
             </button>
             <button
-              onClick={handleEnable}
+              onClick={onEnable}
               style={{
                 background: "#ea580c",
                 color: "white",
