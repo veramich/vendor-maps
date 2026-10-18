@@ -3,8 +3,7 @@ import sql from "@/lib/db";
 import Link from "next/link";
 import SaveButton from "@/components/ui/SaveButton";
 import OwnerResponse from "@/components/ui/OwnerResponse";
-import PhotoLightbox from "@/components/ui/PhotoLightbox";
-import BannerImage from "@/components/ui/BannerImage";
+import BannerGallery from "@/components/ui/BannerGallery";
 import AddressLink from "@/components/ui/AddressLink";
 import ReportListingButton from
   "@/components/ui/ReportListingButton";
@@ -356,10 +355,6 @@ export default async function BusinessProfilePage({
     .filter(Boolean)
     .join(", ");
 
-  const coverImage =
-    images.find((img) => img.is_primary) ||
-    images[0];
-
   const jsonLd = buildBusinessJsonLd({
     business: business as unknown as BusinessRow,
     images,
@@ -376,10 +371,11 @@ export default async function BusinessProfilePage({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      {/* Cover image */}
-      {coverImage ? (
-        <BannerImage
-          src={coverImage.cloudinary_url}
+      {/* Cover photo gallery — images are ordered primary-first, so the
+          primary photo is the first slide. */}
+      {images.length > 0 ? (
+        <BannerGallery
+          photos={images}
           businessName={business.name}
         />
       ) : (
@@ -952,21 +948,6 @@ export default async function BusinessProfilePage({
                 />
               )}
             </div>
-          </div>
-        )}
-
-        {/* Image gallery */}
-        {images.length > 1 && (
-          <div className="py-5 border-b
-            border-gray-100">
-            <h2 className="text-sm font-semibold
-              text-black mb-3">
-              Photos
-            </h2>
-            <PhotoLightbox
-              photos={images}
-              businessName={business.name}
-            />
           </div>
         )}
 

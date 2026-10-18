@@ -49,7 +49,14 @@ export async function GET(req: NextRequest) {
         ST_X(l.coordinates) as lng,
         ST_Y(l.coordinates) as lat,
         l.neighborhood,
-        l.city
+        l.city,
+        (
+          SELECT bi.cloudinary_url
+          FROM business_images bi
+          WHERE bi.business_id = b.id
+          ORDER BY bi.is_primary DESC, bi.display_order ASC
+          LIMIT 1
+        ) AS image_url
       FROM businesses b
       JOIN locations l ON l.business_id = b.id
       LEFT JOIN categories cat ON cat.id = b.category_id

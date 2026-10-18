@@ -3,8 +3,8 @@
 import { useEffect, useCallback, useRef } from "react";
 
 export interface LightboxPhoto {
-  // Used by PhotoLightbox's thumbnail grid as a React key; Lightbox itself
-  // only needs cloudinary_url, so id is optional for single-photo callers.
+  // Used by BannerGallery's slides as a React key; Lightbox itself only
+  // needs cloudinary_url, so id is optional.
   id?: string;
   cloudinary_url: string;
 }

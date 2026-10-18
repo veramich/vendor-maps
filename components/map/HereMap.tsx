@@ -38,6 +38,8 @@ export interface MapLocation {
   lat: number;
   neighborhood: string | null;
   city: string | null;
+  /** Cover photo (primary image, else first by display order), if any. */
+  image_url: string | null;
 }
 
 const CLUSTER_ZOOM_THRESHOLD = 12;

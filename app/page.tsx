@@ -1,8 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import { useCallback, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import { CLD } from "@/lib/utils/cldUrl";
 import SearchBar from "@/components/ui/SearchBar";
 import FilterPanel from "@/components/ui/FilterPanel";
 import LocationBanner from "@/components/ui/LocationBanner";
@@ -272,20 +274,25 @@ export default function MapPage() {
   );
 }
 
+const POPUP_COVER_WIDTH = 240;
+const POPUP_COVER_HEIGHT = 135;
+
 // Popup content: the business name is the whole button, with a brand-orange
-// arrow badge so it reads as tappable. HereMap supplies the white bubble, the
-// tail pointing at the marker, and the pop-out animation around it. There is
-// no close button; tapping empty map (or another marker) dismisses it.
+// arrow badge so it reads as tappable. A listing with a cover photo shows it
+// above the name. HereMap supplies the white bubble, the tail pointing at the
+// marker, and the pop-out animation around it. There is no close button;
+// tapping empty map (or another marker) dismisses it.
 function BusinessPopup({ location }: { location: MapLocation }) {
+  const cover = location.image_url;
   return (
     <a
       href={`/${location.slug || location.id}`}
       style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "10px",
+        display: "block",
+        // The bubble is max-content, so a cover needs a set width to fill;
+        // without one the bubble hugs the name.
+        width: cover ? `${POPUP_COVER_WIDTH}px` : undefined,
         maxWidth: "240px",
-        padding: "10px 10px 10px 14px",
         color: "#111",
         fontFamily: "sans-serif",
         fontSize: "14px",
@@ -294,33 +301,62 @@ function BusinessPopup({ location }: { location: MapLocation }) {
         textDecoration: "none",
       }}
     >
-      <span style={{ minWidth: 0 }}>{location.name}</span>
+      {/* Fixed height, so the bubble's size is known before the photo loads
+          and HereMap's pan-into-view measures it correctly. alt is empty:
+          the name right below already labels the link. */}
+      {cover && (
+        <Image
+          src={CLD.popup(cover)}
+          alt=""
+          width={POPUP_COVER_WIDTH}
+          height={POPUP_COVER_HEIGHT}
+          unoptimized
+          style={{
+            display: "block",
+            width: "100%",
+            height: `${POPUP_COVER_HEIGHT}px`,
+            objectFit: "cover",
+            borderRadius: "12px 12px 0 0",
+            background: "#f3f4f6",
+          }}
+        />
+      )}
       <span
-        aria-hidden
         style={{
-          flexShrink: 0,
-          width: "24px",
-          height: "24px",
-          borderRadius: "9999px",
-          background: "#FF7300",
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
+          gap: "10px",
+          padding: "10px 10px 10px 14px",
         }}
       >
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="white"
-          strokeWidth="2.75"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+        <span style={{ minWidth: 0 }}>{location.name}</span>
+        <span
+          aria-hidden
+          style={{
+            flexShrink: 0,
+            width: "24px",
+            height: "24px",
+            borderRadius: "9999px",
+            background: "#FF7300",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
-          <line x1="5" y1="12" x2="19" y2="12" />
-          <polyline points="12 5 19 12 12 19" />
-        </svg>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="white"
+            strokeWidth="2.75"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="5" y1="12" x2="19" y2="12" />
+            <polyline points="12 5 19 12 12 19" />
+          </svg>
+        </span>
       </span>
     </a>
   );

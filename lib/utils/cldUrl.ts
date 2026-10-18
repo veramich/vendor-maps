@@ -36,6 +36,8 @@ export const CLD = {
   thumb: (url?: string | null) => cldUrl(url, "w_88,h_88,c_fill,g_auto"),
   // ~200px square gallery-grid thumbnails (@2x = 400px).
   square: (url?: string | null) => cldUrl(url, "w_400,h_400,c_fill,g_auto"),
+  // Cover strip in the map marker popup (240x135 box @2x).
+  popup: (url?: string | null) => cldUrl(url, "w_480,h_270,c_fill,g_auto"),
   // Card cover image in list views (~ full-width-ish small card).
   card: (url?: string | null) => cldUrl(url, "w_800,c_fill,g_auto"),
   // Hero / cover photo on the business detail page.
